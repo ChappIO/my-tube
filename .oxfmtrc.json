@@ -9,6 +9,7 @@
     "**/routeTree.gen.ts",
     "pnpm-lock.yaml",
     ".local/**",
-    "design_handoff_mytube/**"
+    "design_handoff_mytube/**",
+    ".claude/worktrees/**"
   ]
 }
