@@ -14,8 +14,9 @@ packages/web/src
   main.tsx            router + QueryClientProvider + root render
   routes/             TanStack Router file-based routes
     __root.tsx        layout shell
-    index.tsx         /
+    index.tsx         /  (see Routing for the full list)
     dev/              /dev/* visual reference pages (/dev/tokens, /dev/logo)
+  navigation.ts       tab ids, defaults and labels for the tabbed sections
   components/
     brand/            LogoMark, Wordmark, LogoLockup
     icons.tsx         the icon set (Lucide wrappers + BellIcon)
@@ -28,8 +29,48 @@ packages/web/src
 ## Routing
 
 - File-based routing via `@tanstack/router-plugin`. Adding a file under `src/routes` adds a route; the plugin regenerates `routeTree.gen.ts` while `pnpm dev` or `pnpm build` runs.
-- Planned routes from the design handoff: `/`, `/music/$tab`, `/video/$tab`, `/video/channel/$id`, `/activity`, `/settings/$tab`.
 - Export `Route = createFileRoute('/path')({ component })` from each route file. Keep the page component in the same file unless it is reused.
+
+### Route files
+
+| File                    | Path                 | Notes                                                          |
+| ----------------------- | -------------------- | -------------------------------------------------------------- |
+| `index.tsx`             | `/`                  | Home, "What's new"                                             |
+| `music.index.tsx`       | `/music`             | redirects to `/music/albums`                                   |
+| `music.$tab.tsx`        | `/music/$tab`        | `artists`, `albums`, `playlists`, `tracks`                     |
+| `video.index.tsx`       | `/video`             | redirects to `/video/videos`                                   |
+| `video.$tab.tsx`        | `/video/$tab`        | `videos`, `channels`                                           |
+| `video.channel.$id.tsx` | `/video/channel/$id` | channel page; `id` is an opaque string passed to the API as is |
+| `activity.tsx`          | `/activity`          |                                                                |
+| `settings.index.tsx`    | `/settings`          | redirects to `/settings/general`                               |
+| `settings.$tab.tsx`     | `/settings/$tab`     | `general`, `music`, `video`, `advanced`                        |
+| `dev/*`                 | `/dev/*`             | demo pages, see below                                          |
+
+The screens are still placeholders built on `src/components/PlaceholderPage.tsx`. Delete that file once the last screen replaces it. The app shell highlights the current section from the pathname (`useLocation()` or `Link`'s active state); pages expose nothing else for it.
+
+### Tabs: the `navigation.ts` contract
+
+`src/navigation.ts` is the single source for tabbed sections. The shell, the tab pills and the screens import from it; never repeat a tab id or label as a string literal elsewhere.
+
+- `MUSIC_TABS`, `VIDEO_TABS`, `SETTINGS_TABS`: readonly tuples of the lowercase URL ids, in display order.
+- `MusicTab`, `VideoTab`, `SettingsTab`: their union types.
+- `DEFAULT_MUSIC_TAB` (`albums`), `DEFAULT_VIDEO_TAB` (`videos`), `DEFAULT_SETTINGS_TAB` (`general`).
+- `TAB_LABELS`: display label per tab id (`albums` → `Albums`). The ids are unique across sections.
+- `parseTab(tabs, value)`: the tab, or `undefined` when `value` is not one of `tabs` (exact, lowercase).
+
+### Typed params and redirects
+
+- A `$tab` route declares `params: { parse, stringify }`. `parse` returns `{ tab: MusicTab }` (annotate the return type), so `Route.useParams()` and `Link`'s `params` are typed with the union.
+- An unknown tab never renders: `parse` throws `redirect({ to, params: { tab: DEFAULT_… }, replace: true })`. The router runs `parse` while matching, before `beforeLoad`, and treats a thrown redirect as a redirect, so this is the one place the check lives.
+- A bare section (`/music`) has a `*.index.tsx` route with only `beforeLoad: () => { throw redirect({ …, replace: true }) }`.
+- Always `replace: true` on these redirects so browser back skips the URL that redirected.
+- Link to a tab with `<Link to="/music/$tab" params={{ tab: 'tracks' }}>`; link to a section with its default tab rather than the bare path, which saves a redirect.
+
+### Adding a tabbed section
+
+1. Add `FOO_TABS`, `FooTab`, `DEFAULT_FOO_TAB` and the labels to `navigation.ts`, and cover them in `navigation.spec.ts`.
+2. Add `foo.$tab.tsx` with the `params` block above and `foo.index.tsx` with the redirect.
+3. Run `pnpm dev` or `pnpm build` so the plugin regenerates `routeTree.gen.ts`, and commit it.
 
 ## Data fetching
 

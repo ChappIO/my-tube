@@ -10,12 +10,25 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as DevLogoRouteImport } from './routes/dev/logo'
 import { Route as DevTokensRouteImport } from './routes/dev/tokens'
+import { Route as MusicIndexRouteImport } from './routes/music.index'
+import { Route as MusicTabRouteImport } from './routes/music.$tab'
+import { Route as SettingsIndexRouteImport } from './routes/settings.index'
+import { Route as SettingsTabRouteImport } from './routes/settings.$tab'
+import { Route as VideoIndexRouteImport } from './routes/video.index'
+import { Route as VideoTabRouteImport } from './routes/video.$tab'
+import { Route as VideoChannelIdRouteImport } from './routes/video.channel.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ActivityRoute = ActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DevLogoRoute = DevLogoRouteImport.update({
@@ -28,35 +41,136 @@ const DevTokensRoute = DevTokensRouteImport.update({
   path: '/dev/tokens',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MusicIndexRoute = MusicIndexRouteImport.update({
+  id: '/music/',
+  path: '/music/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MusicTabRoute = MusicTabRouteImport.update({
+  id: '/music/$tab',
+  path: '/music/$tab',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsTabRoute = SettingsTabRouteImport.update({
+  id: '/settings/$tab',
+  path: '/settings/$tab',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VideoIndexRoute = VideoIndexRouteImport.update({
+  id: '/video/',
+  path: '/video/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VideoTabRoute = VideoTabRouteImport.update({
+  id: '/video/$tab',
+  path: '/video/$tab',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VideoChannelIdRoute = VideoChannelIdRouteImport.update({
+  id: '/video/channel/$id',
+  path: '/video/channel/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/activity': typeof ActivityRoute
   '/dev/logo': typeof DevLogoRoute
   '/dev/tokens': typeof DevTokensRoute
+  '/music/$tab': typeof MusicTabRoute
+  '/settings/$tab': typeof SettingsTabRoute
+  '/video/$tab': typeof VideoTabRoute
+  '/music/': typeof MusicIndexRoute
+  '/settings/': typeof SettingsIndexRoute
+  '/video/': typeof VideoIndexRoute
+  '/video/channel/$id': typeof VideoChannelIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/activity': typeof ActivityRoute
   '/dev/logo': typeof DevLogoRoute
   '/dev/tokens': typeof DevTokensRoute
+  '/music/$tab': typeof MusicTabRoute
+  '/settings/$tab': typeof SettingsTabRoute
+  '/video/$tab': typeof VideoTabRoute
+  '/music': typeof MusicIndexRoute
+  '/settings': typeof SettingsIndexRoute
+  '/video': typeof VideoIndexRoute
+  '/video/channel/$id': typeof VideoChannelIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/activity': typeof ActivityRoute
   '/dev/logo': typeof DevLogoRoute
   '/dev/tokens': typeof DevTokensRoute
+  '/music/$tab': typeof MusicTabRoute
+  '/settings/$tab': typeof SettingsTabRoute
+  '/video/$tab': typeof VideoTabRoute
+  '/music/': typeof MusicIndexRoute
+  '/settings/': typeof SettingsIndexRoute
+  '/video/': typeof VideoIndexRoute
+  '/video/channel/$id': typeof VideoChannelIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dev/logo' | '/dev/tokens'
+  fullPaths:
+    | '/'
+    | '/activity'
+    | '/dev/logo'
+    | '/dev/tokens'
+    | '/music/$tab'
+    | '/settings/$tab'
+    | '/video/$tab'
+    | '/music/'
+    | '/settings/'
+    | '/video/'
+    | '/video/channel/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dev/logo' | '/dev/tokens'
-  id: '__root__' | '/' | '/dev/logo' | '/dev/tokens'
+  to:
+    | '/'
+    | '/activity'
+    | '/dev/logo'
+    | '/dev/tokens'
+    | '/music/$tab'
+    | '/settings/$tab'
+    | '/video/$tab'
+    | '/music'
+    | '/settings'
+    | '/video'
+    | '/video/channel/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/activity'
+    | '/dev/logo'
+    | '/dev/tokens'
+    | '/music/$tab'
+    | '/settings/$tab'
+    | '/video/$tab'
+    | '/music/'
+    | '/settings/'
+    | '/video/'
+    | '/video/channel/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ActivityRoute: typeof ActivityRoute
   DevLogoRoute: typeof DevLogoRoute
   DevTokensRoute: typeof DevTokensRoute
+  MusicTabRoute: typeof MusicTabRoute
+  SettingsTabRoute: typeof SettingsTabRoute
+  VideoTabRoute: typeof VideoTabRoute
+  MusicIndexRoute: typeof MusicIndexRoute
+  SettingsIndexRoute: typeof SettingsIndexRoute
+  VideoIndexRoute: typeof VideoIndexRoute
+  VideoChannelIdRoute: typeof VideoChannelIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -66,6 +180,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/activity': {
+      id: '/activity'
+      path: '/activity'
+      fullPath: '/activity'
+      preLoaderRoute: typeof ActivityRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dev/logo': {
@@ -82,13 +203,70 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DevTokensRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/music/': {
+      id: '/music/'
+      path: '/music'
+      fullPath: '/music/'
+      preLoaderRoute: typeof MusicIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/music/$tab': {
+      id: '/music/$tab'
+      path: '/music/$tab'
+      fullPath: '/music/$tab'
+      preLoaderRoute: typeof MusicTabRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/': {
+      id: '/settings/'
+      path: '/settings'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof SettingsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/$tab': {
+      id: '/settings/$tab'
+      path: '/settings/$tab'
+      fullPath: '/settings/$tab'
+      preLoaderRoute: typeof SettingsTabRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/video/': {
+      id: '/video/'
+      path: '/video'
+      fullPath: '/video/'
+      preLoaderRoute: typeof VideoIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/video/$tab': {
+      id: '/video/$tab'
+      path: '/video/$tab'
+      fullPath: '/video/$tab'
+      preLoaderRoute: typeof VideoTabRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/video/channel/$id': {
+      id: '/video/channel/$id'
+      path: '/video/channel/$id'
+      fullPath: '/video/channel/$id'
+      preLoaderRoute: typeof VideoChannelIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ActivityRoute: ActivityRoute,
   DevLogoRoute: DevLogoRoute,
   DevTokensRoute: DevTokensRoute,
+  MusicTabRoute: MusicTabRoute,
+  SettingsTabRoute: SettingsTabRoute,
+  VideoTabRoute: VideoTabRoute,
+  MusicIndexRoute: MusicIndexRoute,
+  SettingsIndexRoute: SettingsIndexRoute,
+  VideoIndexRoute: VideoIndexRoute,
+  VideoChannelIdRoute: VideoChannelIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
