@@ -1,0 +1,10 @@
+.git
+.github
+.idea
+.local
+node_modules
+**/node_modules
+**/dist
+design_handoff_mytube
+docker-compose.yml
+*.md

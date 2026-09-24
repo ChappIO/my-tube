@@ -36,4 +36,8 @@ The owner and a few friends. No public marketing. UI copy is dry and technical. 
 - `design_handoff_mytube/MyTube App.dc.html`: HTML prototype of every screen, light and dark, wide and narrow.
 - `design_handoff_mytube/Brand Directions.dc.html`: brand board. Only Turn 4 (logo set) and Turn 5 option 5b (playlist stack) are final.
 
-The prototypes are design references, not production code. Technology choices and how things work are documented in skills, not here.
+The prototypes are design references, not production code.
+
+## Working in this repo
+
+Technology choices and conventions live in skills under `.claude/skills`, one per area: `tooling` (workspace, scripts, lint, CI), `backend`, `database`, `frontend` and `deployment`. Read the relevant skill before changing that area. `pnpm dev` starts everything; `pnpm check` runs what CI runs.

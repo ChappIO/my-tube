@@ -1,0 +1,41 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "react", "vitest"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "rules": {
+    "typescript/no-floating-promises": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-extraneous-class": [
+      "error",
+      {
+        "allowWithDecorator": true
+      }
+    ],
+    "react/react-in-jsx-scope": "off",
+    "vitest/require-to-throw-message": "off"
+  },
+  "options": {
+    "typeAware": true
+  },
+  "env": {
+    "es2024": true
+  },
+  "ignorePatterns": ["**/dist/**", "**/routeTree.gen.ts", ".local/**", "design_handoff_mytube/**"],
+  "overrides": [
+    {
+      "files": ["packages/api/**", "packages/shared/**"],
+      "env": {
+        "node": true
+      }
+    },
+    {
+      "files": ["packages/web/**"],
+      "env": {
+        "browser": true
+      }
+    }
+  ]
+}

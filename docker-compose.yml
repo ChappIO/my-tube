@@ -1,0 +1,19 @@
+services:
+  mytube:
+    build:
+      context: .
+      args:
+        APP_VERSION: dev
+    image: mytube:dev
+    container_name: mytube
+    ports:
+      - '8080:8080'
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Amsterdam
+    volumes:
+      - ./.local/config:/config
+      - ./.local/music:/media/music
+      - ./.local/video:/media/video
+    restart: unless-stopped
