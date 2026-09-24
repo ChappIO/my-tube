@@ -1,0 +1,88 @@
+#!/usr/bin/env node
+// A stand-in for the yt-dlp binary in tests. Point YTDLP_PATH (or a YtdlpBinaryLocator) at
+// this file. It never touches the network and mimics the output shapes the real binary
+// produces for the arguments YtdlpRunner builds.
+//
+//   --version                   prints FAKE_YTDLP_VERSION (default 2026.08.19)
+//   --dump-single-json <url>    prints a fixture from ./ytdlp: playlist.json for list= URLs,
+//                               video.json for watch?v= URLs, channel.json otherwise;
+//                               FAKE_YTDLP_FIXTURE overrides with a path
+//   anything else               a download: progress lines on stdout, post-processor lines
+//                               on stderr, then the final file path; creates the file
+//
+// Environment:
+//   FAKE_YTDLP_FAIL=1           print an ERROR line to stderr and exit 1
+//   FAKE_YTDLP_EXIT=<code>      exit code used with FAKE_YTDLP_FAIL (default 1)
+//   FAKE_YTDLP_DELAY_MS=<ms>    delay before each progress line (and before the JSON)
+//   FAKE_YTDLP_STDOUT=<text>    print this instead of a fixture for --dump-single-json
+//   FAKE_YTDLP_ARGS_FILE=<path> write the received argv as JSON to this file
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+
+const args = process.argv.slice(2);
+const env = process.env;
+const delay = Number(env.FAKE_YTDLP_DELAY_MS ?? 0);
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const fixtures = join(import.meta.dirname, 'ytdlp');
+
+if (env.FAKE_YTDLP_ARGS_FILE) writeFileSync(env.FAKE_YTDLP_ARGS_FILE, JSON.stringify(args));
+
+const option = (name) => {
+  const index = args.indexOf(name);
+  return index === -1 ? undefined : args[index + 1];
+};
+const url = args[args.indexOf('--') + 1] ?? '';
+
+if (args.includes('--version')) {
+  process.stdout.write(`${env.FAKE_YTDLP_VERSION ?? '2026.08.19'}\n`);
+  process.exit(0);
+}
+
+if (env.FAKE_YTDLP_FAIL) {
+  await sleep(delay);
+  process.stderr.write('WARNING: [youtube] Falling back to generic n function search\n');
+  process.stderr.write(`ERROR: [youtube] ${url.split('=').pop()}: Video unavailable\n`);
+  process.exit(Number(env.FAKE_YTDLP_EXIT ?? 1));
+}
+
+if (args.includes('--dump-single-json')) {
+  await sleep(delay);
+  if (env.FAKE_YTDLP_STDOUT !== undefined) {
+    process.stdout.write(env.FAKE_YTDLP_STDOUT);
+  } else {
+    const name = url.includes('list=')
+      ? 'playlist.json'
+      : url.includes('watch?v=')
+        ? 'video.json'
+        : 'channel.json';
+    process.stdout.write(readFileSync(env.FAKE_YTDLP_FIXTURE ?? join(fixtures, name)));
+  }
+  process.exit(0);
+}
+
+// Download. The same line shapes the real binary prints with the runner's templates.
+const id = url.split('=').pop() || 'fake';
+const output = (option('-o') ?? '%(id)s.%(ext)s')
+  .replaceAll('%(id)s', id)
+  .replaceAll('%(title)s', 'Fake video')
+  .replaceAll('%(ext)s', 'mp4');
+const total = 3000000;
+const progress = (fields) => process.stdout.write(`[mytube-progress] ${JSON.stringify(fields)}\n`);
+
+for (const downloaded of [1024, 750000, 1500000, 3000000]) {
+  await sleep(delay);
+  const remaining = total - downloaded;
+  progress({
+    status: 'downloading',
+    downloaded_bytes: downloaded,
+    total_bytes: total,
+    speed: 1048576.5,
+    eta: Math.ceil(remaining / 1048576),
+  });
+}
+progress({ status: 'finished', downloaded_bytes: total, total_bytes: total, speed: 1048576.5 });
+process.stderr.write('[mytube-progress] {"status": "started", "postprocessor": "MoveFiles"}\n');
+process.stderr.write('[mytube-progress] {"status": "finished", "postprocessor": "MoveFiles"}\n');
+mkdirSync(dirname(output), { recursive: true });
+writeFileSync(output, 'fake media');
+process.stdout.write(`[mytube-file] ${output}\n`);

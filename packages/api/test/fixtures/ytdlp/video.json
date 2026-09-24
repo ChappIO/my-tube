@@ -1,0 +1,40 @@
+{
+  "id": "90Kgw_SvK4w",
+  "title": "What It Takes",
+  "thumbnails": [
+    {
+      "url": "https://i.ytimg.com/vi/90Kgw_SvK4w/3.jpg",
+      "preference": -37,
+      "id": "0"
+    },
+    {
+      "url": "https://i.ytimg.com/vi_webp/90Kgw_SvK4w/3.webp",
+      "preference": -36,
+      "id": "1"
+    }
+  ],
+  "channel_id": "UCLA_DiR1FfKNvjuUpBHmylQ",
+  "channel_url": "https://www.youtube.com/channel/UCLA_DiR1FfKNvjuUpBHmylQ",
+  "duration": 152,
+  "view_count": 311813,
+  "webpage_url": "https://www.youtube.com/watch?v=90Kgw_SvK4w",
+  "live_status": "not_live",
+  "media_type": "video",
+  "channel": "NASA",
+  "uploader": "NASA",
+  "uploader_id": "@NASA",
+  "uploader_url": "https://www.youtube.com/@NASA",
+  "upload_date": "20260904",
+  "timestamp": 1788544902,
+  "availability": "public",
+  "original_url": "https://www.youtube.com/watch?v=90Kgw_SvK4w",
+  "extractor": "youtube",
+  "extractor_key": "Youtube",
+  "display_id": "90Kgw_SvK4w",
+  "fulltitle": "What It Takes",
+  "duration_string": "2:32",
+  "is_live": false,
+  "was_live": false,
+  "ext": "webm",
+  "_type": "video"
+}
