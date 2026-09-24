@@ -11,7 +11,8 @@ import * as schema from './schema.js';
 export const DATABASE = Symbol('DATABASE');
 export type Database = BetterSQLite3Database<typeof schema>;
 
-const migrationsDir = fileURLToPath(new URL('./migrations/', import.meta.url));
+/** Folder of the SQL migrations, next to this file in src and in dist. */
+export const MIGRATIONS_DIR = fileURLToPath(new URL('./migrations/', import.meta.url));
 
 export function openDatabase(file: string): { db: Database; client: BetterSqlite3.Database } {
   const client = new BetterSqlite3(file);
@@ -31,7 +32,7 @@ export function openDatabase(file: string): { db: Database; client: BetterSqlite
         mkdirSync(config.configDir, { recursive: true });
         const file = join(config.configDir, 'mytube.db');
         const { db, client } = openDatabase(file);
-        const result = runMigrations(client, migrationsDir);
+        const result = runMigrations(client, MIGRATIONS_DIR);
         logger.log(
           `Opened ${file} (${result.applied.length} migrations applied, ${result.skipped} already up to date)`,
         );

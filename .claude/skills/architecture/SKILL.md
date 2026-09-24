@@ -24,6 +24,7 @@ Playback is external (Plex reads the mounts). Preview streams the file with rang
 - **Music metadata is a provider chain.** yt-dlp's own metadata (YouTube Music extractor) is the default and always on. MusicBrainz and Discogs are additional providers behind a common interface, disabled by default and enabled per provider in Settings (Discogs needs a token). Providers enrich tags after download in configured order; the first confident match wins per field.
 - **No authentication.** The app is for the owner and friends on a home network or behind a reverse proxy. Say so in user-facing docs.
 - **Nothing deletes media** except retention and the explicit Delete button in Preview.
+- **The theme is a setting.** `general.theme` (`system`, `light`, `dark`) lives in the settings table like every other user choice, so it follows the user across browsers. The browser keeps a copy in localStorage (`mytube.theme`) only so the pre-paint script in `index.html` can apply it before the first frame; once settings load, the stored value wins. Settings → General offers Light, Dark and System; System is an addition to the handoff (which shows Light / Dark) so the user can return to following the device.
 
 ## Domain model
 
@@ -55,7 +56,7 @@ One folder per module under `packages/api/src` (see the backend skill for conven
 - `files`: mount access, path templates, rescan, delete, range streaming for preview.
 - `metadata`: the provider interface and the yt-dlp, MusicBrainz and Discogs providers. Tag writing and cover embedding.
 - `activity`: queue view and history view.
-- `settings`: typed keys with defaults, and the shapes the Settings screen needs.
+- `settings`: typed keys with defaults (the `Settings` schema in shared), `GET` and `PATCH /api/settings`. Other modules inject `SettingsService` and call `get()`.
 - `maintenance`: yt-dlp update schedule, backups, log download.
 
 Scheduling uses `@nestjs/schedule` inside the API process. No Redis, no external workers.

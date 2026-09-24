@@ -22,6 +22,13 @@ Migrations are plain SQL files in `packages/api/src/database/migrations`, applie
 
 `schema.ts` is the Drizzle description of the same tables, used for typing and query building. It does not create anything. When you add a migration, update `schema.ts` to match in the same commit.
 
+## Tables
+
+| Table        | Columns                                                                                                                                          |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `migrations` | `name` (file name, PK), `applied_at`. Owned by the migration runner.                                                                             |
+| `settings`   | `key` (dotted path such as `general.theme`, PK), `value` (JSON text), `updated_at`. One row per changed field; see the backend skill "Settings". |
+
 ## Querying
 
 Inject the database with `@Inject(DATABASE) private readonly db: Database` and use Drizzle: `this.db.select().from(settings).where(eq(settings.key, 'theme'))`. better-sqlite3 is synchronous; Drizzle's sqlite driver exposes `.all()`, `.get()`, `.run()` synchronously and the query builder is also awaitable.

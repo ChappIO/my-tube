@@ -18,6 +18,7 @@ packages/api/src
   common/               cross-cutting helpers such as ZodValidationPipe
   health/               example feature module (controller only)
   ytdlp/                the yt-dlp runner (the only code that spawns yt-dlp)
+  settings/             SettingsService over the settings table, GET/PATCH /api/settings
 packages/api/test       end-to-end tests booting the real AppModule
 ```
 
@@ -41,6 +42,20 @@ Feature modules go in `src/<feature>/` with `<feature>.module.ts`, `<feature>.co
 - Constructor injection by class works (decorator metadata is emitted by both `nest build` and Vitest).
 - Interfaces and types used only as types must be imported with `import type`; classes used for injection must be value imports.
 - Non-class providers use a `Symbol` token and `@Inject(TOKEN)`. The database is one: `@Inject(DATABASE) private readonly db: Database`.
+
+## Settings
+
+`src/settings/` owns every user-changeable value. The contract is `Settings` in `packages/shared/src/settings.ts`: groups `general`, `music`, `video`, `ytdlp`, `network`, `data`, each field with a `.default()`, so `DEFAULT_SETTINGS = Settings.parse({})` is a fresh install.
+
+- Storage: one `settings` row per field the user changed, key = dotted path (`general.theme`), value = JSON. No row means the default.
+- `SettingsService.get(): Settings` merges the rows over the defaults. A row with an unknown key (a removed setting), invalid JSON or a value that no longer validates is ignored with a one-time warning and its default used; it never throws.
+- `SettingsService.patch(patch: SettingsPatch): Settings` validates, upserts only the given fields in one transaction (bumping `updated_at`) and returns the merged settings.
+- `GET /api/settings` returns `Settings`. `PATCH /api/settings` takes a `SettingsPatch` (any fields of any groups; unknown keys and empty patches are a 400) and returns `Settings`.
+- Other modules import `SettingsModule` and call `settings.get()` when they need a value (read at use time, so changes apply without a restart). Do not cache settings in a service.
+
+**Adding a setting:** add the field with a `.default()` to its group in `packages/shared/src/settings.ts` (option lists as exported `as const` arrays, so the web select reuses them), extend the defaults test in `settings.spec.ts`, rebuild shared, then add the control to the Settings tab (see the frontend skill). No migration: a field without a row uses its default. Removing or narrowing a field is safe too; stale rows are ignored.
+
+Env (`AppConfig`) stays for what is known before the database exists: mount paths, port, version. Those are shown in Settings read-only and are never settings.
 
 ## Background work
 
