@@ -22,6 +22,7 @@ packages/api/src
   settings/             SettingsService over the settings table, GET/PATCH /api/settings
   activity/             HistoryService over the history table (global module; controller in Stage 4)
   sources/              URL resolution, source CRUD, rules and the subscribe toggle
+  system/               GET /api/system/info and /logs, the backup and rescan stubs (see System)
 packages/api/test       end-to-end tests booting the real AppModule
 ```
 
@@ -59,6 +60,15 @@ Feature modules go in `src/<feature>/` with `<feature>.module.ts`, `<feature>.co
 **Adding a setting:** add the field with a `.default()` to its group in `packages/shared/src/settings.ts` (option lists as exported `as const` arrays, so the web select reuses them), extend the defaults test in `settings.spec.ts`, rebuild shared, then add the control to the Settings tab (see the frontend skill). No migration: a field without a row uses its default. Removing or narrowing a field is safe too; stale rows are ignored.
 
 Env (`AppConfig`) stays for what is known before the database exists: mount paths, port, version. Those are shown in Settings read-only and are never settings.
+
+## System
+
+`src/system/` (`SystemModule`) serves instance facts and maintenance actions for Settings → Advanced. The contract is `packages/shared/src/system.ts`.
+
+- `GET /api/system/info` → `SystemInfo`: `version` (`APP_VERSION`), `configDir`, `musicDir`, `videoDir` (the resolved `AppConfig` paths, `/config` and `/media/*` in the image) and `platform` (`<process.platform> <process.arch>`). The Settings Library and Data cards show the paths read-only; they are env, never settings.
+- `GET /api/system/logs` → `text/plain` attachment `mytube.log`. It streams `CONFIG_DIR/logs/mytube.log` when that file exists; nothing writes it yet (the API logs to stdout, `docker logs`), so today it answers a short note saying so. Stage 7 (maintenance) decides whether a log file is kept and replaces the note.
+- `POST /api/system/backup` and `POST /api/system/rescan` are **stubs**: `501` with `SystemActionResult` `{ message: 'Not implemented until Stage 7' }`. Stage 7 replaces them with real jobs (the `backup` and `rescan` job types) and should keep answering `SystemActionResult` so the Data card shows the new message without changes. Stage 7 also fills "Last backup" (read-only "never" in the web until then).
+- `data.logLevel` is stored and editable in Settings but not applied to the Nest logger yet; Stage 7 wires it with the log file.
 
 ## Sources and rules
 

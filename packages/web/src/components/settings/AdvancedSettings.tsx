@@ -3,10 +3,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useUpdateSettings } from '../../api/settings';
 import { ytdlpStatusQueryKey } from '../../api/ytdlp';
 import { SettingsNote } from '../ui/SettingsCard';
+import { DataCard } from './DataCard';
+import { NetworkCard } from './NetworkCard';
 import { SettingsTab } from './SettingsTab';
 import { YtdlpCard } from './YtdlpCard';
 
-/** Settings → Advanced: the yt-dlp card. Network and Data cards follow. */
+/** Settings → Advanced: yt-dlp, Network and Data, and the mounts footnote. */
 export function AdvancedSettings() {
   const update = useUpdateSettings();
   const queryClient = useQueryClient();
@@ -21,7 +23,14 @@ export function AdvancedSettings() {
       {(settings) => (
         <>
           <YtdlpCard settings={settings.ytdlp} onChange={saveYtdlp} />
-          <SettingsNote>Network and data settings follow.</SettingsNote>
+          <NetworkCard
+            settings={settings.network}
+            onChange={(patch) => update.mutate({ network: patch })}
+          />
+          <DataCard settings={settings.data} onChange={(patch) => update.mutate({ data: patch })} />
+          <SettingsNote size="small">
+            Paths are container mounts. Change them in your Docker configuration.
+          </SettingsNote>
         </>
       )}
     </SettingsTab>

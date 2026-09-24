@@ -14,6 +14,11 @@ export interface InputProps extends Omit<ComponentProps<'input'>, 'width' | 'siz
   mono?: boolean;
   /** CSS width, capped at the container ("300px", 300). Defaults to full width (`value`: see shape). */
   width?: string | number;
+  /**
+   * Visible width in characters (the native `size`). For `value`, whose wide width is the
+   * content's: a text value box grows with its text instead of the browser's default 20.
+   */
+  chars?: number;
 }
 
 const shapes: Record<InputShape, string> = {
@@ -27,6 +32,7 @@ export function Input({
   shape = 'field',
   mono,
   width,
+  chars,
   type = 'text',
   className,
   style,
@@ -35,6 +41,7 @@ export function Input({
   return (
     <input
       type={type}
+      size={chars}
       className={cx(
         'max-w-full placeholder:text-muted',
         shape === 'value'

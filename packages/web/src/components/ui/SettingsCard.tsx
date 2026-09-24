@@ -52,16 +52,27 @@ export function SettingsRow({ description, children }: SettingsRowProps) {
   );
 }
 
-/** Plain muted status line under the cards: loading, load failure, save failure. */
-export function SettingsNote({
-  children,
-  role,
-}: {
+export interface SettingsNoteProps {
   children: ReactNode;
   role?: 'status' | 'alert';
-}) {
+  /**
+   * `body` (default): Archivo 14, for status lines under the cards (loading, load or save
+   * failure). `small`: Archivo 12, the handoff's footnote ("Paths are container mounts. …"),
+   * also used for short notes inside a card.
+   */
+  size?: 'body' | 'small';
+}
+
+/** Plain muted line: a status under the cards, the footnote, or a note inside a card. */
+export function SettingsNote({ children, role, size = 'body' }: SettingsNoteProps) {
   return (
-    <p role={role} className="text-body text-muted">
+    <p
+      role={role}
+      className={cx(
+        size === 'small' ? 'font-sans text-[12px] font-normal' : 'text-body',
+        'text-muted',
+      )}
+    >
       {children}
     </p>
   );

@@ -67,7 +67,12 @@ export function KeyValueRow({ label, children, control = true }: KeyValueRowProp
   );
 }
 
-/** A read-only value in the value box ("/media/music", "282 GB · 3,104 tracks"). */
+/**
+ * A read-only value in the value box ("/media/music", "282 GB · 3,104 tracks"). A value longer
+ * than the cell (a deep dev path) wraps anywhere instead of overflowing the card.
+ */
 export function KeyValueText({ children }: { children: ReactNode }) {
-  return <span className={cx(valueBox, 'block')}>{children}</span>;
+  return (
+    <span className={cx(valueBox, 'block max-w-full [overflow-wrap:anywhere]')}>{children}</span>
+  );
 }
