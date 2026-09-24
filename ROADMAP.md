@@ -74,7 +74,7 @@ Skills: backend, database, frontend. Handoff: Screen 5 Activity, Sidebar badge.
 
 Skills: frontend, backend. Handoff: Screen 1 Home, Screen 3 Videos tab, Screen 7 Preview.
 
-- [ ] **Library read endpoints.** Videos list with channel and on-disk info, home feed grouped by day across both libraries, thumbnail serving. Done when responses validate against shared schemas in e2e tests.
+- [ ] **Library read endpoints.** Videos list with channel and on-disk info, home feed grouped by day across both libraries, thumbnail serving. Cache remote avatars/thumbnails through the API (download once into CONFIG_DIR/cache, serve from there) so the web never hotlinks Google, which rate-limits (429). Done when responses validate against shared schemas in e2e tests.
 - [ ] **Videos tab.** Square tiles with fixed chins, channel links that stop propagation, narrow grid sizing. Done when the tab matches the handoff with real downloads.
 - [ ] **Home screen.** Header with the three stat cards, day groups, mixed video and music tiles with the hover chin behaviour. Done when stats reflect the database.
 - [ ] **Preview modal.** Range-streamed playback, title and file path footer, Delete file with confirmation, click-outside close. Done when a downloaded video plays in the browser and delete removes the file and updates status.
