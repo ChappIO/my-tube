@@ -3,6 +3,9 @@ import { RouterProvider, createRouter } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { routeTree } from './routeTree.gen';
+import '@fontsource-variable/archivo/wght.css';
+import '@fontsource/space-mono/400.css';
+import '@fontsource/space-mono/700.css';
 import './styles.css';
 
 const queryClient = new QueryClient();
