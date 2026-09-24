@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter @mytube/shared build && pnpm -r --parallel dev",
+    "dev": "node scripts/dev.mjs",
+    "dev:api": "pnpm --filter @mytube/shared build && pnpm --filter @mytube/api dev",
+    "dev:web": "pnpm --filter @mytube/web dev",
     "build": "pnpm -r build",
     "start": "pnpm --filter @mytube/api start",
     "lint": "oxlint",

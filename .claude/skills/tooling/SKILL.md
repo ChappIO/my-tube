@@ -15,11 +15,26 @@ MyTube is a pnpm workspace. Node and pnpm versions are pinned; use nvm (`.nvmrc`
 
 ## Commands (run from the repo root)
 
-- `pnpm dev`: builds shared once, then runs shared (`tsc --watch`), api (`nest start --watch`, port 8080) and web (Vite, port 5173, proxies `/api`) in parallel. Open http://localhost:5173.
+- `pnpm dev`: runs `scripts/dev.mjs`, which builds shared once, then runs shared (`tsc --watch`), api (`nest start --watch`) and web (Vite, proxies `/api` to the api) with prefixed output, and prints the URLs. Ctrl-C stops all three. If one process exits, the others are stopped too. Open http://localhost:5173.
+- `pnpm dev:api` / `pnpm dev:web`: one side only, with the same env names. `dev:api` builds shared once but does not watch it.
 - `pnpm build`: builds all packages in dependency order.
-- `pnpm check`: lint, format check, typecheck, tests. This is what CI runs. Run it before committing.
+- `pnpm check`: lint, format check, typecheck, tests. CI runs this plus `pnpm build` and `pnpm lint:infra`. Run it before committing.
 - `pnpm fmt`: formats everything with oxfmt.
 - `pnpm --filter @mytube/api <script>`: run a script in one package.
+
+### Dev stacks per checkout
+
+Every checkout (worktree) runs its own stack, configured by env. Defaults are per checkout, so two worktrees only need different ports:
+
+| Variable     | Default                     | Used by                                               |
+| ------------ | --------------------------- | ----------------------------------------------------- |
+| `API_PORT`   | `8080` (`PORT` is accepted) | api listen port (passed as `PORT`), Vite proxy target |
+| `WEB_PORT`   | `5173`                      | Vite port, `--strictPort` (fails instead of moving)   |
+| `CONFIG_DIR` | `<checkout>/.local/config`  | api: database and settings                            |
+| `MUSIC_DIR`  | `<checkout>/.local/music`   | api: music library                                    |
+| `VIDEO_DIR`  | `<checkout>/.local/video`   | api: video library                                    |
+
+Example for a second checkout: `API_PORT=8082 WEB_PORT=5175 pnpm dev`. `dev.mjs` checks both ports before starting and exits with a message if either is taken. The container defaults in `AppConfig` (`/config`, `/media/*`) are unchanged; only the dev entry points set per-checkout paths. `.local/` is gitignored. The package `dev` scripts use `${VAR:-default}` and so need a POSIX shell.
 
 ## Versions
 
@@ -34,9 +49,9 @@ MyTube is a pnpm workspace. Node and pnpm versions are pinned; use nvm (`.nvmrc`
 - Generated files (`routeTree.gen.ts`, `dist/`) are ignored by both.
 - Do not add ESLint or Prettier.
 
-## Infrastructure linters (local only)
+## Infrastructure linters
 
-`pnpm lint:infra` runs actionlint (workflows), hadolint (Dockerfile, config in `.hadolint.yaml`) and shellcheck (`docker/entrypoint.sh`). They are installed with Homebrew on the dev machine and are not in CI yet. Run it after touching anything under `.github`, the Dockerfile or `docker/`.
+`pnpm lint:infra` runs actionlint (workflows), hadolint (Dockerfile, config in `.hadolint.yaml`) and shellcheck (`docker/entrypoint.sh`). CI runs it in the check job with pinned release binaries (versions and sha256 digests in `ci.yml`); locally they come from Homebrew. Run it after touching anything under `.github`, the Dockerfile or `docker/`. When bumping a linter in CI, update the version and the digest together (the release page lists the sha256 per asset).
 
 ## TypeScript
 
@@ -52,5 +67,5 @@ MyTube is a pnpm workspace. Node and pnpm versions are pinned; use nvm (`.nvmrc`
 
 ## CI
 
-- `.github/workflows/ci.yml` runs `pnpm check` and `pnpm build`, then builds the Docker image and curls `/api/health` inside it.
+- `.github/workflows/ci.yml` runs `pnpm lint:infra`, `pnpm build` and `pnpm check`, then builds the Docker image and curls `/api/health` inside it.
 - `.github/workflows/release.yml` builds a multi-arch image and pushes it to GHCR on a `v*` tag. See the deployment skill.
