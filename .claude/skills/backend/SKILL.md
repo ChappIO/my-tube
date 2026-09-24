@@ -18,8 +18,9 @@ packages/api/src
   common/               cross-cutting helpers such as ZodValidationPipe
   health/               example feature module (controller only)
   web/                  serves packages/web/dist next to the API with an SPA fallback
-  ytdlp/                the yt-dlp runner (the only code that spawns yt-dlp)
+  ytdlp/                the yt-dlp runner (the only code that spawns yt-dlp) and the binary manager
   settings/             SettingsService over the settings table, GET/PATCH /api/settings
+  activity/             HistoryService over the history table (global module; controller in Stage 4)
 packages/api/test       end-to-end tests booting the real AppModule
 ```
 
@@ -72,6 +73,8 @@ The contract is `packages/shared/src/rules.ts`; the tables are in the database s
 
 - Subscription checks and downloads run in-process. Use `@nestjs/schedule` for timers and a database-backed queue table for work items. No Redis, no external workers.
 - yt-dlp is a binary the app downloads into `CONFIG_DIR` itself on first boot and updates periodically. It is not part of the image.
+- `ScheduleModule.forRoot()` is in `AppModule`. Use `@Interval(ms)` / `@Cron` without a name (named intervals collide when tests boot several apps in one process). For a user-configurable interval, run a fixed short tick that re-reads settings and decides whether it is time (see the yt-dlp manager), instead of re-registering timers.
+- Record outcomes with the global `HistoryService` (`src/activity`): `record({ kind: 'video' | 'music' | 'system', title, result, details? })` and `recent(limit)` (newest first).
 
 ## yt-dlp
 
@@ -83,9 +86,25 @@ The contract is `packages/shared/src/rules.ts`; the tables are in the database s
 - Failures reject with `YtdlpError`: `kind` (`spawn`, `exit`, `aborted`, `output`), `exitCode`, `stderrTail` (last 20 lines) and `reason` (the last `ERROR:` line).
 - `NetworkOptions` (`rateLimit`, `proxy`, `cookiesFile`, all optional) are passed by the caller on each call; the runner never reads settings. The caller maps the Settings Network card to it.
 - Arguments are built by the pure `buildArgs()` in `args.ts` and passed to `spawn` as an array, never through a shell. URLs always follow `--`. `extraArgs` may not contain flags the runner owns (`RESERVED_FLAGS`: output, print, progress, cookies, proxy, rate limit, exec, config). Every call uses `--ignore-config`. The command is logged at debug level with the cookies path and proxy credentials masked.
-- Binary location is a seam: the `YTDLP_BINARY` token provides a `YtdlpBinaryLocator` (`{ path(): string }`), asked on every spawn. The default is `YTDLP_PATH` if set, else `CONFIG_DIR/bin/yt-dlp`. The binary manager replaces this provider and owns downloading and updating the binary.
+- Binary location is a seam: the `YTDLP_BINARY` token provides a `YtdlpBinaryLocator` (`{ path(): string }`), asked on every spawn. `YtdlpModule` binds it to `YtdlpBinaryService` (`useExisting`): `YTDLP_PATH` if set, else `CONFIG_DIR/bin/yt-dlp`.
+
+### Binary manager
+
+`YtdlpBinaryService` (`ytdlp-binary.service.ts`) owns the binary. Pure helpers are in `release.ts`, GitHub access in `github-releases.ts`.
+
+- **Boot** (`onApplicationBootstrap`, not awaited, so `listen` is never held up): if the binary exists, read `--version`; otherwise install the latest release. Then run a due update check. Failures are logged and stored; the app keeps serving.
+- **Install / update**: `GET https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest` (`User-Agent: MyTube`, `GITHUB_TOKEN` as a bearer token when set, to avoid the anonymous rate limit). The asset comes from `assetNameFor(process.platform, process.arch)`: linux x64 `yt-dlp_linux`, linux arm64 `yt-dlp_linux_aarch64`, darwin `yt-dlp_macos` (glibc builds, the image is Debian; Windows and other platforms get `UnsupportedPlatformError`, shown as the status error; use `YTDLP_PATH` there). The binary is downloaded to `bin/.yt-dlp-<random>.download`, checked against the release's `SHA2-256SUMS` (a mismatch fails; a missing file or line only warns), `chmod 755`, run with `--version` through a runner pointed at the temp file, and only then renamed over `bin/yt-dlp`. The temp file is always removed. A binary that does not run never replaces a working one.
+- **Scheduling**: `@Interval` every 15 minutes (`TICK_MS`). While nothing is installed each tick retries the install; otherwise, when `ytdlp.autoUpdate` is on and `ytdlp.updateIntervalHours` has passed since `last_checked_at` (`isCheckDue`), it runs `update()`. Settings are re-read each tick, so changes apply without a restart.
+- **Concurrency**: `check`, `update` and installs run one at a time through a promise chain; a second request waits and then usually finds nothing to do.
+- **History**: `system` rows `yt-dlp <v> installed` (result `installed`), `yt-dlp <old> → <new>` (`updated`), and failures (`failed`, message in `details`) such as `yt-dlp install failed`. A failure is recorded only when its message differs from the stored last error, so a retry every tick while offline does not flood history. Plain `check` failures are not recorded, only stored.
+- **State**: the single `ytdlp_state` row (see the database skill). `status()` derives `state`: `installing`/`updating` while busy, `error` when `last_error` is set, `not_installed`, `update_available` when the latest tag is newer (`compareVersions`, numeric segments), else `up_to_date`.
+- **`YTDLP_PATH`** (dev, tests, unsupported platforms): the binary is used as is and its version read on boot; no install, no scheduled checks, `update` is a 409.
+- **Endpoints** (`ytdlp.controller.ts`): `GET /api/ytdlp/status` → `YtdlpStatus` (`packages/shared/src/ytdlp.ts`); `POST /api/ytdlp/check` → looks up the latest release, installs nothing; `POST /api/ytdlp/update[?force=true]` → checks and installs when newer (`force` reinstalls). Both POSTs return 200 with the status; a failed lookup or install is reported in it (`state: 'error'`, `error`), not as a 5xx.
+- On shutdown the manager aborts in-flight downloads and spawns.
 
 ### Testing with the fake binary
+
+The API test suite has no network: `test/setup.ts` (a Vitest setup file) replaces `fetch` with one that rejects, so booting `AppModule` in an e2e test starts an install that fails at once. Tests that need GitHub stub `fetch` with `vi.stubGlobal` (see `ytdlp-binary.service.spec.ts`, which serves a fake release whose asset is a tiny shell script printing a version, and `test/ytdlp.e2e.spec.ts`, whose fetch never answers).
 
 `packages/api/test/fixtures/fake-yt-dlp` is a Node script that stands in for yt-dlp without network access. Construct the runner with `new YtdlpRunner({ path: () => FAKE })`, set `YTDLP_PATH` to it, or override `YTDLP_BINARY` in a testing module. It serves the trimmed real JSON in `test/fixtures/ytdlp` (`channel.json` for channel URLs, `playlist.json` for `list=` URLs, `video.json` for `watch?v=` URLs), prints real-shaped progress lines for downloads and writes the output file. Env switches: `FAKE_YTDLP_FAIL`, `FAKE_YTDLP_EXIT`, `FAKE_YTDLP_DELAY_MS`, `FAKE_YTDLP_STDOUT`, `FAKE_YTDLP_FIXTURE`, `FAKE_YTDLP_ARGS_FILE` (records argv), `FAKE_YTDLP_VERSION`. Never call the real binary from the test suite.
 

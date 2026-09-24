@@ -84,3 +84,33 @@ export const playlists = sqliteTable(
   },
   (table) => [index('playlists_source_id').on(table.sourceId)],
 );
+
+/** Kinds of history entries, matching the Activity screen's kind chip. */
+export const HISTORY_KINDS = ['video', 'music', 'system'] as const;
+export type HistoryKind = (typeof HISTORY_KINDS)[number];
+
+/** Audit trail: downloads, retention deletions, yt-dlp installs and updates. */
+export const history = sqliteTable(
+  'history',
+  {
+    id: integer('id').primaryKey(),
+    at: text('at')
+      .notNull()
+      .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+    kind: text('kind', { enum: HISTORY_KINDS }).notNull(),
+    title: text('title').notNull(),
+    result: text('result').notNull(),
+    details: text('details'),
+  },
+  (table) => [index('history_at').on(table.at)],
+);
+
+/** yt-dlp binary manager state: at most one row, id 1. */
+export const ytdlpState = sqliteTable('ytdlp_state', {
+  id: integer('id').primaryKey(),
+  installedVersion: text('installed_version'),
+  latestVersion: text('latest_version'),
+  lastCheckedAt: text('last_checked_at'),
+  lastUpdatedAt: text('last_updated_at'),
+  lastError: text('last_error'),
+});

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { LogoLockup } from '../brand/Logo';
 import { PlusIcon } from '../icons';
 import { Button } from '../ui/Button';
@@ -32,13 +32,22 @@ export function Sidebar({
   );
 }
 
-/** Sidebar footer: two Space Mono lines, `yt-dlp <version>` over the status line. */
+/**
+ * Sidebar footer: two Space Mono lines, `yt-dlp <version>` over the status line. The status
+ * parts (`up to date`, `auto-update on`) never break inside; a long line wraps at the ` · `.
+ */
 export function SidebarFooter({ version, status }: { version: string; status: string }) {
+  const parts = status.split(' · ');
   return (
     <div className="px-2.5 pt-3.5 pb-1 font-mono text-[11px] leading-[1.6] text-muted">
       yt-dlp {version}
       <br />
-      {status}
+      {parts.map((part, index) => (
+        <Fragment key={part}>
+          {index > 0 && ' · '}
+          <span className="whitespace-nowrap">{part}</span>
+        </Fragment>
+      ))}
     </div>
   );
 }

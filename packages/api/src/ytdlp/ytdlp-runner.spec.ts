@@ -4,10 +4,11 @@ import { join } from 'node:path';
 import { Test } from '@nestjs/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { AppConfig } from '../config/app-config.js';
+import { ActivityModule } from '../activity/activity.module.js';
 import { ConfigModule } from '../config/config.module.js';
+import { DatabaseModule } from '../database/database.module.js';
 import type { DownloadProgress } from './progress.js';
-import { defaultBinaryLocator, YTDLP_BINARY, type YtdlpBinaryLocator } from './ytdlp-binary.js';
+import { YTDLP_BINARY, type YtdlpBinaryLocator } from './ytdlp-binary.js';
 import { YtdlpError } from './ytdlp-error.js';
 import { lineSplitter, YtdlpRunner } from './ytdlp-runner.js';
 import { YtdlpModule } from './ytdlp.module.js';
@@ -159,30 +160,26 @@ describe('YtdlpRunner (fake binary)', () => {
 });
 
 describe('YtdlpBinaryLocator', () => {
-  it('defaults to CONFIG_DIR/bin/yt-dlp and honours YTDLP_PATH', () => {
-    const config = new AppConfig({ CONFIG_DIR: '/config' });
-    expect(defaultBinaryLocator(config, {}).path()).toBe('/config/bin/yt-dlp');
-    expect(defaultBinaryLocator(config, { YTDLP_PATH: '/usr/bin/yt-dlp' }).path()).toBe(
-      '/usr/bin/yt-dlp',
-    );
-  });
-
   it('is provided by YtdlpModule and can be overridden', async () => {
+    const configDir = mkdtempSync(join(tmpdir(), 'mytube-ytdlp-module-'));
     process.env.YTDLP_PATH = FAKE;
+    process.env.CONFIG_DIR = configDir;
+    const imports = [ConfigModule, DatabaseModule, ActivityModule, YtdlpModule];
     try {
-      const moduleRef = await Test.createTestingModule({
-        imports: [ConfigModule, YtdlpModule],
-      }).compile();
+      const moduleRef = await Test.createTestingModule({ imports }).compile();
+      expect(moduleRef.get<YtdlpBinaryLocator>(YTDLP_BINARY).path()).toBe(FAKE);
       await expect(moduleRef.get(YtdlpRunner).version()).resolves.toBe('2026.08.19');
 
       const locator: YtdlpBinaryLocator = { path: () => '/elsewhere/yt-dlp' };
-      const overridden = await Test.createTestingModule({ imports: [ConfigModule, YtdlpModule] })
+      const overridden = await Test.createTestingModule({ imports })
         .overrideProvider(YTDLP_BINARY)
         .useValue(locator)
         .compile();
       expect(overridden.get<YtdlpBinaryLocator>(YTDLP_BINARY).path()).toBe('/elsewhere/yt-dlp');
     } finally {
       delete process.env.YTDLP_PATH;
+      delete process.env.CONFIG_DIR;
+      rmSync(configDir, { recursive: true, force: true });
     }
   });
 });

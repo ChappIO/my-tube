@@ -1,5 +1,6 @@
 import { createFileRoute, linkOptions, redirect } from '@tanstack/react-router';
 import { PlaceholderPage } from '../components/PlaceholderPage';
+import { AdvancedSettings } from '../components/settings/AdvancedSettings';
 import { GeneralSettings } from '../components/settings/GeneralSettings';
 import { PageHeader } from '../components/ui/PageHeader';
 import { TabPillLinks } from '../components/ui/TabPills';
@@ -41,11 +42,13 @@ export const Route = createFileRoute('/settings/$tab')({
 function SettingsPage() {
   const { tab } = Route.useParams();
   const tabs = <TabPillLinks label="Settings section" items={settingsTabItems} value={tab} />;
-  if (tab === 'general') {
+  const content =
+    tab === 'general' ? <GeneralSettings /> : tab === 'advanced' ? <AdvancedSettings /> : null;
+  if (content) {
     return (
       <>
         <PageHeader title="Settings" actions={tabs} />
-        <GeneralSettings />
+        {content}
       </>
     );
   }

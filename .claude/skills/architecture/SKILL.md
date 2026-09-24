@@ -39,10 +39,11 @@ SQLite, one migration per change (see the database skill).
 | `jobs`                        | queue: type, payload (JSON), status, progress, speed, attempts, error, timestamps                                                                    |
 | `history`                     | audit trail: time, kind (video/music/system), title, result, details                                                                                 |
 | `settings`                    | key-value store for everything a user changes in Settings                                                                                            |
+| `ytdlp_state`                 | single row: installed and latest yt-dlp version, last check, last update, last error (binary manager state, not a setting)                           |
 
 Every item row (video, track) carries: youtube id, title, duration, published date, thumbnail, file path, file size, status. Status is one of `wanted`, `downloading`, `on_disk`, `missing`, `skipped`.
 
-Job types: `download`, `check_source`, `retention`, `update_ytdlp`, `rescan`, `backup`.
+Job types: `download`, `check_source`, `retention`, `rescan`, `backup`.
 
 ## Backend modules
 
@@ -57,7 +58,7 @@ One folder per module under `packages/api/src` (see the backend skill for conven
 - `metadata`: the provider interface and the yt-dlp, MusicBrainz and Discogs providers. Tag writing and cover embedding.
 - `activity`: queue view and history view.
 - `settings`: typed keys with defaults (the `Settings` schema in shared), `GET` and `PATCH /api/settings`. Other modules inject `SettingsService` and call `get()`.
-- `maintenance`: yt-dlp update schedule, backups, log download.
+- `maintenance`: backups, log download, rescan. The yt-dlp update schedule lives in `ytdlp` with the binary manager (its own 15-minute tick that reads the settings interval), not in a job row.
 
 Scheduling uses `@nestjs/schedule` inside the API process. No Redis, no external workers.
 
