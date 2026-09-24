@@ -17,6 +17,7 @@ packages/api/src
   database/             SQLite via Drizzle, SQL migrations (see database skill)
   common/               cross-cutting helpers such as ZodValidationPipe
   health/               example feature module (controller only)
+  ytdlp/                the yt-dlp runner (the only code that spawns yt-dlp)
 packages/api/test       end-to-end tests booting the real AppModule
 ```
 
@@ -45,6 +46,22 @@ Feature modules go in `src/<feature>/` with `<feature>.module.ts`, `<feature>.co
 
 - Subscription checks and downloads run in-process. Use `@nestjs/schedule` for timers and a database-backed queue table for work items. No Redis, no external workers.
 - yt-dlp is a binary the app downloads into `CONFIG_DIR` itself on first boot and updates periodically. It is not part of the image.
+
+## yt-dlp
+
+`src/ytdlp` is the only code that spawns yt-dlp. Everything else (sources, sync, jobs, maintenance) injects `YtdlpRunner`.
+
+- `runner.version()`: `yt-dlp --version`.
+- `runner.metadata(url, { limit?, approximateDates?, network?, signal? })`: `--dump-single-json --flat-playlist` (plus `youtubetab:approximate_date` so flat channel listings carry dates). Returns a normalised `SourceMetadata` (`metadata.ts`): `kind` (`channel`, `playlist`, `video`), ids, names, URLs, `thumbnailUrl` (avatar for channels), `playlistCount`, and flattened `entries` with `duration`, `uploadDate`, `timestamp`, `liveStatus`, `isShort` and the channel `tab` they came from. A channel root's tabs (Videos, Live, Shorts) are merged; a single video is its own only entry. The Zod schemas ignore unknown fields and drop individual invalid entries (`skippedEntries`).
+- `runner.download(url, { output, format?, mergeOutputFormat?, extraArgs?, network?, signal? }, onProgress)`: resolves with `{ filePath }` (the path after merging and moving). `onProgress` gets `{ status, percent, downloadedBytes, totalBytes, speedBytesPerSec, etaSeconds }` with status `downloading`, `finished` (once per stream, so percent restarts for separate video and audio) or `postprocessing`. Aborting the signal kills the process group (ffmpeg included); a `.part` file may remain for the caller to clean up.
+- Failures reject with `YtdlpError`: `kind` (`spawn`, `exit`, `aborted`, `output`), `exitCode`, `stderrTail` (last 20 lines) and `reason` (the last `ERROR:` line).
+- `NetworkOptions` (`rateLimit`, `proxy`, `cookiesFile`, all optional) are passed by the caller on each call; the runner never reads settings. The caller maps the Settings Network card to it.
+- Arguments are built by the pure `buildArgs()` in `args.ts` and passed to `spawn` as an array, never through a shell. URLs always follow `--`. `extraArgs` may not contain flags the runner owns (`RESERVED_FLAGS`: output, print, progress, cookies, proxy, rate limit, exec, config). Every call uses `--ignore-config`. The command is logged at debug level with the cookies path and proxy credentials masked.
+- Binary location is a seam: the `YTDLP_BINARY` token provides a `YtdlpBinaryLocator` (`{ path(): string }`), asked on every spawn. The default is `YTDLP_PATH` if set, else `CONFIG_DIR/bin/yt-dlp`. The binary manager replaces this provider and owns downloading and updating the binary.
+
+### Testing with the fake binary
+
+`packages/api/test/fixtures/fake-yt-dlp` is a Node script that stands in for yt-dlp without network access. Construct the runner with `new YtdlpRunner({ path: () => FAKE })`, set `YTDLP_PATH` to it, or override `YTDLP_BINARY` in a testing module. It serves the trimmed real JSON in `test/fixtures/ytdlp` (`channel.json` for channel URLs, `playlist.json` for `list=` URLs, `video.json` for `watch?v=` URLs), prints real-shaped progress lines for downloads and writes the output file. Env switches: `FAKE_YTDLP_FAIL`, `FAKE_YTDLP_EXIT`, `FAKE_YTDLP_DELAY_MS`, `FAKE_YTDLP_STDOUT`, `FAKE_YTDLP_FIXTURE`, `FAKE_YTDLP_ARGS_FILE` (records argv), `FAKE_YTDLP_VERSION`. Never call the real binary from the test suite.
 
 ## Testing
 
