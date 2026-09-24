@@ -1,14 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { closeAdd, isAddOpen, openAdd, subscribeUiState } from './ui-state';
 
 describe('Add modal state', () => {
-  beforeEach(() => {
-    vi.spyOn(console, 'debug').mockImplementation(() => {});
-  });
-
   afterEach(() => {
     closeAdd();
-    vi.restoreAllMocks();
   });
 
   it('starts closed and toggles with openAdd and closeAdd', () => {

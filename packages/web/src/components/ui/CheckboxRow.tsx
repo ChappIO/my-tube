@@ -52,8 +52,12 @@ export function CheckboxRow({
       >
         {checked && <CheckIcon size={12} strokeWidth={3.5} />}
       </span>
-      <span className="min-w-0 flex-1 font-sans text-[14px] font-medium">{label}</span>
-      {hint && <span className="text-right text-meta text-muted">{hint}</span>}
+      {/* Label and hint share a wrapping line: on a narrow screen a long hint moves under the
+          label instead of squeezing it into a column. */}
+      <span className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+        <span className="font-sans text-[14px] font-medium">{label}</span>
+        {hint && <span className="text-meta text-muted">{hint}</span>}
+      </span>
     </label>
   );
 }

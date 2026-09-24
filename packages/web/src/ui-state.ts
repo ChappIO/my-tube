@@ -27,7 +27,6 @@ export function isAddOpen(): boolean {
 export function openAdd(): void {
   if (addOpen) return;
   addOpen = true;
-  console.debug('[ui-state] Add to library requested; the modal arrives in Stage 3');
   notify();
 }
 
@@ -39,8 +38,8 @@ export function closeAdd(): void {
 }
 
 /**
- * The Add modal seam. Every Add button calls `openAdd`; the modal renders
- * while `open` is true and calls `closeAdd` to dismiss.
+ * The Add modal. Every Add button calls `openAdd`; `AppShell` renders `AddSourceModal` while
+ * `open` is true, and the modal calls `closeAdd` to dismiss.
  */
 export function useAddModal(): { open: boolean; openAdd: () => void; closeAdd: () => void } {
   const open = useSyncExternalStore(subscribeUiState, isAddOpen, () => false);
