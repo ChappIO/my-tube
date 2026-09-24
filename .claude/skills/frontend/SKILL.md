@@ -106,6 +106,13 @@ Self-hosted through Fontsource, imported in `main.tsx`: `@fontsource-variable/ar
 
 Routes under `src/routes/dev/` (`/dev/*`) are visual reference pages for building blocks: `/dev/tokens` for colors, type scale, radii, shadows, fonts and the theme switcher, `/dev/logo` for the brand and icon set. They are not linked from the app and have no data dependencies. Add a page when you add a design system piece, update the relevant page when you add a token, variant or icon, and check it in the browser.
 
+## Component structure
+
+- **Pages and semantic components compose named components.** A page should read like the design: `<PageHeader>`, `<TabPills>`, `<TileGrid>`, `<StatCard>`. Long Tailwind class lists do not belong on pages, layouts or other high-level components.
+- **Class lists live inside the leaf components** that implement the design system (`src/components/**`), and those use the token utilities (`bg-surface`, `text-muted`, `rounded-tile`, `text-section-label`) rather than raw values.
+- **Type roles are components too.** Wrap the type utilities in small components such as `<PageTitle>`, `<SectionLabel>` and `<Meta>` so screens never repeat `text-h1` or `text-meta`.
+- A component takes semantic props (`variant="primary"`, `subscribed`, `incomplete`), not class names, except an optional `className` for layout placement by the parent.
+
 ## Conventions
 
 - Function components, hooks, no class components.
