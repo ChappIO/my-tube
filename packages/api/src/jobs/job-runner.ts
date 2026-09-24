@@ -13,6 +13,8 @@ export interface JobProgress {
   progress?: number | null;
   speedBytesPerSec?: number | null;
   etaSeconds?: number | null;
+  /** Expected size of the whole download, for the queue meta line. */
+  totalBytes?: number | null;
 }
 
 export interface JobContext {
@@ -22,7 +24,7 @@ export interface JobContext {
    */
   signal: AbortSignal;
   /** Report progress; writes are throttled by the worker. */
-  progress(update: JobProgress): void;
+  progress: (update: JobProgress) => void;
 }
 
 /** What a finished job records in history. */
@@ -39,12 +41,13 @@ export interface JobOutcome {
  * Does the work of one job type. Register it in `JobsModule.forRoot({ runners })`; the worker
  * picks runners by `type`, one runner per type.
  *
- * `run` resolves with the outcome (recorded in history as the job completes) or rejects. A
- * rejection is retried with backoff until `max_attempts`, unless it is a `PermanentJobError`.
+ * `run` resolves with the outcome (recorded in history as the job completes, linked to the job)
+ * or null to record nothing, or rejects. A rejection is retried with backoff until
+ * `max_attempts`, unless it is a `PermanentJobError`.
  */
 export interface JobRunner {
   readonly type: JobType;
-  run(job: JobRow, ctx: JobContext): Promise<JobOutcome>;
+  run(job: JobRow, ctx: JobContext): Promise<JobOutcome | null>;
 }
 
 /** Throw from a runner when retrying cannot help (a removed video, a bad payload). */

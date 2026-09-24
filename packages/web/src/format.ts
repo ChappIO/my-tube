@@ -1,5 +1,8 @@
+import type { Job } from '@mytube/shared';
+
 /*
- * Display formatting shared by the screens: relative times, sizes, counts and upload cadence.
+ * Display formatting shared by the screens: relative times, sizes, counts, upload cadence, and
+ * the Activity queue and history (speeds, row meta and state, day labels, result colours).
  * Pure functions; `now` is a parameter so tests and `useNow` control the clock.
  */
 
@@ -71,4 +74,83 @@ export function formatCadence(uploadsPerWeek: number | null): string {
   if (uploadsPerWeek === null || uploadsPerWeek <= 0) return '0 uploads/week';
   const value = uploadsPerWeek.toFixed(1);
   return `${value} ${value === '1.0' ? 'upload' : 'uploads'}/week`;
+}
+
+// Activity screen.
+
+/** `4.1 MB/s`. */
+export function formatSpeed(bytesPerSec: number): string {
+  return `${formatBytes(bytesPerSec)}/s`;
+}
+
+/**
+ * The queue row's meta line, as in the handoff (`Deep Dive Podcast · 1080p · 1.2 GB · 4.1 MB/s`):
+ * channel, quality, size and speed, each only when known. The speed shows while running.
+ */
+export function queueMeta(job: Job): string {
+  const parts: string[] = [];
+  if (job.subtitle) parts.push(job.subtitle);
+  if (job.detail) parts.push(job.detail);
+  if (job.totalBytes) parts.push(formatBytes(job.totalBytes));
+  if (job.status === 'running' && job.speedBytesPerSec)
+    parts.push(formatSpeed(job.speedBytesPerSec));
+  if (job.status === 'queued' && job.attempts > 0) {
+    parts.push(`attempt ${job.attempts + 1} of ${job.maxAttempts}`);
+  }
+  return parts.join(' · ');
+}
+
+export type QueueTone = 'red' | 'muted';
+
+/** The state column: `downloading 64%` (red), `checking`, `queued` (muted), `failed` (red). */
+export function queueState(job: Job): { text: string; tone: QueueTone } {
+  if (job.status === 'failed') return { text: 'failed', tone: 'red' };
+  if (job.status !== 'running') return { text: 'queued', tone: 'muted' };
+  if (job.type === 'check_source') return { text: 'checking', tone: 'red' };
+  if (job.type !== 'download') return { text: 'running', tone: 'red' };
+  if (job.progress === null) return { text: 'starting', tone: 'red' };
+  return { text: `downloading ${Math.floor(job.progress * 100)}%`, tone: 'red' };
+}
+
+/** Width of the queue row's progress bar, 0 to 100 (floored like the state text). Failed and queued rows are empty. */
+export function queuePercent(job: Job): number {
+  return job.status === 'running' && job.progress !== null ? Math.floor(job.progress * 100) : 0;
+}
+
+/** The last line of an error, which is the useful one for yt-dlp (`ERROR: … unavailable`). */
+export function errorTail(error: string | null): string | null {
+  if (!error) return null;
+  const lines = error.trim().split('\n');
+  return lines.at(-1)?.trim() || null;
+}
+
+function localDay(date: Date): number {
+  return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY);
+}
+
+function pad(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+/**
+ * The history "when" column, grouped by local day like the handoff: `Today 08:12`,
+ * `Yesterday 21:40`, `3 days ago` within a week, then the date (`2026-09-10`).
+ */
+export function whenLabel(at: string, now: Date = new Date()): string {
+  const date = new Date(at);
+  const days = localDay(now) - localDay(date);
+  const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  if (days <= 0) return `Today ${time}`;
+  if (days === 1) return `Yesterday ${time}`;
+  if (days < 7) return `${days} days ago`;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+export type ResultTone = 'ok' | 'red' | 'muted';
+
+/** History result colour: `done`, `updated`, `installed` green; `failed` red; the rest muted. */
+export function resultTone(result: string): ResultTone {
+  if (result === 'done' || result === 'updated' || result === 'installed') return 'ok';
+  if (result === 'failed') return 'red';
+  return 'muted';
 }

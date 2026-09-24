@@ -29,8 +29,8 @@ export class SystemService {
   }
 
   /**
-   * Where a log file would live: `CONFIG_DIR/logs/mytube.log`. Nothing writes it yet; the API
-   * logs to stdout (read it with `docker logs`). Stage 7 decides whether a file is kept.
+   * The application log file, `CONFIG_DIR/logs/mytube.log`, written by `AppLogger` next to
+   * stdout (rotated at 5 MB, older files `mytube.log.1` to `.3`). Only the current file is served.
    */
   logFilePath(): string {
     return join(this.config.configDir, 'logs', 'mytube.log');
@@ -45,12 +45,10 @@ export class SystemService {
     return {
       kind: 'note',
       text: [
-        `MyTube ${this.config.version} has no log file.`,
+        `MyTube ${this.config.version} has not written ${path} yet.`,
         '',
-        'The server writes its logs to stdout. Read them with `docker logs <container>`',
+        'The server also writes its logs to stdout. Read them with `docker logs <container>`',
         '(or in the terminal running `pnpm dev`).',
-        '',
-        `A log file at ${path} is served here once one exists.`,
         '',
       ].join('\n'),
     };

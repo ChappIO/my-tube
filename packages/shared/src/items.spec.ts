@@ -10,6 +10,8 @@ const job = {
   progress: 0.5,
   speedBytesPerSec: 1_000_000,
   etaSeconds: 12,
+  totalBytes: 3_000_000,
+  detail: '1080p',
   error: null,
   attempts: 0,
   maxAttempts: 3,

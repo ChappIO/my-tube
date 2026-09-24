@@ -100,7 +100,11 @@ export const ICON_REGISTRY = {
     meaning: 'Add to library',
     usedIn: 'sidebar Add button, top bar "+", Add modal trigger',
   },
-  CloseIcon: { base: X, meaning: 'Close / dismiss', usedIn: 'Modal close button' },
+  CloseIcon: {
+    base: X,
+    meaning: 'Close / dismiss / cancel',
+    usedIn: 'Modal close button, Activity queue row cancel',
+  },
   SearchIcon: { base: Search, meaning: 'Search', usedIn: 'search inputs (demo only so far)' },
   PlayIcon: { base: Play, meaning: 'Play (preview)', usedIn: 'preview player (Stage 3+)' },
   PauseIcon: { base: Pause, meaning: 'Pause (preview)', usedIn: 'preview player (Stage 3+)' },
@@ -119,7 +123,7 @@ export const ICON_REGISTRY = {
   RefreshIcon: {
     base: RefreshCw,
     meaning: 'Check now / re-sync',
-    usedIn: 'Check now buttons (yt-dlp, subscriptions)',
+    usedIn: 'Check now buttons (yt-dlp, Activity subscriptions check)',
   },
   MoreIcon: { base: Ellipsis, meaning: 'More actions menu', usedIn: 'row menus (Stage 3+)' },
 
@@ -207,7 +211,7 @@ export const AdvancedIcon = icon('AdvancedIcon');
 
 /** Add to library: sidebar Add button, top bar "+", Add modal trigger. */
 export const PlusIcon = icon('PlusIcon');
-/** Close / dismiss: Modal close button. */
+/** Close / dismiss / cancel: Modal close button, Activity queue row cancel. */
 export const CloseIcon = icon('CloseIcon');
 /** Search: search inputs. */
 export const SearchIcon = icon('SearchIcon');
@@ -223,7 +227,7 @@ export const UnlinkIcon = icon('UnlinkIcon');
 export const CheckIcon = icon('CheckIcon');
 /** Open on YouTube / external: external links. */
 export const ExternalLinkIcon = icon('ExternalLinkIcon');
-/** Check now / re-sync: Check now buttons. */
+/** Check now / re-sync: Check now buttons (yt-dlp, Activity). */
 export const RefreshIcon = icon('RefreshIcon');
 /** More actions menu: row menus. */
 export const MoreIcon = icon('MoreIcon');

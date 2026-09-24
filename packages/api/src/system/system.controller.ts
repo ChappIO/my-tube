@@ -20,7 +20,7 @@ export class SystemController {
 
   /**
    * The server log as a download (`text/plain`, attachment `mytube.log`): the log file when it
-   * exists, otherwise a short note that logs go to stdout.
+   * exists (it does once the app logger wrote a line), otherwise a short note.
    */
   @Get('logs')
   logs(): StreamableFile {

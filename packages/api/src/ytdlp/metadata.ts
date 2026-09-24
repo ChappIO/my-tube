@@ -92,6 +92,12 @@ export interface SourceEntry {
   isShort: boolean;
   /** The channel tab the entry was listed under, when the source was a channel root. */
   tab: ChannelTab | null;
+  /**
+   * The uploading channel when the listing says so (playlist entries, single videos). Flat
+   * channel listings leave it out: the entries belong to the listed channel.
+   */
+  channelId: string | null;
+  channel: string | null;
   thumbnails: Thumbnail[];
 }
 
@@ -216,6 +222,8 @@ function toEntry(node: RawInfo, tab: ChannelTab | null): SourceEntry {
     liveStatus: node.live_status ?? null,
     isShort: !isPlaylist && (url.includes('/shorts/') || tab === 'shorts'),
     tab,
+    channelId: node.channel_id ?? null,
+    channel: node.channel ?? node.uploader ?? null,
     thumbnails: node.thumbnails,
   };
 }
