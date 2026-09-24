@@ -8,6 +8,7 @@ Working checklist for building MyTube. Stages come from the architecture skill a
 - Before starting a task, read `CLAUDE.md` and the skills it names. The task lists which skills and which handoff sections matter.
 - A task is done when its "Done when" holds, `pnpm check` passes, and the relevant skill is updated if the task changed a convention.
 - Check the box in the same pull request that finishes the task.
+- Prefer vertical slices: pair an endpoint with the screen that uses it in one task and one pull request, so the whole feature can be validated at once. Pure infrastructure (migrations, runners, schedulers) may stay backend-only.
 - Finish the work inside the task: fix what you find in scope (accessibility, missing variants, polish) before reporting. Only add a new task when it would substantially change the outcome or belongs to a later stage's feature. Small follow-ups are not filed; they pile up.
 - Handoff references point into `design_handoff_mytube/README.md`.
 
