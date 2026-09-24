@@ -43,7 +43,7 @@ jobs:
       - name: Boot the container and check health
         run: |
           docker run -d --name mytube -p 8080:8080 mytube:ci
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             if curl -fsS http://localhost:8080/api/health; then echo; exit 0; fi
             sleep 1
           done

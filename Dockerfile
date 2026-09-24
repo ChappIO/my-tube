@@ -63,7 +63,7 @@ ENV NODE_ENV=production \
 VOLUME ["/config", "/media/music", "/media/video"]
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD curl -fsS "http://localhost:${PORT}/api/health" || exit 1
+  CMD ["sh", "-c", "curl -fsS \"http://localhost:${PORT}/api/health\" || exit 1"]
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/entrypoint.sh"]
 CMD ["node", "packages/api/dist/main.js"]

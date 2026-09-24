@@ -17,6 +17,7 @@ Working checklist for building MyTube. Stages come from the architecture skill a
 - [x] Vite web app with TanStack Router, React Query, Tailwind
 - [x] oxlint, oxfmt, Vitest, CI, Docker image, release workflow
 - [x] Skills: architecture, tooling, backend, database, frontend, deployment
+- [ ] **Infra linters in CI.** Run actionlint, hadolint and shellcheck in the check job (see `pnpm lint:infra`). Done when a deliberate Dockerfile smell fails CI.
 
 ## Stage 1: Shell and design system
 

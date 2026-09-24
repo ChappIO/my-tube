@@ -12,7 +12,8 @@
     "fmt:check": "oxfmt --check",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "check": "pnpm lint && pnpm fmt:check && pnpm typecheck && pnpm test"
+    "check": "pnpm lint && pnpm fmt:check && pnpm typecheck && pnpm test",
+    "lint:infra": "actionlint && hadolint Dockerfile && shellcheck docker/entrypoint.sh"
   },
   "devDependencies": {
     "oxfmt": "0.70.0",

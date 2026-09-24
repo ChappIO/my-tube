@@ -1,0 +1,4 @@
+# DL3008: pinning apt versions on Debian breaks as soon as a security update
+# replaces the pinned build; the base image tag is the pin we rely on.
+ignored:
+  - DL3008

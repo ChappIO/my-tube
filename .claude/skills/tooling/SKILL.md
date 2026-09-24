@@ -34,6 +34,10 @@ MyTube is a pnpm workspace. Node and pnpm versions are pinned; use nvm (`.nvmrc`
 - Generated files (`routeTree.gen.ts`, `dist/`) are ignored by both.
 - Do not add ESLint or Prettier.
 
+## Infrastructure linters (local only)
+
+`pnpm lint:infra` runs actionlint (workflows), hadolint (Dockerfile, config in `.hadolint.yaml`) and shellcheck (`docker/entrypoint.sh`). They are installed with Homebrew on the dev machine and are not in CI yet. Run it after touching anything under `.github`, the Dockerfile or `docker/`.
+
 ## TypeScript
 
 - `tsconfig.base.json` holds the strict shared options. Each package extends it and only sets module/JSX/output options.
