@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ActivityRouteImport } from './routes/activity'
+import { Route as DevComponentsRouteImport } from './routes/dev/components'
 import { Route as DevLogoRouteImport } from './routes/dev/logo'
 import { Route as DevTokensRouteImport } from './routes/dev/tokens'
 import { Route as MusicIndexRouteImport } from './routes/music.index'
@@ -29,6 +30,11 @@ const IndexRoute = IndexRouteImport.update({
 const ActivityRoute = ActivityRouteImport.update({
   id: '/activity',
   path: '/activity',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevComponentsRoute = DevComponentsRouteImport.update({
+  id: '/dev/components',
+  path: '/dev/components',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DevLogoRoute = DevLogoRouteImport.update({
@@ -80,6 +86,7 @@ const VideoChannelIdRoute = VideoChannelIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/dev/components': typeof DevComponentsRoute
   '/dev/logo': typeof DevLogoRoute
   '/dev/tokens': typeof DevTokensRoute
   '/music/$tab': typeof MusicTabRoute
@@ -93,6 +100,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/dev/components': typeof DevComponentsRoute
   '/dev/logo': typeof DevLogoRoute
   '/dev/tokens': typeof DevTokensRoute
   '/music/$tab': typeof MusicTabRoute
@@ -107,6 +115,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/dev/components': typeof DevComponentsRoute
   '/dev/logo': typeof DevLogoRoute
   '/dev/tokens': typeof DevTokensRoute
   '/music/$tab': typeof MusicTabRoute
@@ -122,6 +131,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/activity'
+    | '/dev/components'
     | '/dev/logo'
     | '/dev/tokens'
     | '/music/$tab'
@@ -135,6 +145,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/activity'
+    | '/dev/components'
     | '/dev/logo'
     | '/dev/tokens'
     | '/music/$tab'
@@ -148,6 +159,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/activity'
+    | '/dev/components'
     | '/dev/logo'
     | '/dev/tokens'
     | '/music/$tab'
@@ -162,6 +174,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActivityRoute: typeof ActivityRoute
+  DevComponentsRoute: typeof DevComponentsRoute
   DevLogoRoute: typeof DevLogoRoute
   DevTokensRoute: typeof DevTokensRoute
   MusicTabRoute: typeof MusicTabRoute
@@ -187,6 +200,13 @@ declare module '@tanstack/react-router' {
       path: '/activity'
       fullPath: '/activity'
       preLoaderRoute: typeof ActivityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev/components': {
+      id: '/dev/components'
+      path: '/dev/components'
+      fullPath: '/dev/components'
+      preLoaderRoute: typeof DevComponentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dev/logo': {
@@ -258,6 +278,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivityRoute: ActivityRoute,
+  DevComponentsRoute: DevComponentsRoute,
   DevLogoRoute: DevLogoRoute,
   DevTokensRoute: DevTokensRoute,
   MusicTabRoute: MusicTabRoute,
