@@ -29,6 +29,23 @@ Migrations are plain SQL files in `packages/api/src/database/migrations`, applie
 | `migrations` | `name` (file name, PK), `applied_at`. Owned by the migration runner.                                                                             |
 | `settings`   | `key` (dotted path such as `general.theme`, PK), `value` (JSON text), `updated_at`. One row per changed field; see the backend skill "Settings". |
 
+### Sources and catalog
+
+Migration `20260924193510_sources.sql`. Every table has `id` (INTEGER PK), `created_at` and `updated_at`.
+
+| Table       | Columns                                                                                                                                                                                                                                                                                                                                                                |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sources`   | What the user added. `library` (`music`/`video`), `kind` (`channel`/`artist`/`playlist`), `youtube_id`, `url`, `name`, `avatar_url` (null), `subscribed` (0/1, default 1), `rules` (JSON of the shared `Rules` schema; `json_valid` and its `library` tag must equal the row's), `last_checked_at` (null), `item_count`, `size_bytes`. `UNIQUE (library, youtube_id)`. |
+| `channels`  | Every channel MyTube knows, `youtube_id` UNIQUE, `name`, `avatar_url`, `source_id` (null).                                                                                                                                                                                                                                                                             |
+| `artists`   | Every artist MyTube knows, `youtube_id` UNIQUE but nullable (YouTube Music artist or channel id; null for artists known only from tags), `name` (indexed), `avatar_url`, `source_id` (null).                                                                                                                                                                           |
+| `playlists` | Playlists synced from YouTube, `library`, `youtube_id` UNIQUE, `name`, `thumbnail_url`, `item_count`, `source_id` (null).                                                                                                                                                                                                                                              |
+
+- **A channel row exists for every channel we know**, not only for subscribed ones: a video that arrives through a playlist still gets its channel row. `source_id` points at the source only when the channel (or artist, or playlist) was added as one. The same holds for `artists` and `playlists`.
+- `source_id` is `ON DELETE SET NULL` and indexed. Deleting a source unlinks its catalog rows and never removes them, and never touches files. Unsubscribing only flips `subscribed`.
+- The same YouTube id can be a source in both libraries (two `sources` rows), but it has one `channels`, `artists` or `playlists` row.
+- In Drizzle, `subscribed` is `integer({ mode: 'boolean' })` and `rules` is `text({ mode: 'json' }).$type<Rules>()`. The `Source` DTO in shared maps one to one onto a `sources` row (`Source.parse(row)`).
+- Items (`videos`, `tracks`, `albums`, `playlist_items`) arrive in Stage 4.
+
 ## Querying
 
 Inject the database with `@Inject(DATABASE) private readonly db: Database` and use Drizzle: `this.db.select().from(settings).where(eq(settings.key, 'theme'))`. better-sqlite3 is synchronous; Drizzle's sqlite driver exposes `.all()`, `.get()`, `.run()` synchronously and the query builder is also awaitable.

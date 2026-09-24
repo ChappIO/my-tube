@@ -33,7 +33,7 @@ SQLite, one migration per change (see the database skill).
 | Table                         | Purpose                                                                                                                                              |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `sources`                     | library (music/video), kind (channel/artist/playlist), youtube id, url, name, avatar, subscribed, rules (JSON), last checked, cached counts and size |
-| `channels`, `videos`          | video library. A video belongs to a channel and optionally to playlists                                                                              |
+| `channels`, `videos`          | video library. Every known channel has a row (linked to its source if added). A video belongs to a channel and optionally to playlists               |
 | `artists`, `albums`, `tracks` | music library. A track belongs to an album and an artist                                                                                             |
 | `playlists`, `playlist_items` | synced playlists for both libraries, with an ordered position                                                                                        |
 | `jobs`                        | queue: type, payload (JSON), status, progress, speed, attempts, error, timestamps                                                                    |
