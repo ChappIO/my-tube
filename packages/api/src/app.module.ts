@@ -5,6 +5,7 @@ import { ConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
 import { SettingsModule } from './settings/settings.module.js';
+import { SourcesModule } from './sources/sources.module.js';
 import { WebModule } from './web/web.module.js';
 import { YtdlpModule } from './ytdlp/ytdlp.module.js';
 
@@ -16,6 +17,7 @@ import { YtdlpModule } from './ytdlp/ytdlp.module.js';
     ActivityModule,
     HealthModule,
     SettingsModule,
+    SourcesModule,
     YtdlpModule,
     // Serves the built web app when it exists (production). In development Vite serves it.
     WebModule,

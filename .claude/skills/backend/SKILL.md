@@ -21,6 +21,7 @@ packages/api/src
   ytdlp/                the yt-dlp runner (the only code that spawns yt-dlp) and the binary manager
   settings/             SettingsService over the settings table, GET/PATCH /api/settings
   activity/             HistoryService over the history table (global module; controller in Stage 4)
+  sources/              URL resolution, source CRUD, rules and the subscribe toggle
 packages/api/test       end-to-end tests booting the real AppModule
 ```
 
@@ -68,6 +69,27 @@ The contract is `packages/shared/src/rules.ts`; the tables are in the database s
 - `describeRules(rules)` returns the handoff's chip labels in order: `no shorts`, `keep 90 days` (`keep 1 day`), `since 2025-01-01`, `only "Monologue"`, `sync order`, `no live`, `full albums`, `cover art`. Rules that are off give no chip.
 - `Source` is the DTO for one `sources` row: `id`, `library`, `kind`, `youtubeId`, `url`, `name`, `avatarUrl`, `subscribed`, `rules`, `lastCheckedAt`, `itemCount`, `sizeBytes`, `createdAt`, `updatedAt`. A Drizzle row parses directly.
 - `sourceIssues({ library, kind, rules })` lists invalid combinations (rules of the other library, an artist outside Music, sync order on a non-playlist). `Source` applies it; reuse it in create and update inputs.
+
+### Sources API
+
+`src/sources/` (`SourcesService`, `SourcesController`); the DTOs are in `packages/shared/src/sources.ts`.
+
+| Endpoint                            | Body / query                                     | Response                                                     |
+| ----------------------------------- | ------------------------------------------------ | ------------------------------------------------------------ |
+| `POST /api/sources/resolve`         | `ResolveRequest` `{ url }`                       | 200 `ResolvedSource`; 400 unsupported link; 502 yt-dlp error |
+| `GET /api/sources`                  | `?library=video\|music` (optional)               | `Source[]`, newest first                                     |
+| `GET /api/sources/:id`              |                                                  | `Source`; 404                                                |
+| `POST /api/sources`                 | `CreateSource` `{ url, library, kind?, rules? }` | 201 `Source`; 400; 409 `SourceConflict` `{ sourceId }`       |
+| `PATCH /api/sources/:id`            | `UpdateSource` `{ rules?, subscribed?, name? }`  | `Source`; 400; 404                                           |
+| `PATCH /api/sources/:id/subscribed` | `SetSubscribed` `{ subscribed }` (the bell)      | `Source`; 404                                                |
+| `DELETE /api/sources/:id`           |                                                  | 204; 404                                                     |
+
+- **Links.** `parseYoutubeUrl(input)` (shared, pure, also for the web's pre-validation) returns `{ kind: channel|artist|playlist|video, id, url (canonical), music }` or null. It accepts `@handle` (bare or in a URL), `/channel/UC…`, `/c/…`, `/user/…`, `/playlist?list=…`, `watch?v=…&list=…` (the playlist), `watch?v=…`, `youtu.be/…`, `/shorts/…`, `/live/…`, and on `music.youtube.com` `/channel/UC…` (an artist) and `/playlist?list=…`. Mixes (`RD…`, except YouTube Music's curated `RDCLAK…`), liked and watch-later lists are rejected. `guessLibrary(parsed)` is Music for `music.youtube.com`, else Video.
+- **Resolve.** Parse (400 with a clear message when null), then `runner.metadata(canonicalUrl, { limit: 30, network })` with the Settings network options. A video resolves to its channel with a second call (`resolvedFrom: 'video'`). `ResolvedSource`: `kind` (a channel in the guessed Music library is an `artist`), `library` (guess), `youtubeId` (channel id or playlist id), `url` (id-based: `/channel/UC…`, artists on `music.youtube.com`, `/playlist?list=…`), `name`, `avatarUrl` (absolute; YouTube's original-size `=s0` avatars are requested at `=s256`), `itemCount` (playlists only; YouTube's flat channel listing has no total, so null for channels and artists), `uploadsPerWeek` and `latestItemAt` (from the newest 30 dated uploads across the channel tabs; null with fewer than two), `alreadyAdded` (`{ sourceId, library }`, preferring the guessed library). yt-dlp failures are 502 `{ message, reason }` with the runner's `reason`. Nothing is cached.
+- **Create.** Re-resolves the URL. `kind` defaults to the resolved kind mapped to the chosen library (`kindForLibrary`: channel ↔ artist; a playlist stays a playlist; a playlist link cannot become a channel or the reverse). Rules: `defaultRules(library)`, then for video Settings → Video `keepDays` and `skipShorts`, then the client's `rules`. Then `sourceIssues`. Inserts subscribed, and in the same transaction upserts the `channels`, `artists` or `playlists` row (by kind) and links it when it is not linked yet. 409 with `sourceId` when `(library, youtubeId)` exists.
+- **Rule inputs** (`RulesInput`) are partial and have no defaults: `library` is required and must equal the source's library, the other fields are optional and unknown ones rejected. On create they overlay the defaults above, on `PATCH` they overlay the current rules, so a full `Rules` object and a single changed field both work.
+- **Removing never deletes media.** `DELETE` removes the `sources` row only. The migration's `ON DELETE SET NULL` unlinks the catalog row (relinked to the same YouTube id's source in the other library when one exists); files and items are never touched. Unsubscribing only flips `subscribed`. Nothing in this module enqueues syncs or downloads (Stage 4).
+- **Tests.** `sources.e2e.spec.ts` sets `YTDLP_PATH` to the fake binary, so `@NASA`, `/channel/UC…` and `music.youtube.com/channel/…` get `channel.json`, `list=` links `playlist.json` and `watch?v=`/`youtu.be` links `video.json` (then `channel.json` for its channel); `FAKE_YTDLP_FAIL=1` drives the 502. Pure helpers (`resolve.ts`: cadence, kind mapping, canonical URLs, rule overlay) and `parseYoutubeUrl` have unit tests.
 
 ## Background work
 

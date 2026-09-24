@@ -54,8 +54,8 @@ Skills: backend, database. Handoff: Screen 6 Settings, Sidebar footer.
 Skills: backend, database, frontend. Handoff: Screen 3 Channels tab and Channel page, Screen 4 Add to library, Components bell toggle.
 
 - [x] **Sources table and rules schema.** Migration for `sources`, `channels`, `artists`, `playlists`. Rules as a Zod schema in shared with the video and music rule sets from the handoff. Done when the schema and migration are in one commit and the database skill lists the tables.
-- [ ] **URL resolution.** `POST /api/sources/resolve` takes a YouTube URL and returns kind, name, avatar, counts and upload cadence via the yt-dlp runner. Done when channel, artist, playlist and unsupported URLs each return the documented result.
-- [ ] **Source CRUD and subscribe toggle.** Create from a resolved URL with library and rules, list, get, update rules, toggle subscribed. Unsubscribing never deletes anything. Done when the e2e test covers the full lifecycle.
+- [x] **URL resolution.** `POST /api/sources/resolve` takes a YouTube URL and returns kind, name, avatar, counts and upload cadence via the yt-dlp runner. Done when channel, artist, playlist and unsupported URLs each return the documented result.
+- [x] **Source CRUD and subscribe toggle.** Create from a resolved URL with library and rules, list, get, update rules, toggle subscribed. Unsubscribing never deletes anything. Done when the e2e test covers the full lifecycle.
 - [ ] **Add modal.** URL input with detection, source card, Save-to switch that swaps the rule set, rule checkbox rows, Cancel and Subscribe. Done when subscribing closes the modal and the new source appears in Channels.
 - [ ] **Channels tab and channel page.** Channel rows with rule chips, checked-ago, bell toggle and Edit rules, the collapse below 760px, and the channel page header with back link. Bell state shared between list and page with optimistic updates. Done when both screens match the handoff with real sources.
 
