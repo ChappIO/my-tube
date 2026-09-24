@@ -1,6 +1,6 @@
 import { createFileRoute, linkOptions } from '@tanstack/react-router';
 import { type ReactNode, useState } from 'react';
-import { PlusIcon, RefreshIcon, SearchIcon, TrashIcon } from '../../components/icons';
+import { PlayIcon, PlusIcon, RefreshIcon, SearchIcon, TrashIcon } from '../../components/icons';
 import { BackLink } from '../../components/ui/BackLink';
 import { MUSIC_TABS, TAB_ICONS, TAB_LABELS } from '../../navigation';
 import { Button } from '../../components/ui/Button';
@@ -86,6 +86,7 @@ function ComponentsDemo() {
   const [rules, setRules] = useState<Record<string, boolean>>({ shorts: true, keep: true });
   const [addOpen, setAddOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [library, setLibrary] = useState<Library>('video');
   const [url, setUrl] = useState('');
 
@@ -154,7 +155,10 @@ function ComponentsDemo() {
         <BackLink link={backToVideo}>Video</BackLink>
       </Story>
 
-      <Story name="Button" note="primary, secondary, outlined × md, lg · optional leading icon">
+      <Story
+        name="Button"
+        note="primary, secondary, outlined × md, lg · xl full width (sidebar Add) · optional leading icon"
+      >
         <div className="grid gap-4">
           <Row>
             <Button variant="primary">Subscribe</Button>
@@ -178,8 +182,8 @@ function ComponentsDemo() {
               Delete file
             </Button>
           </Row>
-          <div className="max-w-[232px]">
-            <Button variant="primary" size="lg" fullWidth icon={<PlusIcon />}>
+          <div className="max-w-[204px]">
+            <Button variant="primary" size="xl" fullWidth icon={<PlusIcon />}>
               Add to library
             </Button>
           </div>
@@ -283,13 +287,16 @@ function ComponentsDemo() {
         </div>
       </Story>
 
-      <Story name="Modal" note="overlay 0.45 (strong 0.7) · click outside, Escape or × closes">
+      <Story
+        name="Modal"
+        note="scrim 0.45 (strong 0.7) · click outside, Escape or × closes · Tab stays inside · header-less Preview · Delete file opens a nested confirm; Escape closes only the top one"
+      >
         <Row>
           <Button variant="primary" icon={<PlusIcon />} onClick={() => setAddOpen(true)}>
             Add to library
           </Button>
           <Button variant="outlined" onClick={() => setPreviewOpen(true)}>
-            Open wide, strong dim
+            Preview (no title row)
           </Button>
         </Row>
       </Story>
@@ -334,13 +341,67 @@ function ComponentsDemo() {
       <Modal
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
-        title="A wider dialog"
+        aria-label="Preview: Why dishwashers ignore you"
         dim="strong"
-        width="min(880px, 100%)"
+        width="min(880px, 100%, calc((100vh - 160px) * 16 / 9))"
       >
-        <Body muted>Uses the Preview overlay (0.7) and a wider dialog.</Body>
+        <PreviewPlayer />
+        <div className="flex flex-wrap items-center justify-between gap-4 px-[26px] py-[22px]">
+          <div className="grid min-w-0 gap-1">
+            <SectionTitle as="div">Why dishwashers ignore you</SectionTitle>
+            <Meta className="truncate">
+              /media/video/Technology Connections/Why dishwashers ignore you (2026-09-22).mkv
+            </Meta>
+          </div>
+          <Row>
+            <Button size="lg">Open in Plex</Button>
+            <Button
+              variant="outlined"
+              size="lg"
+              icon={<TrashIcon />}
+              onClick={() => setConfirmOpen(true)}
+            >
+              Delete file
+            </Button>
+          </Row>
+        </div>
+      </Modal>
+
+      <Modal open={confirmOpen} onClose={() => setConfirmOpen(false)} title="Delete file?">
+        <Body muted>The file is removed from the video library. The subscription stays.</Body>
+        <ModalActions>
+          <Button size="lg" onClick={() => setConfirmOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={() => {
+              setConfirmOpen(false);
+              setPreviewOpen(false);
+            }}
+          >
+            Delete
+          </Button>
+        </ModalActions>
       </Modal>
     </main>
+  );
+}
+
+/** Stand-in for the Preview player area: 16/9 black with a 72px translucent white play circle. */
+function PreviewPlayer() {
+  return (
+    // The player black is fixed in both themes (handoff Screen 7: #0F1012).
+    <div className="grid aspect-video place-items-center" style={{ background: '#0F1012' }}>
+      <button
+        type="button"
+        aria-label="Play"
+        className="grid size-[72px] cursor-pointer place-items-center rounded-full bg-white/20 text-white"
+      >
+        <PlayIcon size={28} />
+      </button>
+    </div>
   );
 }
 

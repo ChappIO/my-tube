@@ -20,6 +20,12 @@
   --color-ok: #2f9e6a;
   /* Glyphs and text on red (primary buttons, subscribed bell). Same in both themes. */
   --color-white: #ffffff;
+  /*
+   * Modal overlays: the light-theme ink at fixed opacity, the same in both themes
+   * (handoff Screens 4 and 7). `scrim` for Add to library, `scrim-strong` for Preview.
+   */
+  --color-scrim: rgba(21, 22, 24, 0.45);
+  --color-scrim-strong: rgba(21, 22, 24, 0.7);
 
   --font-sans:
     'Archivo Variable', 'Archivo', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
@@ -84,6 +90,79 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /*
+   * Global keyboard focus style (handoff Inputs: 2px red outline, offset 2px). Anything
+   * focusable gets it without opting in; components use the focus-ring utilities below to
+   * override the offset or to draw it on a parent.
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-red);
+    outline-offset: 2px;
+  }
+}
+
+/*
+ * Focus ring utilities. `focus-ring` is the global style made explicit (and robust against
+ * `outline-none`); `focus-ring-inset` draws it inside the element, for items in a clipping
+ * container (tab pills, nav rows); `focus-ring-overlay` rings an element when the overlay
+ * control inside it (marked `data-overlay`) has keyboard focus (media tiles).
+ */
+@utility focus-ring {
+  &:focus-visible {
+    outline: 2px solid var(--color-red);
+    outline-offset: 2px;
+  }
+}
+
+@utility focus-ring-inset {
+  &:focus-visible {
+    outline: 2px solid var(--color-red);
+    outline-offset: -2px;
+  }
+}
+
+@utility focus-ring-overlay {
+  &:has([data-overlay]:focus-visible) {
+    outline: 2px solid var(--color-red);
+    outline-offset: 2px;
+  }
+}
+
+/*
+ * Motion (handoff "Motion"; nothing else animates). Tailwind 4 scales and translates through
+ * the individual `scale` and `translate` properties, so those are what transition.
+ *   motion-tile   tile hover: transform .2s ease, box-shadow .2s ease (open music tiles also
+ *                 fade in their `surface` background with it)
+ *   motion-chin   chin reveal: transform .2s ease
+ *   motion-knob   toggle knob: left .15s
+ * Reduced motion keeps the end states and drops the animation.
+ */
+@utility motion-tile {
+  transition-property: scale, translate, transform, box-shadow, background-color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+@utility motion-chin {
+  transition-property: translate, transform;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+@utility motion-knob {
+  transition-property: left;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
   }
 }
 

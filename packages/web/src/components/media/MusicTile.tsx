@@ -1,5 +1,6 @@
 import type { KeyboardEvent } from 'react';
 import { BellIcon } from '../icons';
+import { cx, focusRing } from '../ui/cx';
 import { Artwork } from './Artwork';
 import { PlaylistStack } from './PlaylistStack';
 
@@ -27,9 +28,6 @@ export interface MusicTileProps {
   className?: string;
 }
 
-// Handoff motion for the open tile: `transform .2s ease, background .2s ease`.
-const TILE_MOTION = 'transition-[scale,background-color] duration-200 ease-[ease]';
-
 /**
  * The open music tile (Music tab): no box, art with text below. Hover scales it to 1.03 and
  * puts `surface` behind the whole tile.
@@ -45,7 +43,7 @@ export function MusicTile({
   covers,
   seed,
   onOpen,
-  className = '',
+  className,
 }: MusicTileProps) {
   const artist = kind === 'artist';
 
@@ -63,7 +61,13 @@ export function MusicTile({
       tabIndex={0}
       onClick={onOpen}
       onKeyDown={handleKeyDown}
-      className={`grid cursor-pointer gap-3 rounded-card hover:scale-[1.03] hover:bg-surface ${artist ? 'p-3 text-center' : 'p-2.5 text-left'} ${TILE_MOTION} ${className}`}
+      className={cx(
+        'grid cursor-pointer gap-3 rounded-card hover:scale-[1.03] hover:bg-surface',
+        'motion-tile',
+        focusRing,
+        artist ? 'p-3 text-center' : 'p-2.5 text-left',
+        className,
+      )}
     >
       <div className="relative">
         {kind === 'playlist' ? (
@@ -77,7 +81,9 @@ export function MusicTile({
         <div className="text-tile-title text-pretty">{title}</div>
         {subtitle && <div className="mt-0.5 text-tile-meta text-muted">{subtitle}</div>}
         {meta && (
-          <div className={`mt-1.5 truncate text-meta-sm ${incomplete ? 'text-red' : 'text-muted'}`}>
+          <div
+            className={cx('mt-1.5 truncate text-meta-sm', incomplete ? 'text-red' : 'text-muted')}
+          >
             {meta}
           </div>
         )}

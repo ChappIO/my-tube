@@ -8,7 +8,11 @@ export type TabPillSize = 'md' | 'sm';
 export interface TabPillItem<T extends string> {
   id: T;
   label: ReactNode;
-  /** Optional icon from `components/icons` (for example `TAB_ICONS[id]`), 16px before the label. */
+  /**
+   * Optional icon from `components/icons` (for example `TAB_ICONS[id]`), 16px before the label.
+   * Wide screens only: below 760px the pills are text only, as in the handoff, so four of
+   * them fit a 375px screen.
+   */
   icon?: ComponentType<IconProps>;
 }
 
@@ -48,20 +52,21 @@ function itemClass(size: TabPillSize, active: boolean): string {
   );
 }
 
-/** Item content shared by both variants: optional 16px icon, 8px gap, label. */
+/** Item content shared by both variants: optional 16px icon (wide only), 8px gap, label. */
 function TabPillContent({ item }: { item: TabPillItem<string> }) {
   const Icon = item.icon;
   return (
     <>
-      {Icon && <Icon size={16} />}
+      {Icon && <Icon size={16} className="hidden wide:block" />}
       {item.label}
     </>
   );
 }
 
 /**
- * When the track scrolls sideways (narrow screens), keeps the active pill visible: on first
- * render `/music/tracks` would otherwise show its active pill cut off at the edge.
+ * When the track scrolls sideways, keeps the active pill visible: on first render the active
+ * pill would otherwise sit cut off at the edge. Text-only pills fit a 375px screen, so this is
+ * a fallback for longer labels or larger text settings.
  */
 function useActivePillInView<E extends HTMLElement>(value: string): RefObject<E | null> {
   const ref = useRef<E>(null);

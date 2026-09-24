@@ -18,6 +18,11 @@ export interface MarkGeometry {
   barRadius: number;
   /** Vertical gap between the triangle's tip and the bar. */
   gap: number;
+  /**
+   * Top of the triangle, when the glyph block is pixel-snapped instead of centered (16px: an
+   * odd-height block cannot be centered on whole pixels).
+   */
+  top?: number;
 }
 
 type Hinted = [
@@ -30,9 +35,13 @@ type Hinted = [
   gap: number,
 ];
 
-/** Tile sizes drawn in the handoff (Turn 4: sizes row, lockups, app tile). */
+/**
+ * Tile sizes drawn in the handoff (Turn 4: sizes row, lockups, app tile). 16px is snapped to
+ * whole pixels for the favicon: the handoff's 7 × 1.5 bar would sit on half pixels and blur,
+ * so it is 8 × 2, and the 7px block starts at y 4 (see SNAPPED_TOP).
+ */
 const TILE_HINTED: Record<number, Hinted> = {
-  16: [4, 6, 4, 7, 1.5, 0, 1],
+  16: [4, 6, 4, 8, 2, 0, 1],
   24: [6, 9, 5.5, 10, 2, 1, 1],
   28: [7, 10, 6, 11, 2, 1, 2],
   32: [8, 12, 7, 13, 2, 1, 2],
@@ -42,6 +51,12 @@ const TILE_HINTED: Record<number, Hinted> = {
   88: [20, 32, 20, 35, 6, 3, 5],
   96: [22, 34, 22, 38, 6, 3, 5],
 };
+
+/**
+ * Pixel-snapped block tops. At 16px the 7px block would start at 4.5; 4 puts every edge on a
+ * whole pixel, and the bar's weight below the triangle keeps it optically centered.
+ */
+const SNAPPED_TOP: Record<number, number> = { 16: 4 };
 
 /** The glyph without a tile fills more of its box (Turn 4: "Glyph, red" at 96px). */
 const GLYPH_REFERENCE: Hinted = [0, 52, 34, 58, 9, 4, 7];
@@ -66,7 +81,9 @@ function scaled(reference: Hinted, size: number): MarkGeometry {
 
 export function tileGeometry(size: number): MarkGeometry {
   const hinted = TILE_HINTED[size];
-  return hinted ? fromHinted(hinted) : scaled(TILE_HINTED[96]!, size);
+  if (!hinted) return scaled(TILE_HINTED[96]!, size);
+  const top = SNAPPED_TOP[size];
+  return top === undefined ? fromHinted(hinted) : { ...fromHinted(hinted), top };
 }
 
 export function glyphGeometry(size: number): MarkGeometry {
@@ -83,7 +100,7 @@ export interface GlyphShapes {
 /** Lays the glyph out centered in a `size` × `size` box. */
 export function glyphShapes(size: number, g: MarkGeometry): GlyphShapes {
   const blockHeight = g.triangleHeight + g.gap + g.barHeight;
-  const top = (size - blockHeight) / 2;
+  const top = g.top ?? (size - blockHeight) / 2;
   const cx = size / 2;
   const left = cx - g.triangleWidth / 2;
   const right = cx + g.triangleWidth / 2;

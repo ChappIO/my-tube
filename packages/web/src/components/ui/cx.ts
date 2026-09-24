@@ -5,14 +5,20 @@ export function cx(...parts: Array<string | false | null | undefined | 0>): stri
 
 /**
  * Keyboard focus style shared by every control: 2px red outline, offset 2px (the handoff has no
- * designed focus ring). Only shown for keyboard focus.
+ * designed focus ring). Only shown for keyboard focus. The values live once in `styles.css`
+ * (the global `:focus-visible` rule and the `focus-ring` utilities); these constants name the
+ * utilities so components can list them next to their other shared classes.
  */
-export const focusRing =
-  'focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-red';
+export const focusRing = 'focus-ring';
 
 /** The same ring drawn inside the element, for items in a clipping container (tab pills). */
-export const focusRingInset =
-  'focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-2 focus-visible:outline-red';
+export const focusRingInset = 'focus-ring-inset';
+
+/**
+ * Rings the element when its overlay control (the descendant with `data-overlay`) has keyboard
+ * focus. For tiles whose single interactive element is a full-size overlay button.
+ */
+export const focusRingOverlay = 'focus-ring-overlay';
 
 /**
  * Minimum hit target: 44px tall on narrow screens, 36px on wide (handoff "Buttons").

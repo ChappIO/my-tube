@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { LogoLockup } from '../brand/Logo';
-import { AddToLibraryButton } from './AddButtons';
+import { PlusIcon } from '../icons';
+import { Button } from '../ui/Button';
 import { NavList } from './NavItem';
 
 /** Wide layout sidebar: lockup, nav, spacer, Add button, footer slot. Hidden below 760px. */
@@ -23,7 +24,9 @@ export function Sidebar({
       </div>
       <NavList activityCount={activityCount} />
       <div className="flex-1" />
-      <AddToLibraryButton onClick={onAdd} />
+      <Button variant="primary" size="xl" fullWidth icon={<PlusIcon />} onClick={onAdd}>
+        Add to library
+      </Button>
       {footer}
     </nav>
   );

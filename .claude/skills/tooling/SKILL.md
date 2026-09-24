@@ -57,7 +57,7 @@ Example for a second checkout: `API_PORT=8082 WEB_PORT=5175 pnpm dev`. `dev.mjs`
 
 - `tsconfig.base.json` holds the strict shared options. Each package extends it and only sets module/JSX/output options.
 - The api and shared packages are Node ESM with `NodeNext` resolution: relative imports need the `.js` extension.
-- The web package uses `bundler` resolution: no extensions.
+- The web package uses `bundler` resolution: no extensions. The exception is `packages/web/scripts/` (build-time helpers such as `favicon.ts`): Node runs them directly with type stripping, so their imports carry the `.ts` extension. They are typechecked and linted with the package.
 - `@mytube/shared` is consumed through its built `dist`. After changing shared without `pnpm dev` running, rebuild it (`pnpm --filter @mytube/shared build`).
 
 ## Tests
