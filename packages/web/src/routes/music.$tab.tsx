@@ -1,10 +1,13 @@
-import { Link, createFileRoute, redirect } from '@tanstack/react-router';
-import {
-  PlaceholderPage,
-  PlaceholderTabs,
-  placeholderTabProps,
-} from '../components/PlaceholderPage';
+import { createFileRoute, linkOptions, redirect } from '@tanstack/react-router';
+import { PlaceholderPage } from '../components/PlaceholderPage';
+import { TabPillLinks } from '../components/ui/TabPills';
 import { DEFAULT_MUSIC_TAB, MUSIC_TABS, type MusicTab, TAB_LABELS, parseTab } from '../navigation';
+
+const musicTabItems = MUSIC_TABS.map((tab) => ({
+  id: tab,
+  label: TAB_LABELS[tab],
+  link: linkOptions({ to: '/music/$tab', params: { tab } }),
+}));
 
 export const Route = createFileRoute('/music/$tab')({
   params: {
@@ -24,14 +27,10 @@ export const Route = createFileRoute('/music/$tab')({
 function MusicPage() {
   const { tab } = Route.useParams();
   return (
-    <PlaceholderPage title="Music" sub={`${TAB_LABELS[tab]}. Nothing here yet.`}>
-      <PlaceholderTabs>
-        {MUSIC_TABS.map((t) => (
-          <Link key={t} to="/music/$tab" params={{ tab: t }} {...placeholderTabProps}>
-            {TAB_LABELS[t]}
-          </Link>
-        ))}
-      </PlaceholderTabs>
-    </PlaceholderPage>
+    <PlaceholderPage
+      title="Music"
+      sub={`${TAB_LABELS[tab]}. Nothing here yet.`}
+      actions={<TabPillLinks label="Music view" items={musicTabItems} value={tab} />}
+    />
   );
 }

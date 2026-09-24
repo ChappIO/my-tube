@@ -30,3 +30,27 @@ export const TAB_LABELS: Record<MusicTab | VideoTab | SettingsTab, string> = {
 export function parseTab<T extends string>(tabs: readonly T[], value: unknown): T | undefined {
   return tabs.find((tab) => tab === value);
 }
+
+/** Top-level sections of the app, in sidebar and tab bar order. */
+export const NAV_SECTIONS = ['home', 'music', 'video', 'activity', 'settings'] as const;
+
+export type NavSection = (typeof NAV_SECTIONS)[number];
+
+export const NAV_SECTION_LABELS: Record<NavSection, string> = {
+  home: 'Home',
+  music: 'Music',
+  video: 'Video',
+  activity: 'Activity',
+  settings: 'Settings',
+};
+
+/**
+ * The section a pathname belongs to. Section-level, so `/music/tracks` is Music
+ * and `/video/channel/abc` is Video. Home matches `/` only. Undefined for paths
+ * outside the five sections (for example `/dev/tokens`).
+ */
+export function sectionOfPath(pathname: string): NavSection | undefined {
+  if (pathname === '/' || pathname === '') return 'home';
+  const first = pathname.split('/')[1];
+  return NAV_SECTIONS.find((section) => section !== 'home' && section === first);
+}

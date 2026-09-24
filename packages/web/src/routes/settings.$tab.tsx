@@ -1,9 +1,6 @@
-import { Link, createFileRoute, redirect } from '@tanstack/react-router';
-import {
-  PlaceholderPage,
-  PlaceholderTabs,
-  placeholderTabProps,
-} from '../components/PlaceholderPage';
+import { createFileRoute, linkOptions, redirect } from '@tanstack/react-router';
+import { PlaceholderPage } from '../components/PlaceholderPage';
+import { TabPillLinks } from '../components/ui/TabPills';
 import {
   DEFAULT_SETTINGS_TAB,
   SETTINGS_TABS,
@@ -11,6 +8,12 @@ import {
   TAB_LABELS,
   parseTab,
 } from '../navigation';
+
+const settingsTabItems = SETTINGS_TABS.map((tab) => ({
+  id: tab,
+  label: TAB_LABELS[tab],
+  link: linkOptions({ to: '/settings/$tab', params: { tab } }),
+}));
 
 export const Route = createFileRoute('/settings/$tab')({
   params: {
@@ -34,14 +37,10 @@ export const Route = createFileRoute('/settings/$tab')({
 function SettingsPage() {
   const { tab } = Route.useParams();
   return (
-    <PlaceholderPage title="Settings" sub={`${TAB_LABELS[tab]}. Nothing here yet.`}>
-      <PlaceholderTabs>
-        {SETTINGS_TABS.map((t) => (
-          <Link key={t} to="/settings/$tab" params={{ tab: t }} {...placeholderTabProps}>
-            {TAB_LABELS[t]}
-          </Link>
-        ))}
-      </PlaceholderTabs>
-    </PlaceholderPage>
+    <PlaceholderPage
+      title="Settings"
+      sub={`${TAB_LABELS[tab]}. Nothing here yet.`}
+      actions={<TabPillLinks label="Settings section" items={settingsTabItems} value={tab} />}
+    />
   );
 }
