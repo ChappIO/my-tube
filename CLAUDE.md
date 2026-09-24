@@ -7,14 +7,14 @@ Concretely, MyTube is a self-hosted media library that downloads YouTube content
 - **Music**: artists, albums, playlists, tracks.
 - **Video**: channels, playlists, videos.
 
-Users subscribe to artists and channels. New content is downloaded automatically according to per-subscription rules (skip shorts, keep only the last N days, title filters). Playback is primarily external (Plex). The web app is for browsing the libraries, managing subscriptions, watching the download queue and history, changing settings, and a light in-browser preview.
+Users subscribe to artists and channels. New content is downloaded automatically according to per-subscription rules (an AND/OR/NOT tree of conditions such as skip shorts, not older than N days, title contains). Playback is primarily external (Plex). The web app is for browsing the libraries, managing subscriptions, watching the download queue and history, changing settings, and a light in-browser preview.
 
 ## Goals
 
 - Put the user in control of what they watch and listen to. No recommendations, no trending, no autoplay of things they did not choose.
 - Run as a single Docker container with three mounts: `/media/music`, `/media/video`, and `/config` (database and settings).
 - Keep yt-dlp updated automatically, without user intervention.
-- Never delete files just because a subscription is removed. Deletion happens through retention rules or an explicit action.
+- Never delete files just because a subscription is removed. Deletion happens only through a source's rules (revalidation removes files that no longer match) or an explicit action.
 - Match the design handoff faithfully. It is high fidelity: colors, type, spacing, radii and interactions are final.
 
 ## Audience and tone
@@ -25,9 +25,9 @@ The owner and a few friends. No public marketing. UI copy is dry and technical. 
 
 - **Library**: Music or Video. Every downloaded item belongs to exactly one.
 - **Subscription**: an artist, channel or playlist that is checked for new content on a schedule, with its own rules.
-- **Rules**: per-subscription filters such as skip shorts, keep last N days, only titles matching, skip live recordings.
+- **Rules**: a per-subscription matcher: an AND/OR/NOT tree of conditions (skip shorts, not older than N days, title contains, …) that decides what is downloaded and what stays.
 - **Queue**: downloads in progress or waiting.
-- **History**: completed downloads, retention deletions, and yt-dlp updates.
+- **History**: completed downloads, rule removals, and yt-dlp updates.
 - **On disk / missing**: whether a known track or video actually exists in the library mount.
 
 ## Where to look
