@@ -1,18 +1,29 @@
 /**
- * The app's icon set. Import icons from here, never from `lucide-react` directly, so sizing
- * and stroke stay consistent (16px default, regular 2px stroke; use 16 to 20px in the UI).
+ * The app's icon set and icon registry. Import icons from here, never from `lucide-react`
+ * directly, so sizing and stroke stay consistent (16px default, regular 2px stroke; use 16 to
+ * 20px in the UI).
+ *
+ * One icon, one meaning: every icon is named after what it means (`ChannelsIcon`, not
+ * `TvIcon`), each meaning has exactly one icon, and no two icons share a Lucide glyph
+ * (`icons.spec.ts` enforces this). Reuse the existing icon for a meaning; when a new meaning
+ * needs a glyph that is already taken, pick a different glyph. Keep the table in the frontend
+ * skill ("Icon registry") in sync with `ICON_REGISTRY`.
  */
 import {
   ArrowDownToLine,
   ArrowLeft,
+  AudioLines,
   Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  Disc3,
   Ellipsis,
   ExternalLink,
+  Film,
   House,
+  ListMusic,
   type LucideIcon,
   type LucideProps,
   Music,
@@ -22,16 +33,107 @@ import {
   RefreshCw,
   Search,
   Settings,
+  SlidersHorizontal,
   Trash2,
+  Tv,
+  Users,
   Video,
+  Wrench,
   X,
 } from 'lucide-react';
-import type { SVGProps } from 'react';
+import type { ReactElement, SVGProps } from 'react';
 
 export type IconProps = Omit<LucideProps, 'ref'>;
 
 export const ICON_SIZE = 16;
 const STROKE_WIDTH = 2;
+
+export interface IconEntry {
+  /** The Lucide glyph. Unique across the registry. */
+  base: LucideIcon;
+  /** The one thing this icon means. */
+  meaning: string;
+  /** Where it appears. */
+  usedIn: string;
+}
+
+/** Every Lucide-based icon: export name → glyph, meaning, usage. */
+export const ICON_REGISTRY = {
+  // Sections. The Music and Video icons mean "the music / video library", which is also what
+  // the Settings → Music and Settings → Video tabs configure, so those tabs reuse them.
+  HomeIcon: { base: House, meaning: 'Home section', usedIn: 'sidebar nav, tab bar' },
+  MusicIcon: {
+    base: Music,
+    meaning: 'Music library',
+    usedIn: 'sidebar nav, tab bar, Settings → Music tab',
+  },
+  VideoIcon: {
+    base: Video,
+    meaning: 'Video library',
+    usedIn: 'sidebar nav, tab bar, Settings → Video tab',
+  },
+  ActivityIcon: {
+    base: ArrowDownToLine,
+    meaning: 'Activity section (downloads)',
+    usedIn: 'sidebar nav, tab bar',
+  },
+  SettingsIcon: { base: Settings, meaning: 'Settings section', usedIn: 'sidebar nav, tab bar' },
+
+  // Tabs within a section.
+  ArtistsIcon: { base: Users, meaning: 'Artists', usedIn: 'Music → Artists tab' },
+  AlbumsIcon: { base: Disc3, meaning: 'Albums', usedIn: 'Music → Albums tab' },
+  PlaylistsIcon: { base: ListMusic, meaning: 'Playlists', usedIn: 'Music → Playlists tab' },
+  TracksIcon: { base: AudioLines, meaning: 'Tracks', usedIn: 'Music → Tracks tab' },
+  VideosIcon: { base: Film, meaning: 'Videos (individual items)', usedIn: 'Video → Videos tab' },
+  ChannelsIcon: { base: Tv, meaning: 'Channels', usedIn: 'Video → Channels tab' },
+  GeneralIcon: {
+    base: SlidersHorizontal,
+    meaning: 'General settings',
+    usedIn: 'Settings → General tab',
+  },
+  AdvancedIcon: { base: Wrench, meaning: 'Advanced settings', usedIn: 'Settings → Advanced tab' },
+
+  // Actions.
+  PlusIcon: {
+    base: Plus,
+    meaning: 'Add to library',
+    usedIn: 'sidebar Add button, top bar "+", Add modal trigger',
+  },
+  CloseIcon: { base: X, meaning: 'Close / dismiss', usedIn: 'Modal close button' },
+  SearchIcon: { base: Search, meaning: 'Search', usedIn: 'search inputs (demo only so far)' },
+  PlayIcon: { base: Play, meaning: 'Play (preview)', usedIn: 'preview player (Stage 3+)' },
+  PauseIcon: { base: Pause, meaning: 'Pause (preview)', usedIn: 'preview player (Stage 3+)' },
+  TrashIcon: { base: Trash2, meaning: 'Delete files', usedIn: 'explicit delete actions' },
+  CheckIcon: { base: Check, meaning: 'Checked / selected', usedIn: 'CheckboxRow tick' },
+  ExternalLinkIcon: {
+    base: ExternalLink,
+    meaning: 'Open on YouTube / external',
+    usedIn: 'external links (Stage 3+)',
+  },
+  RefreshIcon: {
+    base: RefreshCw,
+    meaning: 'Check now / re-sync',
+    usedIn: 'Check now buttons (yt-dlp, subscriptions)',
+  },
+  MoreIcon: { base: Ellipsis, meaning: 'More actions menu', usedIn: 'row menus (Stage 3+)' },
+
+  // Direction.
+  BackIcon: { base: ArrowLeft, meaning: 'Back to parent page', usedIn: 'BackLink ("← Video")' },
+  ChevronLeftIcon: { base: ChevronLeft, meaning: 'Previous', usedIn: 'pagers (not used yet)' },
+  ChevronRightIcon: { base: ChevronRight, meaning: 'Next', usedIn: 'pagers (not used yet)' },
+  ChevronUpIcon: {
+    base: ChevronUp,
+    meaning: 'Collapse / sort ascending',
+    usedIn: 'Tracks table sort (Stage 3+)',
+  },
+  ChevronDownIcon: {
+    base: ChevronDown,
+    meaning: 'Expand / sort descending',
+    usedIn: 'Tracks table sort, selects (Stage 3+)',
+  },
+} as const satisfies Record<string, IconEntry>;
+
+export type IconName = keyof typeof ICON_REGISTRY;
 
 function AppIcon({
   base: Base,
@@ -52,37 +154,82 @@ function AppIcon({
   );
 }
 
-function icon(base: LucideIcon, name: string) {
+type AppIconComponent = ((props: IconProps) => ReactElement) & { displayName: string };
+
+const builtIcons: [IconName, AppIconComponent][] = [];
+
+function icon(name: IconName): AppIconComponent {
+  const { base } = ICON_REGISTRY[name];
   const Icon = (props: IconProps) => <AppIcon base={base} {...props} />;
   Icon.displayName = name;
+  builtIcons.push([name, Icon]);
   return Icon;
 }
 
-// Navigation
-export const HomeIcon = icon(House, 'HomeIcon');
-export const MusicIcon = icon(Music, 'MusicIcon');
-export const VideoIcon = icon(Video, 'VideoIcon');
-export const ActivityIcon = icon(ArrowDownToLine, 'ActivityIcon');
-export const SettingsIcon = icon(Settings, 'SettingsIcon');
+/** Every registry icon component with its name, in declaration order (for `/dev/logo` and tests). */
+export function listIcons(): readonly [IconName, AppIconComponent][] {
+  return builtIcons;
+}
 
-// Actions
-export const PlusIcon = icon(Plus, 'PlusIcon');
-export const CloseIcon = icon(X, 'CloseIcon');
-export const SearchIcon = icon(Search, 'SearchIcon');
-export const PlayIcon = icon(Play, 'PlayIcon');
-export const PauseIcon = icon(Pause, 'PauseIcon');
-export const TrashIcon = icon(Trash2, 'TrashIcon');
-export const CheckIcon = icon(Check, 'CheckIcon');
-export const ExternalLinkIcon = icon(ExternalLink, 'ExternalLinkIcon');
-export const RefreshIcon = icon(RefreshCw, 'RefreshIcon');
-export const MoreIcon = icon(Ellipsis, 'MoreIcon');
+/** Home section: sidebar nav, tab bar. */
+export const HomeIcon = icon('HomeIcon');
+/** Music library: sidebar nav, tab bar, Settings → Music tab. */
+export const MusicIcon = icon('MusicIcon');
+/** Video library: sidebar nav, tab bar, Settings → Video tab. */
+export const VideoIcon = icon('VideoIcon');
+/** Activity section (downloads): sidebar nav, tab bar. */
+export const ActivityIcon = icon('ActivityIcon');
+/** Settings section: sidebar nav, tab bar. */
+export const SettingsIcon = icon('SettingsIcon');
 
-// Direction
-export const BackIcon = icon(ArrowLeft, 'BackIcon');
-export const ChevronLeftIcon = icon(ChevronLeft, 'ChevronLeftIcon');
-export const ChevronRightIcon = icon(ChevronRight, 'ChevronRightIcon');
-export const ChevronUpIcon = icon(ChevronUp, 'ChevronUpIcon');
-export const ChevronDownIcon = icon(ChevronDown, 'ChevronDownIcon');
+/** Artists: Music → Artists tab. */
+export const ArtistsIcon = icon('ArtistsIcon');
+/** Albums: Music → Albums tab. */
+export const AlbumsIcon = icon('AlbumsIcon');
+/** Playlists: Music → Playlists tab. */
+export const PlaylistsIcon = icon('PlaylistsIcon');
+/** Tracks: Music → Tracks tab. */
+export const TracksIcon = icon('TracksIcon');
+/** Videos (individual items): Video → Videos tab. */
+export const VideosIcon = icon('VideosIcon');
+/** Channels: Video → Channels tab. */
+export const ChannelsIcon = icon('ChannelsIcon');
+/** General settings: Settings → General tab. */
+export const GeneralIcon = icon('GeneralIcon');
+/** Advanced settings: Settings → Advanced tab. */
+export const AdvancedIcon = icon('AdvancedIcon');
+
+/** Add to library: sidebar Add button, top bar "+", Add modal trigger. */
+export const PlusIcon = icon('PlusIcon');
+/** Close / dismiss: Modal close button. */
+export const CloseIcon = icon('CloseIcon');
+/** Search: search inputs. */
+export const SearchIcon = icon('SearchIcon');
+/** Play (preview): preview player. */
+export const PlayIcon = icon('PlayIcon');
+/** Pause (preview): preview player. */
+export const PauseIcon = icon('PauseIcon');
+/** Delete files: explicit delete actions. */
+export const TrashIcon = icon('TrashIcon');
+/** Checked / selected: CheckboxRow tick. */
+export const CheckIcon = icon('CheckIcon');
+/** Open on YouTube / external: external links. */
+export const ExternalLinkIcon = icon('ExternalLinkIcon');
+/** Check now / re-sync: Check now buttons. */
+export const RefreshIcon = icon('RefreshIcon');
+/** More actions menu: row menus. */
+export const MoreIcon = icon('MoreIcon');
+
+/** Back to parent page: BackLink ("← Video"). */
+export const BackIcon = icon('BackIcon');
+/** Previous: pagers. */
+export const ChevronLeftIcon = icon('ChevronLeftIcon');
+/** Next: pagers. */
+export const ChevronRightIcon = icon('ChevronRightIcon');
+/** Collapse / sort ascending: Tracks table sort. */
+export const ChevronUpIcon = icon('ChevronUpIcon');
+/** Expand / sort descending: Tracks table sort, selects. */
+export const ChevronDownIcon = icon('ChevronDownIcon');
 
 /** The handoff's bell path (24×24 viewBox), filled with the current color. */
 export const BELL_PATH =
@@ -92,7 +239,10 @@ export interface BellIconProps extends Omit<SVGProps<SVGSVGElement>, 'ref'> {
   size?: number | string;
 }
 
-/** Subscribe bell. Uses the design's own path rather than Lucide's bell; 14px by default. */
+/**
+ * Subscribed / subscribe: BellToggle, MusicTile's subscribed badge. Not Lucide: the design's
+ * own bell path, 14px by default. Outside `ICON_REGISTRY` because it has no Lucide glyph.
+ */
 export function BellIcon({ size = 14, style, ...props }: BellIconProps) {
   return (
     <svg

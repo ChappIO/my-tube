@@ -1,10 +1,22 @@
-import { Link, createFileRoute, redirect } from '@tanstack/react-router';
+import { Link, createFileRoute, linkOptions, redirect } from '@tanstack/react-router';
+import { PlaceholderPage } from '../components/PlaceholderPage';
+import { TabPillLinks } from '../components/ui/TabPills';
+import { Body } from '../components/ui/typography';
 import {
-  PlaceholderPage,
-  PlaceholderTabs,
-  placeholderTabProps,
-} from '../components/PlaceholderPage';
-import { DEFAULT_VIDEO_TAB, TAB_LABELS, VIDEO_TABS, type VideoTab, parseTab } from '../navigation';
+  DEFAULT_VIDEO_TAB,
+  TAB_ICONS,
+  TAB_LABELS,
+  VIDEO_TABS,
+  type VideoTab,
+  parseTab,
+} from '../navigation';
+
+const videoTabItems = VIDEO_TABS.map((tab) => ({
+  id: tab,
+  label: TAB_LABELS[tab],
+  icon: TAB_ICONS[tab],
+  link: linkOptions({ to: '/video/$tab', params: { tab } }),
+}));
 
 export const Route = createFileRoute('/video/$tab')({
   params: {
@@ -24,17 +36,16 @@ export const Route = createFileRoute('/video/$tab')({
 function VideoPage() {
   const { tab } = Route.useParams();
   return (
-    <PlaceholderPage title="Video" sub={`${TAB_LABELS[tab]}. Nothing here yet.`}>
-      <PlaceholderTabs>
-        {VIDEO_TABS.map((t) => (
-          <Link key={t} to="/video/$tab" params={{ tab: t }} {...placeholderTabProps}>
-            {TAB_LABELS[t]}
-          </Link>
-        ))}
+    <PlaceholderPage
+      title="Video"
+      sub={`${TAB_LABELS[tab]}. Nothing here yet.`}
+      actions={<TabPillLinks label="Video view" items={videoTabItems} value={tab} />}
+    >
+      <Body muted>
         <Link to="/video/channel/$id" params={{ id: 'example' }}>
           Example channel
         </Link>
-      </PlaceholderTabs>
+      </Body>
     </PlaceholderPage>
   );
 }

@@ -1,6 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, linkOptions } from '@tanstack/react-router';
 import { type ReactNode, useState } from 'react';
 import { PlusIcon, RefreshIcon, SearchIcon, TrashIcon } from '../../components/icons';
+import { BackLink } from '../../components/ui/BackLink';
+import { MUSIC_TABS, TAB_ICONS, TAB_LABELS } from '../../navigation';
 import { Button } from '../../components/ui/Button';
 import { CheckboxRow } from '../../components/ui/CheckboxRow';
 import { IconButton } from '../../components/ui/IconButton';
@@ -8,7 +10,7 @@ import { Input } from '../../components/ui/Input';
 import { Modal, ModalActions } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { StatCard, StatCardGroup } from '../../components/ui/StatCard';
-import { TabPills } from '../../components/ui/TabPills';
+import { TabPillLinks, TabPills } from '../../components/ui/TabPills';
 import { Toggle, ToggleRow } from '../../components/ui/Toggle';
 import {
   Body,
@@ -37,6 +39,15 @@ const musicTabs = [
   { id: 'tracks', label: 'Tracks' },
 ] as const;
 type MusicTab = (typeof musicTabs)[number]['id'];
+
+const musicTabLinks = MUSIC_TABS.map((tab) => ({
+  id: tab,
+  label: TAB_LABELS[tab],
+  icon: TAB_ICONS[tab],
+  link: linkOptions({ to: '/music/$tab', params: { tab } }),
+}));
+
+const backToVideo = linkOptions({ to: '/video/$tab', params: { tab: 'channels' } });
 
 const trackFilters = [
   { id: 'all', label: 'All' },
@@ -130,6 +141,17 @@ function ComponentsDemo() {
         <Meta as="p" className="mt-3">
           musicTab={musicTab} · trackFilter={trackFilter}
         </Meta>
+      </Story>
+
+      <Story
+        name="TabPillLinks"
+        note="routed variant, same styles · links leave this page · aria-current on the active pill"
+      >
+        <TabPillLinks label="Music view" items={musicTabLinks} value="albums" />
+      </Story>
+
+      <Story name="BackLink" note="Archivo 600 13 muted, hover ink">
+        <BackLink link={backToVideo}>Video</BackLink>
       </Story>
 
       <Story name="Button" note="primary, secondary, outlined × md, lg · optional leading icon">
