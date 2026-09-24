@@ -83,7 +83,7 @@ export function MediaTile({
       <div
         className={
           reveal
-            ? `absolute inset-x-0 bottom-0 z-[2] translate-y-full bg-surface group-focus-within:translate-y-0 group-hover:translate-y-0 ${CHIN_MOTION}`
+            ? `absolute inset-x-0 -bottom-px z-[2] translate-y-full bg-surface group-focus-within:translate-y-0 group-hover:translate-y-0 ${CHIN_MOTION}`
             : 'relative z-[2] flex-none bg-surface'
         }
       >
