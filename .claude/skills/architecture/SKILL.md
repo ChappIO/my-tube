@@ -29,15 +29,15 @@ Playback is external (Plex reads the mounts). Preview streams the file with rang
 
 SQLite, one migration per change (see the database skill).
 
-| Table | Purpose |
-|---|---|
-| `sources` | library (music/video), kind (channel/artist/playlist), youtube id, url, name, avatar, subscribed, rules (JSON), last checked, cached counts and size |
-| `channels`, `videos` | video library. A video belongs to a channel and optionally to playlists |
-| `artists`, `albums`, `tracks` | music library. A track belongs to an album and an artist |
-| `playlists`, `playlist_items` | synced playlists for both libraries, with an ordered position |
-| `jobs` | queue: type, payload (JSON), status, progress, speed, attempts, error, timestamps |
-| `history` | audit trail: time, kind (video/music/system), title, result, details |
-| `settings` | key-value store for everything a user changes in Settings |
+| Table                         | Purpose                                                                                                                                              |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sources`                     | library (music/video), kind (channel/artist/playlist), youtube id, url, name, avatar, subscribed, rules (JSON), last checked, cached counts and size |
+| `channels`, `videos`          | video library. A video belongs to a channel and optionally to playlists                                                                              |
+| `artists`, `albums`, `tracks` | music library. A track belongs to an album and an artist                                                                                             |
+| `playlists`, `playlist_items` | synced playlists for both libraries, with an ordered position                                                                                        |
+| `jobs`                        | queue: type, payload (JSON), status, progress, speed, attempts, error, timestamps                                                                    |
+| `history`                     | audit trail: time, kind (video/music/system), title, result, details                                                                                 |
+| `settings`                    | key-value store for everything a user changes in Settings                                                                                            |
 
 Every item row (video, track) carries: youtube id, title, duration, published date, thumbnail, file path, file size, status. Status is one of `wanted`, `downloading`, `on_disk`, `missing`, `skipped`.
 
