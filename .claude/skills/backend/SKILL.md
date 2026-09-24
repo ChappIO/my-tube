@@ -58,6 +58,16 @@ Feature modules go in `src/<feature>/` with `<feature>.module.ts`, `<feature>.co
 
 Env (`AppConfig`) stays for what is known before the database exists: mount paths, port, version. Those are shown in Settings read-only and are never settings.
 
+## Sources and rules
+
+The contract is `packages/shared/src/rules.ts`; the tables are in the database skill ("Sources and catalog").
+
+- `Library` (`video`, `music`) and `SourceKind` (`channel`, `artist`, `playlist`).
+- `Rules` is a discriminated union on `library`. Video: `skipShorts` (true), `keepDays` (90, null keeps forever), `publishedAfter` (null; ISO `YYYY-MM-DD`, only items published on or after it are downloaded; independent of `keepDays`: the date decides what comes in, the day window decides what retention deletes, both may be set; the sync maps it to yt-dlp `--dateafter`), `titleFilter` (null; case-insensitive plain substring, no wildcards or regex), `syncOrder` (false; playlists only). Music: `skipLiveRecordings` (false), `downloadFullAlbums` (true), `embedCoverArt` (true). `DEFAULT_VIDEO_RULES`, `DEFAULT_MUSIC_RULES` and `defaultRules(library)` are the handoff defaults; new video sources should take `keepDays` and `skipShorts` from Settings → Video.
+- `describeRules(rules)` returns the handoff's chip labels in order: `no shorts`, `keep 90 days` (`keep 1 day`), `since 2025-01-01`, `only "Monologue"`, `sync order`, `no live`, `full albums`, `cover art`. Rules that are off give no chip.
+- `Source` is the DTO for one `sources` row: `id`, `library`, `kind`, `youtubeId`, `url`, `name`, `avatarUrl`, `subscribed`, `rules`, `lastCheckedAt`, `itemCount`, `sizeBytes`, `createdAt`, `updatedAt`. A Drizzle row parses directly.
+- `sourceIssues({ library, kind, rules })` lists invalid combinations (rules of the other library, an artist outside Music, sync order on a non-playlist). `Source` applies it; reuse it in create and update inputs.
+
 ## Background work
 
 - Subscription checks and downloads run in-process. Use `@nestjs/schedule` for timers and a database-backed queue table for work items. No Redis, no external workers.
