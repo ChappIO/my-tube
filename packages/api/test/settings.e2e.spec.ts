@@ -5,6 +5,7 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { DEFAULT_SETTINGS, Settings } from '@mytube/shared';
 import request from 'supertest';
+import { z } from 'zod';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module.js';
 
@@ -62,6 +63,17 @@ describe('Settings (e2e)', () => {
     }
     const after = await request(server).get('/api/settings').expect(200);
     expect(Settings.parse(after.body).general.downloadsAtOnce).toBe(4);
+  });
+
+  it('PATCH /api/settings rejects unknown folder structure tags, naming them', async () => {
+    const response = await request(app.getHttpServer())
+      .patch('/api/settings')
+      .send({ video: { pathTemplate: '{channel}/{bogus} {title}' } })
+      .expect(400);
+    const body = z
+      .object({ issues: z.array(z.object({ message: z.string() })) })
+      .parse(response.body);
+    expect(body.issues[0]?.message).toBe('Unknown tag {bogus}.');
   });
 
   it('a restarted app on the same CONFIG_DIR sees the changed values', async () => {

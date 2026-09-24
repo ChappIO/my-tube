@@ -70,6 +70,30 @@ Env (`AppConfig`) stays for what is known before the database exists: mount path
 - `POST /api/system/backup` and `POST /api/system/rescan` are **stubs**: `501` with `SystemActionResult` `{ message: 'Not implemented until Stage 7' }`. Stage 7 replaces them with real jobs (the `backup` and `rescan` job types) and should keep answering `SystemActionResult` so the Data card shows the new message without changes. Stage 7 also fills "Last backup" (read-only "never" in the web until then).
 - `data.logLevel` is stored and editable in Settings but not applied to the Nest logger yet; Stage 7 wires it with the log file.
 
+## Folder structure templates
+
+`packages/shared/src/path-templates.ts` defines the only tags `music.pathTemplate` and `video.pathTemplate` may use. The path templating of the download job (Stage 4) and the library read models (Stages 5 and 6) must consume `MUSIC_PATH_TAGS` / `VIDEO_PATH_TAGS` and fill exactly these; no other tags exist. Adding a tag means adding it there first (with its description, which the Settings chips show).
+
+| Library | Tag          | Value                                                    |
+| ------- | ------------ | -------------------------------------------------------- |
+| Music   | `{artist}`   | album artist, else the track artist                      |
+| Music   | `{album}`    | album title                                              |
+| Music   | `{title}`    | track title                                              |
+| Music   | `{track}`    | track number on the album (numeric)                      |
+| Music   | `{disc}`     | disc number, 1 for single-disc albums (numeric)          |
+| Music   | `{year}`     | release year (numeric)                                   |
+| Music   | `{id}`       | YouTube video id of the track                            |
+| Video   | `{channel}`  | channel name                                             |
+| Video   | `{title}`    | video title                                              |
+| Video   | `{date}`     | upload date, `YYYY-MM-DD`                                |
+| Video   | `{year}`     | upload year (numeric)                                    |
+| Video   | `{id}`       | YouTube video id                                         |
+| Video   | `{playlist}` | playlist name; empty when not downloaded from a playlist |
+
+- **Modifier:** `:02` is the only one. It zero-pads a numeric tag to 2 digits (`{track:02}` → `07`) and is an error on text tags.
+- `/` separates folders; the template is relative to the library mount.
+- `validatePathTemplate(template, tags)` (pure) returns `{ unknownTags, errors }`: unknown tags or modifiers (`{bogus}`, `{track:3}`), `:02` on a text tag, unmatched braces, `..` folders and absolute paths (`/…`, `\…`, `C:…`). The settings schema runs it in a `superRefine`, so `PATCH /api/settings` answers 400 with the message (`Unknown tag {bogus}.`; the Settings chips list the supported ones) and a stored row that no longer validates falls back to the default.
+
 ## Sources and rules
 
 The contract is `packages/shared/src/rules.ts`; the tables are in the database skill ("Sources and catalog").

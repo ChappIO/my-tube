@@ -1,9 +1,13 @@
 import type { z } from 'zod';
 
-/** The first validation message of `schema` for `value`, or undefined when it parses. */
+/**
+ * The validation messages of `schema` for `value` as one line (a folder structure can have an
+ * unknown tag and a `..` at once), or undefined when it parses.
+ */
 export function schemaError(schema: z.ZodType, value: unknown): string | undefined {
   const result = schema.safeParse(value);
-  return result.success ? undefined : result.error.issues[0]?.message;
+  if (result.success) return undefined;
+  return [...new Set(result.error.issues.map((issue) => issue.message))].join(' ');
 }
 
 /** Text box to nullable setting: an empty box means "none" and is stored as null. */

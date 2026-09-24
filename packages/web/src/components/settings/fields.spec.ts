@@ -34,6 +34,10 @@ describe('settings field helpers', () => {
     expect(validateLanguageList('english')).toBe('Use a language code such as en or pt-BR');
     expect(validateMusicTemplate('')).toBe('Enter a folder structure.');
     expect(validateMusicTemplate('{artist}/{title}')).toBeUndefined();
+    expect(validateMusicTemplate('{artist}/{bogus}')).toBe('Unknown tag {bogus}.');
+    expect(validateMusicTemplate('../{title:02}')).toBe(
+      ':02 only pads numbers, not {title:02}. Folders named .. are not allowed.',
+    );
   });
 
   it('sizes a text value box to its text within bounds', () => {

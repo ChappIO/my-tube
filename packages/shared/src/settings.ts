@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import {
+  MUSIC_PATH_TAGS,
+  type PathTag,
+  VIDEO_PATH_TAGS,
+  validatePathTemplate,
+} from './path-templates.js';
 
 /*
  * Every value a user can change in the Settings screen, grouped by the screen's cards.
@@ -29,8 +35,23 @@ export const VIDEO_QUALITIES = ['best', '2160p', '1440p', '1080p', '720p', '480p
 export const VIDEO_CONTAINERS = ['mkv', 'mp4', 'webm'] as const;
 export const LOG_LEVELS = ['error', 'warn', 'info', 'debug'] as const;
 
-/** A path template: placeholders in braces, `/` separates folders. */
-const PathTemplate = z.string().trim().min(1).max(500);
+/**
+ * A folder structure template: `{tag}` placeholders from `tags`, `/` separates folders,
+ * relative to the library mount. See `path-templates.ts`; unknown tags are a 400 whose message
+ * lists them.
+ */
+function pathTemplate(tags: readonly PathTag[]) {
+  return z
+    .string()
+    .trim()
+    .min(1, 'Enter a folder structure.')
+    .max(500)
+    .superRefine((template, ctx) => {
+      for (const message of validatePathTemplate(template, tags).errors) {
+        ctx.addIssue({ code: 'custom', message });
+      }
+    });
+}
 
 /** Settings → General. */
 export const GeneralSettings = z.object({
@@ -50,7 +71,7 @@ export type GeneralSettings = z.infer<typeof GeneralSettings>;
 /** Settings → Music. */
 export const MusicSettings = z.object({
   /** Handoff "Artist / Album / ## Title". */
-  pathTemplate: PathTemplate.default('{artist}/{album}/{track:02} {title}'),
+  pathTemplate: pathTemplate(MUSIC_PATH_TAGS).default('{artist}/{album}/{track:02} {title}'),
   /** Handoff "best available". */
   audioQuality: z.enum(AUDIO_QUALITIES).default('best'),
   container: z.enum(AUDIO_CONTAINERS).default('m4a'),
@@ -65,7 +86,7 @@ export type MusicSettings = z.infer<typeof MusicSettings>;
 /** Settings → Video. `keepDays`, `skipShorts` and `saveThumbnails` are defaults for new channels. */
 export const VideoSettings = z.object({
   /** Handoff "Channel / Title (Date)". */
-  pathTemplate: PathTemplate.default('{channel}/{title} ({date})'),
+  pathTemplate: pathTemplate(VIDEO_PATH_TAGS).default('{channel}/{title} ({date})'),
   quality: z.enum(VIDEO_QUALITIES).default('1080p'),
   container: z.enum(VIDEO_CONTAINERS).default('mkv'),
   /** Subtitle language codes; empty means no subtitles. */

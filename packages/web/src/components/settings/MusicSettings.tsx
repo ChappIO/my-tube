@@ -1,4 +1,5 @@
 import {
+  MUSIC_PATH_TAGS,
   AUDIO_CONTAINERS,
   AUDIO_QUALITIES,
   MusicSettings as MusicSettingsSchema,
@@ -17,9 +18,8 @@ import { SettingsTab } from './SettingsTab';
 const audioOptions = optionsOf(AUDIO_QUALITIES, qualityLabel);
 const containerOptions = optionsOf(AUDIO_CONTAINERS);
 
-/** Error message for a music folder structure that cannot be saved. */
+/** Error message for a music folder structure that cannot be saved (unknown tags, `..`). */
 export function validateMusicTemplate(template: string): string | undefined {
-  if (template === '') return 'Enter a folder structure.';
   return schemaError(MusicSettingsSchema.shape.pathTemplate, template);
 }
 
@@ -37,6 +37,8 @@ export function MusicSettings() {
             pathTemplate={music.pathTemplate}
             onPathTemplateChange={(pathTemplate) => save({ pathTemplate })}
             validatePathTemplate={validateMusicTemplate}
+            tags={MUSIC_PATH_TAGS}
+            tagNote="Use {tag}; {track:02} pads numbers."
           />
           <SettingsCard title="Format">
             <KeyValueGrid>

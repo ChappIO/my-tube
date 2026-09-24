@@ -1,4 +1,5 @@
 import {
+  VIDEO_PATH_TAGS,
   VIDEO_CONTAINERS,
   VIDEO_QUALITIES,
   VideoSettings as VideoSettingsSchema,
@@ -18,9 +19,8 @@ import { KeepDaysControl, SubtitlesControl } from './VideoControls';
 const qualityOptions = optionsOf(VIDEO_QUALITIES, qualityLabel);
 const containerOptions = optionsOf(VIDEO_CONTAINERS);
 
-/** Error message for a video folder structure that cannot be saved. */
+/** Error message for a video folder structure that cannot be saved (unknown tags, `..`). */
 export function validateVideoTemplate(template: string): string | undefined {
-  if (template === '') return 'Enter a folder structure.';
   return schemaError(VideoSettingsSchema.shape.pathTemplate, template);
 }
 
@@ -42,6 +42,8 @@ export function VideoSettings() {
             pathTemplate={video.pathTemplate}
             onPathTemplateChange={(pathTemplate) => save({ pathTemplate })}
             validatePathTemplate={validateVideoTemplate}
+            tags={VIDEO_PATH_TAGS}
+            tagNote="Use {tag}."
           />
           <SettingsCard title="Format">
             <KeyValueGrid>
