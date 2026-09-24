@@ -67,12 +67,6 @@ export function MusicSettings() {
           </SettingsCard>
           <SettingsCard title="Behaviour">
             <ToggleRow
-              label="Download full albums"
-              description="When a single is added, fetch the album it belongs to."
-              checked={music.downloadFullAlbums}
-              onChange={(downloadFullAlbums) => save({ downloadFullAlbums })}
-            />
-            <ToggleRow
               label="Embed cover art and tags"
               description="Artist, album, track number, year."
               checked={music.embedCoverArt}

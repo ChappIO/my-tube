@@ -1,13 +1,49 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 
 export class ApiError extends Error {
   constructor(
     readonly status: number,
-    body: string,
+    /** The raw response body (usually Nest's JSON error). */
+    readonly body: string,
   ) {
     super(`${status}: ${body || 'request failed'}`);
     this.name = 'ApiError';
   }
+
+  /** The body parsed as JSON, or undefined when it is not JSON. */
+  json(): unknown {
+    try {
+      const value: unknown = JSON.parse(this.body);
+      return value;
+    } catch {
+      return undefined;
+    }
+  }
+}
+
+/** The parts of Nest's error body the web app reads (`message`, validation `issues`, yt-dlp `reason`). */
+const ApiErrorBody = z.object({
+  message: z.union([z.string(), z.array(z.string())]),
+  issues: z.array(z.object({ message: z.string() })).optional(),
+  reason: z.string().nullable().optional(),
+});
+
+/**
+ * A readable line for a failed request: the API's `message` (with the `issues` of a validation
+ * error and the `reason` of a yt-dlp failure appended), else `fallback`. Non-API errors (network
+ * down) give `fallback` too.
+ */
+export function apiErrorMessage(error: unknown, fallback: string): string {
+  if (!(error instanceof ApiError)) return fallback;
+  const body = ApiErrorBody.safeParse(error.json());
+  if (!body.success) return fallback;
+  const { message, issues, reason } = body.data;
+  const text = Array.isArray(message) ? message.join(' ') : message;
+  if (!text) return fallback;
+  const details = (issues ?? []).map((issue) => issue.message);
+  if (reason) details.push(reason);
+  const sentence = /[.!?…]$/.test(text) ? text : `${text}.`;
+  return details.length > 0 ? `${sentence} ${details.join('. ')}` : sentence;
 }
 
 async function parseResponse<T>(response: Response, schema: z.ZodType<T>): Promise<T> {
@@ -41,4 +77,10 @@ export async function apiPatch<T>(path: string, body: unknown, schema: z.ZodType
     body: JSON.stringify(body),
   });
   return parseResponse(response, schema);
+}
+
+/** DELETE a resource. Resolves on any 2xx (usually 204, no body). */
+export async function apiDelete(path: string): Promise<void> {
+  const response = await fetch(path, { method: 'DELETE', headers: { accept: 'application/json' } });
+  if (!response.ok) throw new ApiError(response.status, await response.text());
 }

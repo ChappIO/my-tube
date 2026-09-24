@@ -63,7 +63,7 @@ Migration `20260925090000_items.sql`. Item tables have `id` (INTEGER PK), `creat
 **Item status lifecycle** (`ItemStatus` in `packages/shared/src/items.ts`; the column has a CHECK):
 
 - A fetched entry the source's rules accept is inserted as `wanted` and a `download` job is enqueued for it.
-- A fetched entry the rules reject is inserted as `skipped` with `skip_reason` (a `SkipReason`: `short`, `title_filter`, `published_before`, `older_than_keep_days`, `live`, `upcoming`, `not_album`). Transient rejections (a premiere or stream that has not finished) are not stored; the next check sees them again. Changing a source's rules may move `skipped` items back to `wanted`.
+- A fetched entry the rules reject is inserted as `skipped` with `skip_reason` (a `SkipReason`: `short`, `title_filter`, `published_before`, `older_than_keep_days`, `live`, `upcoming`). Transient rejections (a premiere or stream that has not finished) are not stored; the next check sees them again. Changing a source's rules may move `skipped` items back to `wanted`.
 - `wanted` → `downloading` when the download job starts, → `on_disk` when the file is written (`file_path`, `file_size_bytes`, `downloaded_at` set). A failed download goes back to `wanted` (the job retries; after its last attempt the item stays `wanted` and the failure is in history).
 - `on_disk` → `missing` when a rescan finds no file, or when retention deletes it. `file_path` is kept so the library can show where it was.
 - `missing` → `wanted` only through an explicit re-download. Nothing moves an item out of `skipped` or `missing` on its own.

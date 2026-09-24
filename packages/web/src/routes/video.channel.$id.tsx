@@ -1,18 +1,10 @@
-import { createFileRoute, linkOptions } from '@tanstack/react-router';
-import { PlaceholderPage } from '../components/PlaceholderPage';
-import { BackLink } from '../components/ui/BackLink';
+import { createFileRoute } from '@tanstack/react-router';
+import { ChannelPage } from '../components/sources/ChannelPage';
 
-// `id` is an opaque channel id; it is passed to the API as is.
-export const Route = createFileRoute('/video/channel/$id')({ component: ChannelPage });
+// `id` is a source id; it is passed to the API as is (a non-numeric id reads as not found).
+export const Route = createFileRoute('/video/channel/$id')({ component: ChannelRoute });
 
-const backToChannels = linkOptions({ to: '/video/$tab', params: { tab: 'channels' } });
-
-function ChannelPage() {
+function ChannelRoute() {
   const { id } = Route.useParams();
-  return (
-    <>
-      <BackLink link={backToChannels}>Video</BackLink>
-      <PlaceholderPage title={`Channel ${id}`} sub="Nothing here yet." />
-    </>
-  );
+  return <ChannelPage id={id} />;
 }

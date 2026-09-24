@@ -5,11 +5,12 @@ import {
   type VideoSourceRules,
 } from '@mytube/shared';
 import { describe, expect, it } from 'vitest';
-import { evaluateItem, keepCutoff, type EvaluatedEntry } from './rules.js';
+import type { SourceEntry } from '../ytdlp/metadata.js';
+import { evaluateItem, keepCutoff } from './rules.js';
 
 const NOW = new Date('2026-09-24T12:00:00Z');
 
-function entry(overrides: Partial<EvaluatedEntry> = {}): EvaluatedEntry {
+function entry(overrides: Partial<SourceEntry> = {}): SourceEntry {
   return {
     kind: 'video',
     id: 'abc123',
@@ -37,7 +38,6 @@ const OPEN_VIDEO: VideoSourceRules = {
 const OPEN_MUSIC: MusicSourceRules = {
   ...DEFAULT_MUSIC_RULES,
   skipLiveRecordings: false,
-  downloadFullAlbums: false,
 };
 
 const accept = { accept: true };
@@ -176,26 +176,6 @@ describe('evaluateItem', () => {
       expect(evaluateItem(entry({ title: 'Live' }), rules, NOW)).toMatchObject({
         transient: false,
       });
-    });
-  });
-
-  describe('downloadFullAlbums', () => {
-    const rules = { ...OPEN_MUSIC, downloadFullAlbums: true };
-    it('rejects entries known to be singles', () => {
-      expect(evaluateItem(entry({ albumType: 'single' }), rules, NOW)).toEqual(reject('not_album'));
-    });
-    it('accepts albums and EPs', () => {
-      expect(evaluateItem(entry({ albumType: 'album' }), rules, NOW)).toEqual(accept);
-      expect(evaluateItem(entry({ albumType: 'ep' }), rules, NOW)).toEqual(accept);
-    });
-    it('accepts entries without album information (flat listings)', () => {
-      expect(evaluateItem(entry(), rules, NOW)).toEqual(accept);
-      expect(evaluateItem(entry({ kind: 'playlist', albumType: null }), rules, NOW)).toEqual(
-        accept,
-      );
-    });
-    it('accepts singles when off', () => {
-      expect(evaluateItem(entry({ albumType: 'single' }), OPEN_MUSIC, NOW)).toEqual(accept);
     });
   });
 

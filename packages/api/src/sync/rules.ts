@@ -1,15 +1,6 @@
 import type { Rules, SkipReason } from '@mytube/shared';
 import type { SourceEntry } from '../ytdlp/metadata.js';
 
-/**
- * An entry of a fetched listing, as `runner.metadata()` returns it. `albumType` is optional
- * extra information the music sync may add once it knows it (see `downloadFullAlbums`).
- */
-export type EvaluatedEntry = SourceEntry & {
-  /** Release type from album grouping; yt-dlp's flat listings do not carry it. */
-  albumType?: 'album' | 'ep' | 'single' | null;
-};
-
 export type RuleVerdict =
   | { accept: true }
   | {
@@ -54,12 +45,11 @@ const LIVE_WORD = /\blive\b/i;
  *
  * Music rules:
  * - `live` when `skipLiveRecordings` and the title contains the word "live".
- * - `not_album` when `downloadFullAlbums` and the entry is known to be a single
- *   (`albumType === 'single'`). yt-dlp's flat artist listings do not say whether a release is
- *   an album or a single, so entries without `albumType` are accepted; album grouping (Stage 6)
- *   sets it from the full metadata and re-evaluates.
+ *
+ * An artist source downloads all of the artist's releases, albums and singles alike; there is
+ * no album-only rule.
  */
-export function evaluateItem(entry: EvaluatedEntry, rules: Rules, now: Date): RuleVerdict {
+export function evaluateItem(entry: SourceEntry, rules: Rules, now: Date): RuleVerdict {
   if (entry.liveStatus === 'is_upcoming') return reject('upcoming', true);
   if (entry.liveStatus === 'is_live' || entry.liveStatus === 'post_live') {
     return reject('live', true);
@@ -82,7 +72,6 @@ export function evaluateItem(entry: EvaluatedEntry, rules: Rules, now: Date): Ru
   }
 
   if (rules.skipLiveRecordings && LIVE_WORD.test(entry.title ?? '')) return reject('live');
-  if (rules.downloadFullAlbums && entry.albumType === 'single') return reject('not_album');
   return { accept: true };
 }
 

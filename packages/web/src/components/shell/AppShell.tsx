@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useAddModal } from '../../ui-state';
+import { AddSourceModal } from '../sources/AddSourceModal';
 import { Sidebar } from './Sidebar';
 import { TabBar } from './TabBar';
 import { TopBar } from './TopBar';
@@ -23,7 +24,7 @@ export function AppShell({
   sidebarFooter?: ReactNode;
   children: ReactNode;
 }) {
-  const { openAdd } = useAddModal();
+  const { open: addOpen, openAdd, closeAdd } = useAddModal();
   return (
     <div className="min-h-screen bg-bg text-ink wide:flex">
       <Sidebar activityCount={activityCount} onAdd={openAdd} footer={sidebarFooter} />
@@ -32,6 +33,8 @@ export function AppShell({
         {children}
       </main>
       <TabBar activityCount={activityCount} />
+      {/* Mounted only while open, so every opening starts empty. */}
+      {addOpen && <AddSourceModal onClose={closeAdd} />}
     </div>
   );
 }

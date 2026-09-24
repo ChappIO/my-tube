@@ -56,8 +56,8 @@ Skills: backend, database, frontend. Handoff: Screen 3 Channels tab and Channel 
 - [x] **Sources table and rules schema.** Migration for `sources`, `channels`, `artists`, `playlists`. Rules as a Zod schema in shared with the video and music rule sets from the handoff. Done when the schema and migration are in one commit and the database skill lists the tables.
 - [x] **URL resolution.** `POST /api/sources/resolve` takes a YouTube URL and returns kind, name, avatar, counts and upload cadence via the yt-dlp runner. Done when channel, artist, playlist and unsupported URLs each return the documented result.
 - [x] **Source CRUD and subscribe toggle.** Create from a resolved URL with library and rules, list, get, update rules, toggle subscribed. Unsubscribing never deletes anything. Done when the e2e test covers the full lifecycle.
-- [ ] **Add modal.** URL input with detection, source card, Save-to switch that swaps the rule set, rule checkbox rows, Cancel and Subscribe. Done when subscribing closes the modal and the new source appears in Channels.
-- [ ] **Channels tab and channel page.** Channel rows with rule chips, checked-ago, bell toggle and Edit rules, the collapse below 760px, and the channel page header with back link. Bell state shared between list and page with optimistic updates. Done when both screens match the handoff with real sources.
+- [x] **Add modal.** URL input with detection, source card, Save-to switch that swaps the rule set, rule checkbox rows, Cancel and Subscribe. Done when subscribing closes the modal and the new source appears in Channels.
+- [x] **Channels tab and channel page.** Channel rows with rule chips, checked-ago, bell toggle and Edit rules, the collapse below 760px, and the channel page header with back link. Bell state shared between list and page with optimistic updates. Done when both screens match the handoff with real sources.
 
 ## Stage 4: Sync, queue and Activity
 
@@ -65,7 +65,7 @@ Skills: backend, database, frontend. Handoff: Screen 5 Activity, Sidebar badge.
 
 - [x] **Items tables.** Migration for `videos`, `tracks`, `albums`, `playlist_items` with the shared item fields and status enum. Done when the database skill documents the status lifecycle.
 - [x] **Jobs table and worker.** Migration for `jobs`, a worker loop honouring downloads-at-once, retries with backoff, cancellation, progress and speed updates, history rows on completion and failure. Done when unit tests cover ordering, concurrency and failure without a real download.
-- [x] **Rule evaluation.** A pure function deciding which fetched items a source's rules accept (shorts, title match, live recordings, full albums only). Done when every rule has a unit test.
+- [x] **Rule evaluation.** A pure function deciding which fetched items a source's rules accept (shorts, title match, live recordings). Done when every rule has a unit test.
 - [ ] **Sync scheduler.** `check_source` jobs on the settings interval, fetching metadata through the runner, diffing against known items, inserting new ones and enqueueing downloads. Updates `last_checked_at`. Done when adding a subscribed source results in queued downloads within one interval.
 - [ ] **Download job.** Runs the runner with format, container, subtitles and thumbnail options from settings, writes to the templated path, marks the item on disk with size, and stores the sidecar thumbnail. Done when a real small video lands in the video mount with the right name.
 - [ ] **Activity screen and badge.** Queue rows with progress bars, history table with day grouping and the narrow collapse, polling while open, and the sidebar badge count on a slower poll. Done when a running download visibly progresses without reloading.
@@ -74,7 +74,7 @@ Skills: backend, database, frontend. Handoff: Screen 5 Activity, Sidebar badge.
 
 Skills: frontend, backend. Handoff: Screen 1 Home, Screen 3 Videos tab, Screen 7 Preview.
 
-- [ ] **Library read endpoints.** Videos list with channel and on-disk info, home feed grouped by day across both libraries, thumbnail serving. Done when responses validate against shared schemas in e2e tests.
+- [ ] **Library read endpoints.** Videos list with channel and on-disk info, home feed grouped by day across both libraries, thumbnail serving. Cache remote avatars/thumbnails through the API (download once into CONFIG_DIR/cache, serve from there) so the web never hotlinks Google, which rate-limits (429). Done when responses validate against shared schemas in e2e tests.
 - [ ] **Videos tab.** Square tiles with fixed chins, channel links that stop propagation, narrow grid sizing. Done when the tab matches the handoff with real downloads.
 - [ ] **Home screen.** Header with the three stat cards, day groups, mixed video and music tiles with the hover chin behaviour. Done when stats reflect the database.
 - [ ] **Preview modal.** Range-streamed playback, title and file path footer, Delete file with confirmation, click-outside close. Done when a downloaded video plays in the browser and delete removes the file and updates status.

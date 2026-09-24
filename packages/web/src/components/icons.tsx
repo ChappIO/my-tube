@@ -36,6 +36,7 @@ import {
   SlidersHorizontal,
   Trash2,
   Tv,
+  Unlink,
   Users,
   Video,
   Wrench,
@@ -104,6 +105,11 @@ export const ICON_REGISTRY = {
   PlayIcon: { base: Play, meaning: 'Play (preview)', usedIn: 'preview player (Stage 3+)' },
   PauseIcon: { base: Pause, meaning: 'Pause (preview)', usedIn: 'preview player (Stage 3+)' },
   TrashIcon: { base: Trash2, meaning: 'Delete files', usedIn: 'explicit delete actions' },
+  UnlinkIcon: {
+    base: Unlink,
+    meaning: 'Remove a source from the library (files stay)',
+    usedIn: 'channel page "Remove from library"',
+  },
   CheckIcon: { base: Check, meaning: 'Checked / selected', usedIn: 'CheckboxRow tick' },
   ExternalLinkIcon: {
     base: ExternalLink,
@@ -211,6 +217,8 @@ export const PlayIcon = icon('PlayIcon');
 export const PauseIcon = icon('PauseIcon');
 /** Delete files: explicit delete actions. */
 export const TrashIcon = icon('TrashIcon');
+/** Remove a source from the library (files stay): channel page "Remove from library". */
+export const UnlinkIcon = icon('UnlinkIcon');
 /** Checked / selected: CheckboxRow tick. */
 export const CheckIcon = icon('CheckIcon');
 /** Open on YouTube / external: external links. */

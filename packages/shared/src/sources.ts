@@ -242,7 +242,6 @@ export type VideoRulesInput = z.infer<typeof VideoRulesInput>;
 export const MusicRulesInput = z.strictObject({
   library: z.literal('music'),
   skipLiveRecordings: MusicRules.shape.skipLiveRecordings.unwrap().optional(),
-  downloadFullAlbums: MusicRules.shape.downloadFullAlbums.unwrap().optional(),
   embedCoverArt: MusicRules.shape.embedCoverArt.unwrap().optional(),
 });
 export type MusicRulesInput = z.infer<typeof MusicRulesInput>;

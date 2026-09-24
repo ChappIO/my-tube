@@ -10,7 +10,6 @@ describe('Settings', () => {
         audioQuality: 'best',
         container: 'm4a',
         loudnessNormalization: false,
-        downloadFullAlbums: true,
         embedCoverArt: true,
         skipLiveRecordings: false,
       },

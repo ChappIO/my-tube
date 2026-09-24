@@ -1,4 +1,5 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ImageRetry, createImageRetry } from './image-retry';
 import { placeholderFill } from './placeholder';
 
 export interface ArtworkProps {
@@ -31,8 +32,8 @@ export function Artwork({
   children,
   className = '',
 }: ArtworkProps) {
-  const [failedSrc, setFailedSrc] = useState<string>();
-  const showImage = src !== undefined && src !== failedSrc;
+  const status = useImageStatus(src);
+  const showImage = src !== undefined && status.state === 'loading';
   const radius =
     shape === 'circle' ? 'rounded-full' : size === 'thumb' ? 'rounded-chip' : 'rounded-tile';
   const box = fill ? 'absolute inset-0' : 'relative aspect-square w-full';
@@ -44,16 +45,78 @@ export function Artwork({
     >
       {showImage && (
         <img
+          // A new key re-mounts the element, so a retry requests the same URL again.
+          key={status.attempt}
           src={src}
           alt={alt}
           loading="lazy"
           decoding="async"
           draggable={false}
-          onError={() => setFailedSrc(src)}
+          onError={status.onError}
           className="absolute inset-0 size-full object-cover"
         />
       )}
       {children}
     </div>
   );
+}
+
+type ImageState = 'loading' | 'waiting' | 'failed';
+
+/**
+ * Load state of a remote image. A failed load is retried with the same URL after 2s and 8s
+ * (`IMAGE_RETRY_DELAYS_MS`; Google's image hosts rate-limit bursts with 429), and only then the
+ * placeholder stays. While waiting the placeholder shows instead of a broken image. A new `src`
+ * starts over, and a page that becomes visible again tries a failed image once more.
+ */
+function useImageStatus(src: string | undefined): {
+  state: ImageState;
+  attempt: number;
+  onError: () => void;
+} {
+  const [tracked, setTracked] = useState(src);
+  const [state, setState] = useState<ImageState>('loading');
+  const [attempt, setAttempt] = useState(0);
+  const retry = useRef<ImageRetry>(null);
+
+  // A different image: forget the previous one's failures (state adjusted during render).
+  if (tracked !== src) {
+    setTracked(src);
+    setState('loading');
+    setAttempt(0);
+  }
+
+  // One retry schedule per image, so a new `src` gets its retries back.
+  useEffect(() => {
+    if (src === undefined) return undefined;
+    const schedule = createImageRetry({
+      onRetry: () => {
+        setState('loading');
+        setAttempt((n) => n + 1);
+      },
+      onGiveUp: () => setState('failed'),
+    });
+    retry.current = schedule;
+    return () => schedule.dispose();
+  }, [src]);
+
+  useEffect(() => {
+    if (state !== 'failed') return undefined;
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      setState('loading');
+      setAttempt((n) => n + 1);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [state]);
+
+  return {
+    state,
+    attempt,
+    onError: () => {
+      setState((current) => (current === 'loading' ? 'waiting' : current));
+      retry.current?.error();
+    },
+  };
 }

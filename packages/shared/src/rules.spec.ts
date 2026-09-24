@@ -39,7 +39,6 @@ describe('Rules', () => {
     expect(DEFAULT_MUSIC_RULES).toEqual({
       library: 'music',
       skipLiveRecordings: false,
-      downloadFullAlbums: true,
       embedCoverArt: true,
     });
     expect(defaultRules('video')).toEqual(DEFAULT_VIDEO_RULES);
@@ -116,12 +115,11 @@ describe('describeRules', () => {
   });
 
   it('describes music rules', () => {
-    expect(describeRules(DEFAULT_MUSIC_RULES)).toEqual(['full albums', 'cover art']);
+    expect(describeRules(DEFAULT_MUSIC_RULES)).toEqual(['cover art']);
     expect(
       describeRules({
         library: 'music',
         skipLiveRecordings: true,
-        downloadFullAlbums: false,
         embedCoverArt: false,
       }),
     ).toEqual(['no live']);

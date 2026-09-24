@@ -76,7 +76,6 @@ export const MusicSettings = z.object({
   audioQuality: z.enum(AUDIO_QUALITIES).default('best'),
   container: z.enum(AUDIO_CONTAINERS).default('m4a'),
   loudnessNormalization: z.boolean().default(false),
-  downloadFullAlbums: z.boolean().default(true),
   /** "Embed cover art and tags". */
   embedCoverArt: z.boolean().default(true),
   skipLiveRecordings: z.boolean().default(false),

@@ -52,8 +52,6 @@ export type VideoRules = z.infer<typeof VideoRules>;
 export const MusicRules = z.object({
   /** "Skip live recordings — title contains 'live'", case-insensitive. */
   skipLiveRecordings: z.boolean().default(false),
-  /** "Download full albums — not singles". */
-  downloadFullAlbums: z.boolean().default(true),
   /** "Embed cover art — from YouTube Music". */
   embedCoverArt: z.boolean().default(true),
 });
@@ -95,7 +93,6 @@ export function describeRules(rules: Rules): string[] {
     if (rules.syncOrder) chips.push('sync order');
   } else {
     if (rules.skipLiveRecordings) chips.push('no live');
-    if (rules.downloadFullAlbums) chips.push('full albums');
     if (rules.embedCoverArt) chips.push('cover art');
   }
   return chips;
