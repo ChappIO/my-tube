@@ -52,7 +52,7 @@ packages/web/src
 | Shadows | `--shadow-tile` (tile hover), `--shadow-modal`, `--shadow-preview`                                 | `shadow-tile`, `shadow-modal`, `shadow-preview`                         |
 | Layout  | `--breakpoint-wide` 760px                                                                          | `wide:` variant (wide layout); unprefixed classes are the narrow layout |
 
-- The default Tailwind palette is removed (`--color-*: initial`), so `text-neutral-500` and friends do not exist. Every color comes from a token. `white` is only for text and glyphs on red; `transparent` and `current` still work.
+- The default Tailwind palette is removed (`--color-*: initial`), so `text-neutral-500` and friends do not exist. Every color comes from a token. `white` is only for text and glyphs on red and the inverted logo tile; `transparent` and `current` still work.
 - Outside Tailwind classes (SVG attributes, inline styles) use the variables: `fill="var(--color-red)"`.
 - Other Tailwind scales (spacing, sizes) are untouched; spacing values from the handoff are multiples of 4px, use arbitrary values like `p-[22px]` for the rest.
 
@@ -96,7 +96,7 @@ Self-hosted through Fontsource, imported in `main.tsx`: `@fontsource-variable/ar
   - `Wordmark` ("MyTube", Archivo 800, −0.03em, −0.035em at 64px and up; `size`, `twoTone` for ink "My" + red "Tube", otherwise `currentColor`).
   - `LogoLockup`: the header lockup (28px tile, 20px wordmark, 10px gap) for the sidebar and the narrow top bar. Use it; do not rebuild it.
 - `src/components/brand/geometry.ts` has the mark's geometry. Sizes drawn in the handoff (16, 24, 28, 32, 40, 48, 64, 88, 96) use its pixel-hinted values; other sizes scale the 96px tile.
-- Brand components reference `--color-red`, `--color-ink`, `--color-bg` and `--font-sans` with the handoff values as fallbacks.
+- Brand components reference `--color-red`, `--color-ink`, `--color-white` and `--font-sans` with the handoff values as fallbacks. The mark's white is `--color-white`, never `--color-bg` (which is near-black in dark).
 - Favicon: `public/favicon.svg`, the 16px tile, linked from `index.html`. Keep it in sync with the 16px values in `geometry.ts`.
 - Icons: Lucide (`lucide-react`). Import icons only from `src/components/icons.tsx`, never from `lucide-react` directly. That file wraps each icon with the app defaults (16px, stroke 2, `aria-hidden`, no flex shrink); use 16 to 20px. Add new icons there with an app-level name (`CloseIcon`, not `X`).
 - `BellIcon` is not Lucide: it draws the handoff's own bell path (24×24 viewBox, filled with `currentColor`, 14px by default).
