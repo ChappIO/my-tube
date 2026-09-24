@@ -32,6 +32,7 @@ describe('Rules', () => {
       library: 'video',
       skipShorts: true,
       keepDays: 90,
+      publishedAfter: null,
       titleFilter: null,
       syncOrder: false,
     });
@@ -58,8 +59,18 @@ describe('Rules', () => {
     });
   });
 
+  it('accepts a published-after date next to a keep window', () => {
+    expect(
+      Rules.parse({ library: 'video', publishedAfter: '2024-02-29', keepDays: 30 }),
+    ).toMatchObject({ publishedAfter: '2024-02-29', keepDays: 30 });
+  });
+
   it.each([
     { library: 'podcast' },
+    { library: 'video', publishedAfter: '2025-02-30' },
+    { library: 'video', publishedAfter: '2025-1-5' },
+    { library: 'video', publishedAfter: '2025-01-05T00:00:00Z' },
+    { library: 'video', publishedAfter: '' },
     {},
     { library: 'video', keepDays: 0 },
     { library: 'video', keepDays: 3651 },
@@ -80,10 +91,11 @@ describe('describeRules', () => {
         library: 'video',
         skipShorts: true,
         keepDays: 90,
+        publishedAfter: '2025-01-01',
         titleFilter: 'Monologue',
         syncOrder: true,
       }),
-    ).toEqual(['no shorts', 'keep 90 days', 'only "Monologue"', 'sync order']);
+    ).toEqual(['no shorts', 'keep 90 days', 'since 2025-01-01', 'only "Monologue"', 'sync order']);
   });
 
   it('omits rules that are off and uses the singular for one day', () => {
@@ -92,6 +104,7 @@ describe('describeRules', () => {
         library: 'video',
         skipShorts: false,
         keepDays: null,
+        publishedAfter: null,
         titleFilter: null,
         syncOrder: false,
       }),

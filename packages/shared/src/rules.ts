@@ -32,6 +32,13 @@ export const VideoRules = z.object({
   /** "Keep only the last N days — older files deleted". null keeps files forever. */
   keepDays: z.number().int().min(KEEP_DAYS_MIN).max(KEEP_DAYS_MAX).nullable().default(90),
   /**
+   * "Keep everything after a fixed date", as ISO `YYYY-MM-DD`. Only items published on or
+   * after this date are downloaded; null means no lower bound. Independent of `keepDays`: the
+   * date decides what comes in, the day window decides what retention deletes, and both may be
+   * set. The sync maps it to yt-dlp `--dateafter`.
+   */
+  publishedAfter: z.iso.date().nullable().default(null),
+  /**
    * "Only titles matching". A plain case-insensitive substring match on the video title (no
    * wildcards, no regular expressions). null accepts every title.
    */
@@ -83,6 +90,7 @@ export function describeRules(rules: Rules): string[] {
     if (rules.keepDays !== null) {
       chips.push(`keep ${rules.keepDays} ${rules.keepDays === 1 ? 'day' : 'days'}`);
     }
+    if (rules.publishedAfter !== null) chips.push(`since ${rules.publishedAfter}`);
     if (rules.titleFilter !== null) chips.push(`only "${rules.titleFilter}"`);
     if (rules.syncOrder) chips.push('sync order');
   } else {
