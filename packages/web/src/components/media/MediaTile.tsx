@@ -1,4 +1,5 @@
-import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
+import type { ReactNode } from 'react';
+import { cx, focusRingInset, focusRingOverlay } from '../ui/cx';
 import { DurationBadge } from './DurationBadge';
 
 export interface MediaTileProps {
@@ -13,7 +14,7 @@ export interface MediaTileProps {
   art: ReactNode;
   /** Video length, shown as a badge on the art. */
   duration?: string;
-  /** Channel name in the secondary line; a link when `onOpenChannel` is set. */
+  /** Channel name in the secondary line; a button when `onOpenChannel` is set. */
   channel?: string;
   /** Relative date after the channel, for example `2 days ago`. */
   when?: string;
@@ -27,16 +28,15 @@ export interface MediaTileProps {
   className?: string;
 }
 
-// Motion from the handoff: tile hover `transform .2s ease, box-shadow .2s ease`, chin reveal
-// `transform .2s ease`. Tailwind 4 scales and translates through the `scale` and `translate`
-// properties, so those are what transition.
-const TILE_MOTION = 'transition-[scale,box-shadow] duration-200 ease-[ease]';
-const CHIN_MOTION = 'transition-[translate] duration-200 ease-[ease]';
-
 /**
  * The square media tile (Home, Videos tab, channel page). Always square, `surface` box,
  * radius 12; the art is rounded on all corners and sits on the chin. Hover lifts it with
  * `scale(1.04)` and the tile shadow.
+ *
+ * Overlay pattern, so no interactive control is nested in another: the tile itself is a plain
+ * box, a full-size transparent `<button>` (the only control for `onOpen`, named by the title)
+ * lies over it, and the channel name is a separate button above the overlay. Art and chin let
+ * clicks through to the overlay. Keyboard order is tile, then channel.
  */
 export function MediaTile({
   title,
@@ -48,44 +48,42 @@ export function MediaTile({
   subtitle,
   onOpen,
   onOpenChannel,
-  className = '',
+  className,
 }: MediaTileProps) {
   const reveal = chin === 'reveal';
 
-  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    // Keys pressed on the channel link belong to the link.
-    if (event.target !== event.currentTarget) return;
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      onOpen?.();
-    }
-  }
-
-  function handleChannelClick(event: MouseEvent<HTMLButtonElement>) {
-    event.stopPropagation();
-    onOpenChannel?.();
-  }
-
   return (
     <div
-      role="button"
-      tabIndex={0}
-      aria-label={title}
-      onClick={onOpen}
-      onKeyDown={handleKeyDown}
-      className={`group relative flex aspect-square cursor-pointer flex-col overflow-hidden rounded-tile bg-surface hover:scale-[1.04] hover:shadow-tile ${TILE_MOTION} ${className}`}
+      className={cx(
+        'group relative flex aspect-square flex-col overflow-hidden rounded-tile bg-surface hover:scale-[1.04] hover:shadow-tile',
+        'motion-tile',
+        focusRingOverlay,
+        className,
+      )}
     >
-      <div className="relative z-[1] min-h-0 flex-1 overflow-hidden rounded-tile">
+      {onOpen && (
+        <button
+          type="button"
+          data-overlay
+          aria-label={title}
+          onClick={onOpen}
+          // The ring is drawn on the tile (focusRingOverlay); the overlay itself stays invisible.
+          className="absolute inset-0 z-0 cursor-pointer rounded-tile outline-none"
+        />
+      )}
+
+      <div className="pointer-events-none relative z-[1] min-h-0 flex-1 overflow-hidden rounded-tile">
         {art}
         {duration && <DurationBadge duration={duration} />}
       </div>
 
       <div
-        className={
+        className={cx(
+          'pointer-events-none z-[2] bg-surface',
           reveal
-            ? `absolute inset-x-0 -bottom-px z-[2] translate-y-full bg-surface group-focus-within:translate-y-0 group-hover:translate-y-0 ${CHIN_MOTION}`
-            : 'relative z-[2] flex-none bg-surface'
-        }
+            ? 'absolute inset-x-0 -bottom-px translate-y-full group-focus-within:translate-y-0 group-hover:translate-y-0 motion-chin'
+            : 'relative flex-none',
+        )}
       >
         {reveal && <ConcaveCorners />}
         <div className="px-3 pt-2.5 pb-3">
@@ -99,8 +97,12 @@ export function MediaTile({
                   {onOpenChannel ? (
                     <button
                       type="button"
-                      onClick={handleChannelClick}
-                      className="max-w-full cursor-pointer truncate align-bottom hover:text-red hover:underline"
+                      onClick={onOpenChannel}
+                      className={cx(
+                        'pointer-events-auto max-w-full cursor-pointer truncate rounded-badge align-bottom hover:text-red hover:underline',
+                        // Inset: the ellipsis line clips anything drawn outside it.
+                        focusRingInset,
+                      )}
                     >
                       {channel}
                     </button>

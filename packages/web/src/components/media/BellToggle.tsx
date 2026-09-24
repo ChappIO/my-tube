@@ -1,5 +1,6 @@
 import type { MouseEvent } from 'react';
 import { BellIcon } from '../icons';
+import { cx, focusRing, hitArea, minHit } from '../ui/cx';
 
 export interface BellToggleProps {
   /** Current subscription state. */
@@ -26,7 +27,7 @@ export function BellToggle({
   onToggle,
   form = 'circle',
   label,
-  className = '',
+  className,
 }: BellToggleProps) {
   const state = subscribed ? 'border-red bg-red text-white' : 'border-line bg-transparent text-ink';
   const text = subscribed ? 'Subscribed' : 'Subscribe';
@@ -45,7 +46,13 @@ export function BellToggle({
         aria-checked={subscribed}
         aria-label={label}
         onClick={handleClick}
-        className={`inline-flex cursor-pointer items-center gap-2 rounded-pill border py-[9px] pr-4 pl-3 font-sans text-[13px] font-semibold whitespace-nowrap ${state} ${className}`}
+        className={cx(
+          'inline-flex cursor-pointer items-center gap-2 rounded-pill border py-[9px] pr-4 pl-3 font-sans text-[13px] font-semibold whitespace-nowrap',
+          minHit,
+          focusRing,
+          state,
+          className,
+        )}
       >
         <BellIcon size={14} />
         {text}
@@ -61,7 +68,13 @@ export function BellToggle({
       aria-label={label ?? 'Subscribe'}
       title={text}
       onClick={handleClick}
-      className={`grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border ${state} ${className}`}
+      className={cx(
+        'grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border',
+        hitArea,
+        focusRing,
+        state,
+        className,
+      )}
     >
       <BellIcon size={14} />
     </button>

@@ -1,21 +1,30 @@
 import { createFileRoute } from '@tanstack/react-router';
-import type { ComponentType, ReactNode } from 'react';
+import type { ComponentType, CSSProperties, ReactNode } from 'react';
 import { LogoLockup, LogoMark, type LogoMarkVariant, Wordmark } from '../../components/brand/Logo';
 import { BellIcon, listIcons } from '../../components/icons';
 
 export const Route = createFileRoute('/dev/logo')({ component: LogoDemo });
 
-const RED = 'var(--color-red, #EA333E)';
+// The page follows the theme.
+const PAGE_BG = 'var(--color-bg, #FFFFFF)';
 const INK = 'var(--color-ink, #151618)';
-const WHITE = 'var(--color-bg, #FFFFFF)';
 const MUTED = 'var(--color-muted, #6F747C)';
 const LINE = 'var(--color-line, #ECEEF1)';
+// The grounds do not: "on white" and "on ink" show the mark on those exact colors in both
+// themes. White and red are fixed tokens; the ink ground is the light-theme ink, which has no
+// fixed token because --color-ink turns near-white in dark.
+const RED = 'var(--color-red, #EA333E)';
+const WHITE = 'var(--color-white, #FFFFFF)';
+const FIXED_INK = '#151618';
+// Dark sample box for the lockup: the dark theme's bg and ink, fixed.
+const DARK_BG = '#0F1012';
+const DARK_INK = '#F2F3F5';
 
 const SIZES = [16, 24, 32, 48, 64, 96];
 const VARIANTS: LogoMarkVariant[] = ['tile', 'inverted', 'glyph'];
 const GROUNDS = [
-  { name: 'white', bg: WHITE, fg: INK },
-  { name: 'ink', bg: INK, fg: WHITE },
+  { name: 'white', bg: WHITE, fg: FIXED_INK },
+  { name: 'ink', bg: FIXED_INK, fg: WHITE },
   { name: 'red', bg: RED, fg: WHITE },
 ];
 
@@ -32,7 +41,7 @@ function LogoDemo() {
         padding: 32,
         display: 'grid',
         gap: 40,
-        background: WHITE,
+        background: PAGE_BG,
         color: INK,
         font: '400 14px var(--font-sans, Archivo, system-ui, sans-serif)',
       }}
@@ -42,7 +51,18 @@ function LogoDemo() {
       <Section title="Header lockup · 28px tile, 20px wordmark, gap 10px">
         <div data-testid="lockup" style={{ display: 'flex', gap: 32, alignItems: 'center' }}>
           <LogoLockup />
-          <div style={{ background: '#0F1012', color: '#F2F3F5', padding: 16, borderRadius: 12 }}>
+          <div
+            style={
+              {
+                background: DARK_BG,
+                color: DARK_INK,
+                // The lockup's two-tone wordmark reads --color-ink; pin it to the dark ink here.
+                '--color-ink': DARK_INK,
+                padding: 16,
+                borderRadius: 12,
+              } as CSSProperties
+            }
+          >
             <LogoLockup />
           </div>
         </div>
@@ -97,10 +117,18 @@ function LogoDemo() {
         </div>
       </Section>
 
-      <Section title="Favicon · /favicon.svg (16px tile)">
+      <Section title="Favicon · /favicon.svg and /favicon.ico (16px tile, pixel-snapped; ICO adds 32px)">
         <div style={{ display: 'flex', gap: 24, alignItems: 'flex-end' }}>
-          <img src="/favicon.svg" width={16} height={16} alt="favicon at 16px" />
-          <img src="/favicon.svg" width={64} height={64} alt="favicon at 64px" />
+          <img src="/favicon.svg" width={16} height={16} alt="SVG favicon at 16px" />
+          <img src="/favicon.svg" width={64} height={64} alt="SVG favicon at 64px" />
+          <img src="/favicon.ico" width={16} height={16} alt="ICO favicon at 16px" />
+          <img
+            src="/favicon.ico"
+            width={64}
+            height={64}
+            alt="ICO favicon at 64px"
+            style={{ imageRendering: 'pixelated' }}
+          />
         </div>
       </Section>
 

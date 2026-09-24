@@ -15,7 +15,7 @@ packages/web/src
   routes/             TanStack Router file-based routes
     __root.tsx        wraps every route except /dev/* in AppShell
     index.tsx         /  (see Routing for the full list)
-    dev/              /dev/* visual reference pages (/dev/tokens, /dev/logo, /dev/components, /dev/media)
+    dev/              /dev/* visual reference pages (/dev/tokens, /dev/logo, /dev/components, /dev/media); dev server only
   navigation.ts       nav sections, tab ids, defaults and labels
   theme.ts            useTheme() hook: light/dark/system, persisted
   ui-state.ts         useAddModal(): global dialog state (see "App shell")
@@ -48,7 +48,7 @@ packages/web/src
 | `activity.tsx`          | `/activity`          |                                                                |
 | `settings.index.tsx`    | `/settings`          | redirects to `/settings/general`                               |
 | `settings.$tab.tsx`     | `/settings/$tab`     | `general`, `music`, `video`, `advanced`                        |
-| `dev/*`                 | `/dev/*`             | demo pages, see below                                          |
+| `dev/*`                 | `/dev/*`             | demo pages, dev server only, see below                         |
 
 The screens are still placeholders built on `src/components/PlaceholderPage.tsx`. Delete that file once the last screen replaces it. The app shell highlights the current section from the pathname (see App shell); pages expose nothing for it.
 
@@ -93,11 +93,13 @@ The screens are still placeholders built on `src/components/PlaceholderPage.tsx`
 | Kind    | CSS variable                                                                                       | Utilities                                                               |
 | ------- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | Colors  | `--color-bg`, `-side`, `-surface`, `-surface2`, `-line`, `-ink`, `-muted`, `-red`, `-ok`, `-white` | `bg-bg`, `text-ink`, `border-line`, `bg-red`, `text-white`, ...         |
+| Scrims  | `--color-scrim` (ink at 0.45), `--color-scrim-strong` (ink at 0.7)                                 | `bg-scrim`, `bg-scrim-strong` (modal overlays only)                     |
 | Fonts   | `--font-sans` (Archivo), `--font-mono` (Space Mono)                                                | `font-sans`, `font-mono`                                                |
 | Radii   | `--radius-pill` 999, `-modal` 18, `-card` 14, `-tile` 12, `-nav` 10, `-chip` 6, `-badge` 4         | `rounded-pill`, `rounded-tile`, ...                                     |
 | Shadows | `--shadow-tile` (tile hover), `--shadow-modal`, `--shadow-preview`                                 | `shadow-tile`, `shadow-modal`, `shadow-preview`                         |
 | Layout  | `--breakpoint-wide` 760px                                                                          | `wide:` variant (wide layout); unprefixed classes are the narrow layout |
 
+- `scrim` and `scrim-strong` are the modal overlays (Add to library, Preview): the light-theme ink at a fixed opacity, the same in both themes. `Modal` uses them; nothing else should.
 - The default Tailwind palette is removed (`--color-*: initial`), so `text-neutral-500` and friends do not exist. Every color comes from a token. `white` is only for text and glyphs on red and the inverted logo tile; `transparent` and `current` still work.
 - Outside Tailwind classes (SVG attributes, inline styles) use the variables: `fill="var(--color-red)"`.
 - Other Tailwind scales (spacing, sizes) are untouched; spacing values from the handoff are multiples of 4px, use arbitrary values like `p-[22px]` for the rest.
@@ -131,6 +133,14 @@ One utility per role in the handoff's Typography table. Each sets family, size, 
 
 Buttons, tab pills, inputs and form labels vary in size per the handoff and have no utility; their components in `src/components/ui/` compose them from `font-sans`, a size and a weight.
 
+### Focus and motion
+
+Defined once in `styles.css`; components never write their own `transition` or outline values.
+
+- **Focus:** a global `:focus-visible` rule gives every focusable element the handoff's ring (2px red outline, offset 2px) without opting in. Utilities for the variants: `focus-ring` (the same ring, explicit and immune to `outline-none`), `focus-ring-inset` (offset -2px, for items inside a clipping container: tab pills, nav rows, the channel link in a tile chin) and `focus-ring-overlay` (rings the element when its descendant marked `data-overlay` has keyboard focus; for overlay-button tiles). `cx.ts` exports them as `focusRing`, `focusRingInset` and `focusRingOverlay`; interactive components list one of them.
+- **Motion** (handoff Motion; nothing else animates): `motion-tile` (tile hover: scale, shadow and background, .2s ease), `motion-chin` (chin reveal: translate, .2s ease), `motion-knob` (toggle knob: `left` .15s). Put the utility on the element whose property changes; the hover or state classes stay on the component. All three drop the animation under `prefers-reduced-motion: reduce`. Buttons, pills and bells do not animate.
+- `/dev/tokens` shows the motion utilities and the focus ring.
+
 ### Fonts
 
 Self-hosted through Fontsource, imported in `main.tsx`: `@fontsource-variable/archivo` (weight axis, covers 400 to 800) and `@fontsource/space-mono` 400 and 700. No Google Fonts links.
@@ -143,7 +153,7 @@ Self-hosted through Fontsource, imported in `main.tsx`: `@fontsource-variable/ar
   - `LogoLockup`: the header lockup (28px tile, 20px wordmark, 10px gap) for the sidebar and the narrow top bar. Use it; do not rebuild it.
 - `src/components/brand/geometry.ts` has the mark's geometry. Sizes drawn in the handoff (16, 24, 28, 32, 40, 48, 64, 88, 96) use its pixel-hinted values; other sizes scale the 96px tile.
 - Brand components reference `--color-red`, `--color-ink`, `--color-white` and `--font-sans` with the handoff values as fallbacks. The mark's white is `--color-white`, never `--color-bg` (which is near-black in dark).
-- Favicon: `public/favicon.svg`, the 16px tile, linked from `index.html`. Keep it in sync with the 16px values in `geometry.ts`.
+- Favicon: `public/favicon.svg` (the 16px tile) and `public/favicon.ico` (16px and 32px PNGs, for browsers without SVG favicons), both linked from `index.html`. Both are generated from the 16px values in `geometry.ts` by `pnpm --filter @mytube/web favicon` (`scripts/favicon.ts`, no image dependencies); rerun it when the 16px geometry changes. The 16px geometry is pixel-snapped (8 x 2 bar, block top at y 4) so every edge lands on a whole pixel; `SNAPPED_TOP` in `geometry.ts` holds the top.
 - Icons: Lucide (`lucide-react`). Import icons only from `src/components/icons.tsx`, never from `lucide-react` directly. That file wraps each icon with the app defaults (16px, stroke 2, `aria-hidden`, no flex shrink); use 16 to 20px.
 - `BellIcon` is not Lucide: it draws the handoff's own bell path (24×24 viewBox, filled with `currentColor`, 14px by default).
 - Do not use YouTube's logo or play-button shape anywhere.
@@ -186,11 +196,13 @@ Self-hosted through Fontsource, imported in `main.tsx`: `@fontsource-variable/ar
 
 Settings → Music and Settings → Video reuse `MusicIcon` and `VideoIcon` on purpose: those tabs configure the music and video libraries, which is the same meaning as the sections. Settings → General gets its own `GeneralIcon`, not `SettingsIcon`, because "general settings" is not "the Settings section".
 
-**Tab icons** (`TAB_ICONS` in `navigation.ts`, one per tab id) are an addition to the handoff, whose tab pills are text only; the owner asked for them. On a 375px screen the four Music pills with icons are wider than the track (440px of content against 343px), so the track scrolls sideways inside itself and keeps the active pill in view. Even the `sm` size does not fit (404px).
+**Tab icons** (`TAB_ICONS` in `navigation.ts`, one per tab id) are an addition to the handoff, whose tab pills are text only; the owner asked for them on wide screens. Below 760px the pills are text only (the owner's decision), because four Music pills with icons need 440px against the 343px track on a 375px screen. The track still scrolls sideways inside itself and keeps the active pill in view as a fallback (longer labels, larger text).
 
 ## Dev demo routes
 
-Routes under `src/routes/dev/` (`/dev/*`) are visual reference pages for building blocks: `/dev/tokens` for colors, type scale, radii, shadows, fonts and the theme switcher, `/dev/logo` for the brand and icon set, `/dev/components` for the core UI components, `/dev/media` for the media components. They are not linked from the app and have no data dependencies. Add a page when you add a design system piece, update the relevant page when you add a token, variant or icon, and check it in the browser.
+Routes under `src/routes/dev/` (`/dev/*`) exist only in `pnpm dev`. In a production build (`mode === 'production'` in `vite.config.ts`) the router plugin ignores the `dev` directory (`routeFileIgnorePattern: '^dev$'`) and writes that smaller route tree to `node_modules/.tanstack-router/routeTree.gen.ts`, and a small resolver plugin points the `./routeTree.gen` import in `main.tsx` at it. The committed `src/routeTree.gen.ts` always keeps the dev routes, so a build never changes it, and the container answers `/dev/*` with the app's not-found page. Do not import from `routes/dev` elsewhere.
+
+They are visual reference pages for building blocks: `/dev/tokens` for colors, type scale, radii, shadows, fonts and the theme switcher, `/dev/logo` for the brand and icon set, `/dev/components` for the core UI components, `/dev/media` for the media components. They are not linked from the app and have no data dependencies. Add a page when you add a design system piece, update the relevant page when you add a token, variant or icon, and check it in the browser.
 
 ## UI components
 
@@ -199,29 +211,35 @@ Routes under `src/routes/dev/` (`/dev/*`) are visual reference pages for buildin
 - `typography.tsx`: `PageTitle` (h1), `ModalTitle` (h2), `SectionTitle` (h2), `SectionLabel` (h2, muted), `TableHeaderLabel` (span, muted), `Meta` (span; `size="md" | "sm"`, `tone="muted" | "ink" | "ok" | "red"`), `Body` (p; `muted`), `FieldLabel` (label; `htmlFor`). All take `as`, `id`, `className`.
 - `PageHeader`: `title`, `sub?`, `actions?` (a `StatCardGroup` or `TabPills`). Bottom-aligned, wraps on narrow.
 - `StatCard`: `label`, `value`. `StatCardGroup` lays out several with gap 10.
-- `TabPills<T>`: `items: {id, label, icon?}[]`, `value`, `onChange(id)`, `label` (group aria-label), `size="md" | "sm"`. Controlled toggle buttons with `aria-pressed`. `icon` is an icon component from `components/icons`, drawn at 16px, 8px before the label. The track scrolls inside itself instead of widening the page and scrolls the active pill into view. The scroll runs one task after render, because TanStack's scroll restoration otherwise copies the old `scrollLeft` back after navigation.
+- `TabPills<T>`: `items: {id, label, icon?}[]`, `value`, `onChange(id)`, `label` (group aria-label), `size="md" | "sm"`. Controlled toggle buttons with `aria-pressed`. `icon` is an icon component from `components/icons`, drawn at 16px, 8px before the label, on wide screens only (hidden below 760px). The track scrolls inside itself instead of widening the page and scrolls the active pill into view. The scroll runs one task after render, because TanStack's scroll restoration otherwise copies the old `scrollLeft` back after navigation.
 - `TabPillLinks<T>` (same file): the routed variant for tabs that live in the URL. `items: {id, label, icon?, link}[]` where `link` comes from `linkOptions({ to, params })`, `value` (the current tab from `Route.useParams()`), `label` (nav aria-label), `size`. Renders a `<nav>` of `Link`s with the identical track and item classes (shared `trackClass`/`itemClass` helpers, never copy them), `aria-current="page"` on the active pill. Build the items once at module level from `navigation.ts`: `MUSIC_TABS.map((tab) => ({ id: tab, label: TAB_LABELS[tab], icon: TAB_ICONS[tab], link: linkOptions({ to: '/music/$tab', params: { tab } }) }))`, and pass the track as `PageHeader`'s `actions`.
 - `BackLink`: `link` (from `linkOptions`), children (the destination's name). "← Video" above a detail page header: back arrow + Archivo 600 13, muted, hover ink.
-- `Button`: `variant="primary" | "secondary" | "outlined"` (default secondary), `size="md" | "lg"`, `icon?` (leading), `fullWidth?`, plus native button props.
+- `Button`: `variant="primary" | "secondary" | "outlined"` (default secondary), `size="md" | "lg" | "xl"`, `icon?` (leading), `fullWidth?`, plus native button props. `md` Archivo 13 at 9px 16px ("Edit rules"), `lg` Archivo 14 at 11px 18px (modal footer; primary is 700 with 20px sides), `xl` Archivo 700 15 at 13px (the sidebar "Add to library", used with `fullWidth`). Padding includes the 1px border every variant has.
 - `IconButton`: `label` (required, becomes `aria-label`), `size="sm" | "md" | "lg"` (32/36/40px), `tone="surface" | "red"`, icon as the child.
 - `Input`: `shape="field" | "pill"` (default field, radius 10), `mono` for URLs and paths, `width?` (defaults to full width), plus native input props.
 - `Toggle`: `checked`, `onChange(checked)`, `label?` (aria-label when there is no visible label). `ToggleRow`: `label`, `description?`, `checked`, `onChange`, `disabled?`; the whole row is clickable.
 - `CheckboxRow`: `label`, `hint?`, `checked`, `onChange(checked)`, `disabled?`. A native checkbox underneath.
-- `Modal`: `open`, `onClose`, `title`, `dim="default" | "strong"`, `width?` (CSS, default `min(560px, 100%)`), children as the body. Portals to `body`; closes on overlay click and Escape; locks body scroll; focuses the dialog on open and restores focus on close. No focus trap yet. `ModalActions` is the right-aligned footer row.
-- `cx.ts`: `cx(...classes)` joins class names (no clsx), plus the shared class strings `focusRing` (2px red outline, offset 2px, `focus-visible` only), `focusRingInset`, `minHit` (min height 44px narrow, 36px wide) and `hitArea` (invisible 44px/36px pseudo-element hit area for visually smaller controls like the 32px close button and the switch). Every interactive component uses them; new ones must too.
+- `Modal`: `open`, `onClose`, `title?`, `aria-label?`, `dim="default" | "strong"`, `width?` (CSS, default `min(560px, 100%)`), children as the body. Two variants:
+  - **With `title`** (Add to library, confirmations): padding 28, gap 22, a title row with the round close button; the title names the dialog.
+  - **Header-less** (Preview): omit `title` and pass `aria-label` (the types require one or the other). No title row, no close button, no padding, `overflow: hidden`; the children lay out the whole dialog (player area, footer).
+  - `dim="default"` uses `bg-scrim` and the modal shadow; `strong` uses `bg-scrim-strong` and the preview shadow.
+  - Portals to `body`; closes on overlay click and Escape; locks body scroll; focuses the dialog on open, keeps Tab and Shift+Tab inside it, and restores focus on close. Open modals form a module-level stack: only the top-most reacts to Escape and Tab, so a confirm opened from Preview closes first. `ModalActions` is the right-aligned footer row.
+- `focus.ts`: `trapTab(event, container)` (the Tab/Shift+Tab trap), `tabbableWithin(container)` and `createLayerStack()` (the modal stack). Use them for any future overlay (menus, popovers) instead of a dependency.
+- `cx.ts`: `cx(...classes)` joins class names (no clsx), plus the shared class strings `focusRing`, `focusRingInset`, `focusRingOverlay` (names of the focus utilities in `styles.css`, see "Focus and motion"), `minHit` (min height 44px narrow, 36px wide) and `hitArea` (invisible 44px/36px pseudo-element hit area for visually smaller controls like the 32px close button and the switch). Every interactive component uses them; new ones must too.
 
-Tailwind 4 note: `outline-none` sets `--tw-outline-style: none`, which also hides a later `outline-2`. Use `focusRing` instead of combining them.
+Tailwind 4 note: `outline-none` sets `--tw-outline-style: none`, which also hides a later `outline-2`. Use the focus utilities instead of building a ring from `outline-*` classes.
 
 ## Media components
 
 `src/components/media/` (import from `components/media`) implements the handoff's Components section for art and tiles. Every component takes an optional `className` for placement only.
 
 - `TileGrid`: the tile grid, `minmax(180px, 1fr)` gap 20; narrow `minmax(150px, 1fr)` gap 12. Use it for both tile kinds.
-- `MediaTile` (`title`, `chin: 'fixed' | 'reveal'`, `art`, `duration?`, `channel?`, `when?`, `subtitle?`, `onOpen?`, `onOpenChannel?`): the square tile. `fixed` for video (chin always visible, art shrinks), `reveal` for music and playlists on Home (chin slides up on hover or focus). The channel name is a button that calls `onOpenChannel` without opening the tile. Pass `<Artwork fill>` or `<PlaylistStack fill>` as `art`.
+- `MediaTile` (`title`, `chin: 'fixed' | 'reveal'`, `art`, `duration?`, `channel?`, `when?`, `subtitle?`, `onOpen?`, `onOpenChannel?`): the square tile. `fixed` for video (chin always visible, art shrinks), `reveal` for music and playlists on Home (chin slides up on hover or focus). Pass `<Artwork fill>` or `<PlaylistStack fill>` as `art`.
+  - **Overlay pattern** (no nested interactive controls): the tile is a plain box. A transparent full-size `<button data-overlay>` covers it, labelled by the title, and is the only control for `onOpen` (omitted without `onOpen`). Art and chin are `pointer-events: none`, so clicks anywhere land on the overlay; the channel name is a separate `<button>` with `pointer-events: auto` that calls `onOpenChannel`. Keyboard order: tile, then channel. The tile draws the focus ring for its overlay (`focus-ring-overlay`); the channel button uses the inset ring. Use the same pattern for any future card with a secondary action (Channels rows).
 - `MusicTile` (`kind: 'album' | 'artist' | 'playlist'`, `title`, `subtitle?`, `meta?`, `incomplete?`, `subscribed?`, `src?`, `covers?`, `seed?`, `onOpen?`): the open tile of the Music tab. Artists get a circle, centered text and, when `subscribed`, the bell badge; `incomplete` turns the meta line red; playlists draw a `PlaylistStack` from `covers`.
 - `Artwork` (`src?`, `alt?`, `seed?`, `shape: 'square' | 'circle'`, `size: 'tile' | 'thumb'`, `fill?`, `children?`): cover, thumbnail or avatar. Radius 12 (`tile`), 6 (`thumb`, 32px row covers) or round. `surface` while loading; falls back to the placeholder when `src` is missing or fails. `children` are overlays such as `DurationBadge`.
 - `PlaylistStack` (`covers?`, `seed?`, `fill?`): four covers in the handoff's 3D row (brand board Turn 5b). Two or three covers repeat to four; one cover falls back to a flat `Artwork`; none draws four placeholders from `seed`. Geometry lives in `stack.ts`.
-- `BellToggle` (`subscribed`, `onToggle(next)`, `form: 'circle' | 'pill'`, `label?`): subscription switch (`role="switch"`), toggles immediately and stops click propagation. `label` is the accessible name, for example `Subscribe to Radiohead`.
+- `BellToggle` (`subscribed`, `onToggle(next)`, `form: 'circle' | 'pill'`, `label?`): subscription switch (`role="switch"`), toggles immediately and stops click propagation. The circle has the invisible 44px/36px hit area, the pill the minimum height, both the focus ring. `label` is the accessible name, for example `Subscribe to Radiohead`.
 - `DurationBadge` (`duration`): the on-art length badge, bottom-right; the parent must be positioned.
 
 `fill` on `Artwork` and `PlaylistStack` means "fill the positioned parent" (`absolute inset-0`) instead of sizing as a square; tiles need it, standalone art does not.
@@ -233,7 +251,7 @@ Tailwind 4 note: `outline-none` sets `--tw-outline-style: none`, which also hide
 `src/components/shell/AppShell.tsx` is the layout, rendered by `routes/__root.tsx` around `<Outlet />`. `/dev/*` pages are left outside it and render their own `<main>`.
 
 - **Wide (`wide:`, 760px and up):** `Sidebar` (232px, sticky, full height, `side` bg, `line` right border) with the lockup, the five `NavItem`s, a spacer, the "+ Add to library" button and a footer slot. Main is fluid with `min-width: 0`.
-- **Add buttons:** the top bar "+" is `ui/IconButton` (`tone="red"`, `size="lg"`). The sidebar pill is local (`shell/AddButtons.tsx`) because `ui/Button` has no 15px / 13px-padding size; do not bend `Button` for it.
+- **Add buttons:** the top bar "+" is `ui/IconButton` (`tone="red"`, `size="lg"`). The sidebar pill is `ui/Button` (`variant="primary"`, `size="xl"`, `fullWidth`, `PlusIcon`).
 - **Narrow:** the sidebar is hidden, `TopBar` (sticky, lockup + round red "+") sits at the top of main, `TabBar` (five sections, fixed to the bottom, safe-area aware) sits below everything.
 - **Main owns the outer padding and section rhythm:** padding 32px 40px 64px wide and 0 16px 96px narrow (the 96px clears the tab bar), and a flex column gap of 28px wide / 20px narrow between page sections. Pages set **no** outer padding, margin or max width on their root; they render their sections (header, tab pills, grid, ...) as direct children, usually through a fragment. Content max widths such as the Settings column (760px) belong on the section itself.
 - **Props from data:** `activityCount` (active downloads; the Activity badge shows when above 0, in both the sidebar and the tab bar) and `sidebarFooter` (a node, normally `<SidebarFooter version status />`, which renders `yt-dlp <version>` over the status line). The root passes `0` and `—` / `not installed` until Stage 2 wires the queue count and the yt-dlp status from the API.

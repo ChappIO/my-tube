@@ -2,30 +2,52 @@ import { type ReactNode, useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { CloseIcon } from '../icons';
 import { cx } from './cx';
+import { createLayerStack, trapTab } from './focus';
 import { IconButton } from './IconButton';
 import { ModalTitle } from './typography';
 
-export interface ModalProps {
+interface ModalBaseProps {
   open: boolean;
   onClose: () => void;
-  title: ReactNode;
-  /** `default` overlay at 0.45 (Add to library), `strong` at 0.7 (Preview). */
+  /** `default` scrim at 0.45 (Add to library), `strong` at 0.7 with the preview shadow (Preview). */
   dim?: 'default' | 'strong';
   /** CSS width of the dialog. Default `min(560px, 100%)`. */
   width?: string;
   children: ReactNode;
 }
 
-// The overlay is the light-theme ink at fixed opacity in both themes (handoff Screens 4 and 7).
-const overlays = {
-  default: 'bg-[rgba(21,22,24,0.45)]',
-  strong: 'bg-[rgba(21,22,24,0.7)]',
+interface ModalWithTitle extends ModalBaseProps {
+  /** Title row: the title and a round close button. The title names the dialog. */
+  title: ReactNode;
+  'aria-label'?: undefined;
+}
+
+interface ModalWithoutTitle extends ModalBaseProps {
+  /**
+   * No title: the header-less variant (Preview). No title row, no close button and no
+   * padding; the children lay out the whole dialog. `aria-label` names it instead.
+   */
+  title?: undefined;
+  'aria-label': string;
+}
+
+export type ModalProps = ModalWithTitle | ModalWithoutTitle;
+
+const scrims = {
+  default: 'bg-scrim',
+  strong: 'bg-scrim-strong',
 } as const;
 
+// Open modals, top-most last. Only the top one reacts to Escape and Tab, so a nested dialog
+// closes (and traps focus) before the one below it.
+const layers = createLayerStack();
+
 /**
- * Modal frame: dimmed overlay, centered dialog (radius 18, padding 28, gap 22, modal shadow)
- * with a title row and a round close button. Closes on overlay click and Escape, locks page
- * scroll while open and moves focus into the dialog, restoring it on close.
+ * Modal frame: scrim overlay and a centered dialog (radius 18, modal shadow). With a `title`
+ * it has padding 28, gap 22 and a title row with a round close button; without one it is a
+ * bare frame for the Preview player. Closes on overlay click and Escape (top-most modal
+ * only), locks page scroll, moves focus into the dialog, keeps Tab inside it and restores
+ * focus on close.
  */
 export function Modal({
   open,
@@ -34,9 +56,11 @@ export function Modal({
   dim = 'default',
   width = 'min(560px, 100%)',
   children,
+  'aria-label': ariaLabel,
 }: ModalProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const headed = title !== undefined;
   // Keep the latest onClose without re-running the open effect when the parent re-renders.
   const onCloseRef = useRef(onClose);
   useEffect(() => {
@@ -45,21 +69,26 @@ export function Modal({
 
   useEffect(() => {
     if (!open) return undefined;
+    const layer = layers.push();
     const previousFocus = document.activeElement;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     dialogRef.current?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (!layers.isTop(layer)) return;
       if (event.key === 'Escape') {
         event.stopPropagation();
         onCloseRef.current();
+      } else if (dialogRef.current) {
+        trapTab(event, dialogRef.current);
       }
     };
     document.addEventListener('keydown', onKeyDown);
 
     return () => {
       document.removeEventListener('keydown', onKeyDown);
+      layers.remove(layer);
       document.body.style.overflow = previousOverflow;
       if (previousFocus instanceof HTMLElement) previousFocus.focus();
     };
@@ -69,10 +98,7 @@ export function Modal({
 
   return createPortal(
     <div
-      className={cx(
-        'fixed inset-0 z-10 grid place-items-center overflow-y-auto p-6',
-        overlays[dim],
-      )}
+      className={cx('fixed inset-0 z-10 grid place-items-center overflow-y-auto p-6', scrims[dim])}
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -81,17 +107,24 @@ export function Modal({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={titleId}
+        aria-labelledby={headed ? titleId : undefined}
+        aria-label={headed ? undefined : ariaLabel}
         tabIndex={-1}
-        className="grid gap-[22px] rounded-modal bg-bg p-7 text-ink shadow-modal outline-none"
+        className={cx(
+          'rounded-modal bg-bg text-ink outline-none',
+          dim === 'strong' ? 'shadow-preview' : 'shadow-modal',
+          headed ? 'grid gap-[22px] p-7' : 'overflow-hidden',
+        )}
         style={{ width }}
       >
-        <div className="flex items-center justify-between gap-4">
-          <ModalTitle id={titleId}>{title}</ModalTitle>
-          <IconButton label="Close" size="sm" onClick={onClose}>
-            <CloseIcon />
-          </IconButton>
-        </div>
+        {headed && (
+          <div className="flex items-center justify-between gap-4">
+            <ModalTitle id={titleId}>{title}</ModalTitle>
+            <IconButton label="Close" size="sm" onClick={onClose}>
+              <CloseIcon />
+            </IconButton>
+          </div>
+        )}
         {children}
       </div>
     </div>,

@@ -33,6 +33,12 @@ describe('glyphShapes', () => {
     expect(bar).toEqual({ x: 29, y: 58.5, width: 38, height: 6, rx: 3 });
   });
 
+  it('snaps the 16px favicon glyph to whole pixels', () => {
+    const { triangle, bar } = glyphShapes(16, tileGeometry(16));
+    expect(triangle).toBe('M5 4H11L8 8Z');
+    expect(bar).toEqual({ x: 4, y: 9, width: 8, height: 2, rx: 0 });
+  });
+
   it('draws a larger glyph when there is no tile', () => {
     expect(glyphGeometry(96).triangleWidth).toBeGreaterThan(tileGeometry(96).triangleWidth);
   });

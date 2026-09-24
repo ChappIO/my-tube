@@ -36,11 +36,9 @@ export function Toggle({ checked, onChange, label, className, ...props }: Toggle
       <span
         aria-hidden
         className={cx(
-          'absolute top-[3px] size-5 rounded-full bg-white',
+          'absolute top-[3px] size-5 rounded-full bg-white motion-knob',
           checked ? 'left-[21px]' : 'left-[3px]',
         )}
-        // Handoff Motion: "Toggle knob: left .15s".
-        style={{ transition: 'left .15s' }}
       />
     </button>
   );

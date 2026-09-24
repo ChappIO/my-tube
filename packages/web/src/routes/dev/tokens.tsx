@@ -15,6 +15,14 @@ const colors = [
   { name: 'red', light: '#EA333E', dark: '#EA333E', use: 'brand, primary, active' },
   { name: 'ok', light: '#2F9E6A', dark: '#2F9E6A', use: 'on disk, done' },
   { name: 'white', light: '#FFFFFF', dark: '#FFFFFF', use: 'text and glyphs on red' },
+  { name: 'scrim', light: 'ink @ 0.45', dark: 'ink @ 0.45', use: 'modal overlay' },
+  { name: 'scrim-strong', light: 'ink @ 0.7', dark: 'ink @ 0.7', use: 'preview overlay' },
+] as const;
+
+const motions = [
+  { cls: 'motion-tile', value: 'transform, box-shadow .2s ease', use: 'tile hover' },
+  { cls: 'motion-chin', value: 'transform .2s ease', use: 'chin reveal' },
+  { cls: 'motion-knob', value: 'left .15s', use: 'toggle knob' },
 ] as const;
 
 const typeRoles = [
@@ -152,6 +160,27 @@ function TokensDemo() {
               <div className={`h-24 rounded-tile bg-surface ${s.cls}`} />
             </Sample>
           ))}
+        </div>
+      </Section>
+
+      <Section label="Motion and focus">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-8">
+          {motions.map((m) => (
+            <Sample key={m.cls} name={m.cls} value={m.value} use={m.use}>
+              <div className="h-24 overflow-hidden rounded-tile bg-surface">
+                <div className={`h-full rounded-tile bg-surface2 hover:translate-x-1/2 ${m.cls}`} />
+              </div>
+            </Sample>
+          ))}
+          <Sample
+            name="focus-ring"
+            value="2px red, offset 2px"
+            use="global :focus-visible (Tab here)"
+          >
+            <button type="button" className="h-24 w-full rounded-tile bg-surface focus-ring">
+              Focus me
+            </button>
+          </Sample>
         </div>
       </Section>
 
