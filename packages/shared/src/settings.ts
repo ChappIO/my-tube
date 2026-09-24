@@ -1,5 +1,12 @@
 import { z } from 'zod';
 import {
+  DEFAULT_MUSIC_MATCHER,
+  DEFAULT_VIDEO_MATCHER,
+  Matcher,
+  PLAYLIST_ONLY_LEAVES,
+  matcherLeaves,
+} from './matchers.js';
+import {
   MUSIC_PATH_TAGS,
   type PathTag,
   VIDEO_PATH_TAGS,
@@ -10,7 +17,7 @@ import {
  * Every value a user can change in the Settings screen, grouped by the screen's cards.
  *
  * Storage: the API keeps one row per field in the `settings` table, keyed by the dotted path
- * (`general.theme`, `video.keepDays`) with the value as JSON. Rows only exist for values the
+ * (`general.theme`, `video.quality`) with the value as JSON. Rows only exist for values the
  * user changed; everything else comes from the defaults below.
  *
  * Paths of the mounts (`/media/music`, `/media/video`, `/config`) are env, not settings.
@@ -53,6 +60,21 @@ function pathTemplate(tags: readonly PathTag[]) {
     });
 }
 
+/**
+ * A library's default rules: the tree new sources start from. Playlist-only conditions are
+ * refused because the tree also seeds channels and artists.
+ */
+function defaultRules(fallback: Matcher) {
+  return Matcher.superRefine((matcher, ctx) => {
+    if (matcherLeaves(matcher).some((leaf) => PLAYLIST_ONLY_LEAVES.includes(leaf.type))) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Default rules cannot use playlist-only conditions (channel, playlist position).',
+      });
+    }
+  }).default(fallback);
+}
+
 /** Settings → General. */
 export const GeneralSettings = z.object({
   theme: ThemeChoice.default('system'),
@@ -76,13 +98,14 @@ export const MusicSettings = z.object({
   audioQuality: z.enum(AUDIO_QUALITIES).default('best'),
   container: z.enum(AUDIO_CONTAINERS).default('m4a'),
   loudnessNormalization: z.boolean().default(false),
-  /** "Embed cover art and tags". */
+  /** "Embed cover art and tags": the option new music sources start with. */
   embedCoverArt: z.boolean().default(true),
-  skipLiveRecordings: z.boolean().default(false),
+  /** Rules new music sources start with. Default: everything (an artist's every release). */
+  defaultRules: defaultRules(DEFAULT_MUSIC_MATCHER),
 });
 export type MusicSettings = z.infer<typeof MusicSettings>;
 
-/** Settings → Video. `keepDays`, `skipShorts` and `saveThumbnails` are defaults for new channels. */
+/** Settings → Video. `defaultRules` is what new channels and playlists start with. */
 export const VideoSettings = z.object({
   /** Handoff "Channel / Title (Date)". */
   pathTemplate: pathTemplate(VIDEO_PATH_TAGS).default('{channel}/{title} ({date})'),
@@ -100,9 +123,8 @@ export const VideoSettings = z.object({
     .default(['en', 'nl']),
   /** Embed subtitles in the container instead of writing sidecar files. */
   subtitlesEmbedded: z.boolean().default(true),
-  /** "Keep videos for N days"; null keeps them forever. */
-  keepDays: z.number().int().min(1).max(3650).nullable().default(90),
-  skipShorts: z.boolean().default(true),
+  /** Rules new video sources start with. Default: no shorts, nothing older than 90 days. */
+  defaultRules: defaultRules(DEFAULT_VIDEO_MATCHER),
   /** Sidecar thumbnail, for Plex. */
   saveThumbnails: z.boolean().default(true),
 });

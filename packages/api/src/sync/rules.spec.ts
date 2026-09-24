@@ -1,14 +1,15 @@
-import {
-  DEFAULT_MUSIC_RULES,
-  DEFAULT_VIDEO_RULES,
-  type MusicSourceRules,
-  type VideoSourceRules,
-} from '@mytube/shared';
+import { DEFAULT_MUSIC_MATCHER, DEFAULT_VIDEO_MATCHER, and, not, or } from '@mytube/shared';
 import { describe, expect, it } from 'vitest';
 import type { SourceEntry } from '../ytdlp/metadata.js';
-import { evaluateItem, keepCutoff } from './rules.js';
+import { type EntryContext, entryContext, evaluateItem } from './rules.js';
 
 const NOW = new Date('2026-09-24T12:00:00Z');
+const CHANNEL: EntryContext = {
+  now: NOW,
+  channelName: 'NASA',
+  channelId: 'UCnasa',
+  playlistPosition: null,
+};
 
 function entry(overrides: Partial<SourceEntry> = {}): SourceEntry {
   return {
@@ -29,187 +30,116 @@ function entry(overrides: Partial<SourceEntry> = {}): SourceEntry {
   };
 }
 
-/** Video rules with everything off, so each test turns on the rule it is about. */
-const OPEN_VIDEO: VideoSourceRules = {
-  ...DEFAULT_VIDEO_RULES,
-  skipShorts: false,
-  keepDays: null,
-  publishedAfter: null,
-  titleFilter: null,
-};
-const OPEN_MUSIC: MusicSourceRules = {
-  ...DEFAULT_MUSIC_RULES,
-  skipLiveRecordings: false,
-};
-
 const accept = { accept: true };
-const reject = (reason: string, transient = false) => ({ accept: false, reason, transient });
 
 describe('evaluateItem', () => {
-  it('accepts anything when every rule is off', () => {
-    expect(evaluateItem(entry(), OPEN_VIDEO, NOW)).toEqual(accept);
-    expect(evaluateItem(entry({ isShort: true, uploadDate: null }), OPEN_VIDEO, NOW)).toEqual(
+  it('accepts everything with the empty and', () => {
+    expect(evaluateItem(entry(), and(), CHANNEL)).toEqual(accept);
+    expect(evaluateItem(entry({ isShort: true, uploadDate: null }), and(), CHANNEL)).toEqual(
       accept,
     );
-    expect(evaluateItem(entry({ title: 'Live at Wembley' }), OPEN_MUSIC, NOW)).toEqual(accept);
+    expect(
+      evaluateItem(entry({ title: 'Live at Wembley' }), DEFAULT_MUSIC_MATCHER, CHANNEL),
+    ).toEqual(accept);
   });
 
-  describe('skipShorts', () => {
-    const rules = { ...OPEN_VIDEO, skipShorts: true };
-    it('rejects shorts', () => {
-      expect(evaluateItem(entry({ isShort: true }), rules, NOW)).toEqual(reject('short'));
+  it('rejects what the matcher does not match as no_match, naming the conditions', () => {
+    expect(evaluateItem(entry({ isShort: true }), DEFAULT_VIDEO_MATCHER, CHANNEL)).toEqual({
+      accept: false,
+      reason: 'no_match',
+      transient: false,
+      failing: ['no shorts'],
     });
-    it('accepts regular videos', () => {
-      expect(evaluateItem(entry({ isShort: false }), rules, NOW)).toEqual(accept);
-    });
-    it('accepts shorts when off', () => {
-      expect(evaluateItem(entry({ isShort: true }), OPEN_VIDEO, NOW)).toEqual(accept);
-    });
+    expect(
+      evaluateItem(entry({ uploadDate: '2026-01-01' }), DEFAULT_VIDEO_MATCHER, CHANNEL),
+    ).toMatchObject({ reason: 'no_match', failing: ['not older than 90 days'] });
   });
 
-  describe('titleFilter', () => {
-    const rules = { ...OPEN_VIDEO, titleFilter: 'Monologue' };
-    it('accepts a case-insensitive substring match', () => {
-      expect(evaluateItem(entry({ title: 'Late night MONOLOGUE, part 2' }), rules, NOW)).toEqual(
-        accept,
-      );
-    });
-    it('rejects titles without the substring', () => {
-      expect(evaluateItem(entry({ title: 'Interview' }), rules, NOW)).toEqual(
-        reject('title_filter'),
-      );
-    });
-    it('treats the filter as plain text, not a pattern', () => {
-      const dotted = { ...OPEN_VIDEO, titleFilter: 'a.b' };
-      expect(evaluateItem(entry({ title: 'axb' }), dotted, NOW)).toEqual(reject('title_filter'));
-      expect(evaluateItem(entry({ title: 'the a.b show' }), dotted, NOW)).toEqual(accept);
-    });
-    it('rejects entries without a title', () => {
-      expect(evaluateItem(entry({ title: null }), rules, NOW)).toEqual(reject('title_filter'));
-    });
-  });
-
-  describe('publishedAfter', () => {
-    const rules = { ...OPEN_VIDEO, publishedAfter: '2026-09-01' };
-    it('rejects items published before the date', () => {
-      expect(evaluateItem(entry({ uploadDate: '2026-08-31' }), rules, NOW)).toEqual(
-        reject('published_before'),
-      );
-    });
-    it('accepts items published on the date', () => {
-      expect(evaluateItem(entry({ uploadDate: '2026-09-01' }), rules, NOW)).toEqual(accept);
-    });
-    it('accepts items published after the date', () => {
-      expect(evaluateItem(entry({ uploadDate: '2026-09-02' }), rules, NOW)).toEqual(accept);
-    });
-    it('falls back to the timestamp', () => {
-      const before = Date.parse('2026-08-31T23:59:59Z') / 1000;
-      const onDay = Date.parse('2026-09-01T00:00:00Z') / 1000;
-      expect(evaluateItem(entry({ uploadDate: null, timestamp: before }), rules, NOW)).toEqual(
-        reject('published_before'),
-      );
-      expect(evaluateItem(entry({ uploadDate: null, timestamp: onDay }), rules, NOW)).toEqual(
-        accept,
-      );
-    });
-    it('accepts items without a date', () => {
-      expect(evaluateItem(entry({ uploadDate: null, timestamp: null }), rules, NOW)).toEqual(
-        accept,
-      );
-    });
-  });
-
-  describe('keepDays', () => {
-    const rules = { ...OPEN_VIDEO, keepDays: 30 };
-    it('computes the cutoff by UTC date', () => {
-      expect(keepCutoff(NOW, 30)).toBe('2026-08-25');
-      expect(keepCutoff(new Date('2026-09-24T00:00:00Z'), 1)).toBe('2026-09-23');
-    });
-    it('rejects items older than the window', () => {
-      expect(evaluateItem(entry({ uploadDate: '2026-08-24' }), rules, NOW)).toEqual(
-        reject('older_than_keep_days'),
-      );
-    });
-    it('accepts items on the boundary day and inside the window', () => {
-      expect(evaluateItem(entry({ uploadDate: '2026-08-25' }), rules, NOW)).toEqual(accept);
-      expect(evaluateItem(entry({ uploadDate: '2026-09-24' }), rules, NOW)).toEqual(accept);
-    });
-    it('accepts items without a date', () => {
-      expect(evaluateItem(entry({ uploadDate: null }), rules, NOW)).toEqual(accept);
-    });
-    it('keeps everything when null', () => {
-      expect(evaluateItem(entry({ uploadDate: '2001-01-01' }), OPEN_VIDEO, NOW)).toEqual(accept);
-    });
-  });
-
-  describe('live streams (both libraries)', () => {
-    for (const rules of [OPEN_VIDEO, OPEN_MUSIC]) {
-      it(`never downloads an ongoing or upcoming stream (${rules.library})`, () => {
-        expect(evaluateItem(entry({ liveStatus: 'is_upcoming' }), rules, NOW)).toEqual(
-          reject('upcoming', true),
-        );
-        expect(evaluateItem(entry({ liveStatus: 'is_live' }), rules, NOW)).toEqual(
-          reject('live', true),
-        );
-        expect(evaluateItem(entry({ liveStatus: 'post_live' }), rules, NOW)).toEqual(
-          reject('live', true),
-        );
+  it('never downloads an ongoing or upcoming stream, whatever the rules (transient)', () => {
+    for (const matcher of [and(), DEFAULT_VIDEO_MATCHER, or({ type: 'is_short' }, and())]) {
+      expect(evaluateItem(entry({ liveStatus: 'is_upcoming' }), matcher, CHANNEL)).toEqual({
+        accept: false,
+        reason: 'upcoming',
+        transient: true,
+        failing: [],
       });
-      it(`accepts finished streams and regular uploads (${rules.library})`, () => {
-        expect(evaluateItem(entry({ liveStatus: 'was_live' }), rules, NOW)).toEqual(accept);
-        expect(evaluateItem(entry({ liveStatus: 'not_live' }), rules, NOW)).toEqual(accept);
+      expect(evaluateItem(entry({ liveStatus: 'is_live' }), matcher, CHANNEL)).toMatchObject({
+        reason: 'live',
+        transient: true,
+      });
+      expect(evaluateItem(entry({ liveStatus: 'post_live' }), matcher, CHANNEL)).toMatchObject({
+        reason: 'live',
+        transient: true,
       });
     }
+    expect(evaluateItem(entry({ liveStatus: 'was_live' }), and(), CHANNEL)).toEqual(accept);
   });
 
-  describe('skipLiveRecordings', () => {
-    const rules = { ...OPEN_MUSIC, skipLiveRecordings: true };
-    it('rejects titles containing the word "live"', () => {
-      for (const title of ['Live at Wembley', 'Song (Live)', 'Song - LIVE', 'song [live 1999]']) {
-        expect(evaluateItem(entry({ title }), rules, NOW)).toEqual(reject('live'));
-      }
-    });
-    it('accepts "live" inside another word', () => {
-      for (const title of ['Olive Tree', 'Delivery', 'Lively', 'Alive']) {
-        expect(evaluateItem(entry({ title }), rules, NOW)).toEqual(accept);
-      }
-    });
-    it('is not transient', () => {
-      expect(evaluateItem(entry({ title: 'Live' }), rules, NOW)).toMatchObject({
-        transient: false,
-      });
-    });
-  });
-
-  it('ignores the other library’s rules', () => {
-    // A music source never rejects shorts or old items; a video source never rejects "live".
-    expect(
-      evaluateItem(entry({ isShort: true, uploadDate: '2001-01-01' }), DEFAULT_MUSIC_RULES, NOW),
-    ).toEqual(accept);
-    expect(evaluateItem(entry({ title: 'Live!' }), OPEN_VIDEO, NOW)).toEqual(accept);
-  });
-
-  it('reports the first failing rule', () => {
-    const rules = { ...OPEN_VIDEO, skipShorts: true, titleFilter: 'x', keepDays: 1 };
-    const old = entry({ isShort: true, title: 'nope', uploadDate: '2001-01-01' });
-    expect(evaluateItem(old, rules, NOW)).toEqual(reject('short'));
-    expect(evaluateItem({ ...old, isShort: false }, rules, NOW)).toEqual(
-      reject('older_than_keep_days'),
-    );
-    expect(evaluateItem({ ...old, isShort: false, liveStatus: 'is_live' }, rules, NOW)).toEqual(
-      reject('live', true),
-    );
-  });
-
-  it('applies the handoff defaults: no shorts, last 90 days', () => {
-    expect(evaluateItem(entry({ isShort: true }), DEFAULT_VIDEO_RULES, NOW)).toEqual(
-      reject('short'),
-    );
-    expect(evaluateItem(entry({ uploadDate: '2026-06-25' }), DEFAULT_VIDEO_RULES, NOW)).toEqual(
-      reject('older_than_keep_days'),
-    );
-    expect(evaluateItem(entry({ uploadDate: '2026-06-26' }), DEFAULT_VIDEO_RULES, NOW)).toEqual(
+  it('accepts entries without a date under date rules', () => {
+    const since = and({ type: 'published_after', date: '2026-09-01' });
+    expect(evaluateItem(entry({ uploadDate: null }), since, CHANNEL)).toEqual(accept);
+    expect(evaluateItem(entry({ uploadDate: null }), DEFAULT_VIDEO_MATCHER, CHANNEL)).toEqual(
       accept,
     );
+  });
+
+  it('applies the default video rules against the given clock', () => {
+    expect(
+      evaluateItem(entry({ uploadDate: '2026-06-26' }), DEFAULT_VIDEO_MATCHER, CHANNEL),
+    ).toEqual(accept);
+    expect(
+      evaluateItem(entry({ uploadDate: '2026-06-25' }), DEFAULT_VIDEO_MATCHER, CHANNEL).accept,
+    ).toBe(false);
+  });
+
+  it('builds the nested rule from the roadmap', () => {
+    const tree = and(
+      not({ type: 'is_short' }),
+      or({ type: 'title_contains', text: 'Artemis' }, { type: 'title_contains', text: 'Orion' }),
+      not({ type: 'older_than_days', days: 90 }),
+    );
+    expect(evaluateItem(entry({ title: 'Artemis II rollout' }), tree, CHANNEL)).toEqual(accept);
+    expect(evaluateItem(entry({ title: 'Orion splashdown' }), tree, CHANNEL)).toEqual(accept);
+    expect(evaluateItem(entry({ title: 'Mars rover' }), tree, CHANNEL)).toMatchObject({
+      reason: 'no_match',
+      failing: ['only "Artemis"', 'only "Orion"'],
+    });
+  });
+});
+
+describe('entryContext', () => {
+  it('uses the entry uploader, else the source channel, and the timestamp as a date', () => {
+    const at = Date.parse('2026-09-01T10:00:00Z') / 1000;
+    expect(
+      entryContext(entry({ uploadDate: null, timestamp: at, duration: 59.6 }), CHANNEL),
+    ).toMatchObject({
+      publishedAt: '2026-09-01',
+      durationSeconds: 60,
+      channelName: 'NASA',
+      channelId: 'UCnasa',
+    });
+    expect(
+      entryContext(entry({ channel: 'ESA', channelId: 'UCesa' }), {
+        ...CHANNEL,
+        playlistPosition: 3,
+      }),
+    ).toMatchObject({ channelName: 'ESA', channelId: 'UCesa', playlistPosition: 3 });
+  });
+
+  it('lets playlist rules see the uploader and the position', () => {
+    const tree = and(
+      { type: 'channel_is', channel: 'esa' },
+      { type: 'in_playlist_position_under', position: 3 },
+    );
+    const inPlaylist = (position: number, channel: string) =>
+      evaluateItem(entry({ channel, channelId: `UC${channel}` }), tree, {
+        now: NOW,
+        channelName: null,
+        channelId: null,
+        playlistPosition: position,
+      }).accept;
+    expect(inPlaylist(2, 'ESA')).toBe(true);
+    expect(inPlaylist(3, 'ESA')).toBe(false);
+    expect(inPlaylist(1, 'NASA')).toBe(false);
   });
 });

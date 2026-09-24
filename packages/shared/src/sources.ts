@@ -1,12 +1,13 @@
 import { z } from 'zod';
-import { Library, MusicRules, SourceKind, VideoRules } from './rules.js';
+import { Matcher } from './matchers.js';
+import { Library, SourceKind, SourceOptions } from './rules.js';
 
 /*
  * The sources API: resolving a pasted YouTube link, and creating, changing and removing
- * sources. The `Source` DTO and the rules live in `rules.ts`.
+ * sources. The `Source` DTO lives in `rules.ts`, the rules (matchers) in `matchers.ts`.
  *
- * Removing a source or unsubscribing never deletes media. Only retention and the explicit
- * Delete in Preview do.
+ * Removing a source or unsubscribing never deletes media. Only revalidation (a file the
+ * source's rules no longer match) and the explicit Delete in Preview do.
  */
 
 // ---------------------------------------------------------------------------------------
@@ -223,32 +224,16 @@ export const ResolvedSource = z.object({
 });
 export type ResolvedSource = z.infer<typeof ResolvedSource>;
 
-/*
- * Rule inputs. Every field is optional (no defaults) so the API can tell which ones the
- * client set: on create they overlay the library defaults (Settings → Video for video
- * sources), on update they overlay the source's current rules. `library` is required and must
- * match the source's library. Unknown fields are rejected.
+/**
+ * Option inputs: every field optional (no defaults) so the API can tell which ones the client
+ * set. On create they overlay the defaults (`music.embedCoverArt` from Settings for music), on
+ * update the source's current options. Unknown fields are rejected.
  */
-export const VideoRulesInput = z.strictObject({
-  library: z.literal('video'),
-  skipShorts: VideoRules.shape.skipShorts.unwrap().optional(),
-  keepDays: VideoRules.shape.keepDays.unwrap().optional(),
-  publishedAfter: VideoRules.shape.publishedAfter.unwrap().optional(),
-  titleFilter: VideoRules.shape.titleFilter.unwrap().optional(),
-  syncOrder: VideoRules.shape.syncOrder.unwrap().optional(),
+export const SourceOptionsInput = z.strictObject({
+  embedCoverArt: SourceOptions.shape.embedCoverArt.unwrap().optional(),
+  syncOrder: SourceOptions.shape.syncOrder.unwrap().optional(),
 });
-export type VideoRulesInput = z.infer<typeof VideoRulesInput>;
-
-export const MusicRulesInput = z.strictObject({
-  library: z.literal('music'),
-  skipLiveRecordings: MusicRules.shape.skipLiveRecordings.unwrap().optional(),
-  embedCoverArt: MusicRules.shape.embedCoverArt.unwrap().optional(),
-});
-export type MusicRulesInput = z.infer<typeof MusicRulesInput>;
-
-/** Some or all rules of one library. A full `Rules` object is valid input too. */
-export const RulesInput = z.discriminatedUnion('library', [VideoRulesInput, MusicRulesInput]);
-export type RulesInput = z.infer<typeof RulesInput>;
+export type SourceOptionsInput = z.infer<typeof SourceOptionsInput>;
 
 export const SOURCE_NAME_MAX = 200;
 
@@ -261,14 +246,20 @@ export const CreateSource = z.strictObject({
   url: z.string().trim().min(1).max(2000),
   library: Library,
   kind: SourceKind.optional(),
-  rules: RulesInput.optional(),
+  /** The rules; the library's default tree from Settings when omitted. */
+  matcher: Matcher.optional(),
+  options: SourceOptionsInput.optional(),
 });
 export type CreateSource = z.infer<typeof CreateSource>;
 
-/** `PATCH /api/sources/:id` body. At least one field. Rules overlay the current rules. */
+/**
+ * `PATCH /api/sources/:id` body. At least one field. `matcher` replaces the rules as a whole
+ * (and queues a revalidation); `options` overlay the current options.
+ */
 export const UpdateSource = z
   .strictObject({
-    rules: RulesInput.optional(),
+    matcher: Matcher.optional(),
+    options: SourceOptionsInput.optional(),
     subscribed: z.boolean().optional(),
     name: z.string().trim().min(1).max(SOURCE_NAME_MAX).optional(),
   })
@@ -292,3 +283,24 @@ export const SourceConflict = z.object({
   sourceId: z.number().int().positive(),
 });
 export type SourceConflict = z.infer<typeof SourceConflict>;
+
+/** `POST /api/sources/:id/rules/preview` body: the rules the Edit modal is about to save. */
+export const RulesPreviewRequest = z.strictObject({ matcher: Matcher });
+export type RulesPreviewRequest = z.infer<typeof RulesPreviewRequest>;
+
+/**
+ * `POST /api/sources/:id/rules/preview` response: the files on disk the candidate rules would
+ * remove (`id` is the video or track id), and how many on-disk files they keep.
+ */
+export const RulesPreview = z.object({
+  wouldRemove: z.array(
+    z.object({
+      id: z.number().int().positive(),
+      title: z.string(),
+      /** The conditions the item fails (`not older than 90 days`). */
+      failing: z.array(z.string()),
+    }),
+  ),
+  wouldKeep: z.number().int().nonnegative(),
+});
+export type RulesPreview = z.infer<typeof RulesPreview>;

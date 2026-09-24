@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DEFAULT_VIDEO_RULES } from '@mytube/shared';
+import { DEFAULT_SOURCE_OPTIONS, DEFAULT_VIDEO_MATCHER } from '@mytube/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -65,7 +65,8 @@ describe('DownloadRunner (fake binary)', () => {
         youtubeId: 'UCnasa',
         url: 'https://www.youtube.com/channel/UCnasa',
         name: 'NASA',
-        rules: DEFAULT_VIDEO_RULES,
+        matcher: DEFAULT_VIDEO_MATCHER,
+        options: DEFAULT_SOURCE_OPTIONS,
       })
       .returning()
       .get();
@@ -194,7 +195,7 @@ describe('DownloadRunner (fake binary)', () => {
     db.update(videos).set({ status: 'on_disk' }).where(eq(videos.id, video.id)).run();
     await expect(runner.run(job, context().ctx)).resolves.toBeNull();
     db.update(videos)
-      .set({ status: 'skipped', skipReason: 'short' })
+      .set({ status: 'skipped', skipReason: 'no_match' })
       .where(eq(videos.id, video.id))
       .run();
     await expect(runner.run(job, context().ctx)).resolves.toBeNull();

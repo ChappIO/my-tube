@@ -1,78 +1,11 @@
 import {
-  DEFAULT_MUSIC_RULES,
-  DEFAULT_VIDEO_RULES,
+  DEFAULT_SOURCE_OPTIONS,
+  DEFAULT_VIDEO_MATCHER,
   type ResolvedSource,
   type Source,
 } from '@mytube/shared';
 import { describe, expect, it } from 'vitest';
-import { draftFromRules, newRulesDraft, rulesFromDraft, type VideoRulesDraft } from './rules-draft';
 import { kindInLibrary, resolvedMeta, sourceMeta, videoLibrarySummary } from './source-text';
-
-function videoDraft(patch: Partial<VideoRulesDraft> = {}): VideoRulesDraft {
-  const draft = draftFromRules(DEFAULT_VIDEO_RULES);
-  if (draft.library !== 'video') throw new Error('expected a video draft');
-  return { ...draft, ...patch };
-}
-
-describe('rules drafts', () => {
-  it('round-trips the defaults', () => {
-    expect(rulesFromDraft(draftFromRules(DEFAULT_VIDEO_RULES), 'channel')).toEqual({
-      ok: true,
-      rules: DEFAULT_VIDEO_RULES,
-    });
-    expect(rulesFromDraft(draftFromRules(DEFAULT_MUSIC_RULES), 'artist')).toEqual({
-      ok: true,
-      rules: DEFAULT_MUSIC_RULES,
-    });
-  });
-
-  it('starts new video sources from the Settings → Video defaults', () => {
-    const draft = newRulesDraft('video', { keepDays: null, skipShorts: false });
-    expect(draft).toMatchObject({ skipShorts: false, keep: false, keepDays: 90 });
-    expect(newRulesDraft('video', { keepDays: 30, skipShorts: true })).toMatchObject({
-      keep: true,
-      keepDays: 30,
-    });
-    expect(newRulesDraft('music')).toEqual(DEFAULT_MUSIC_RULES);
-  });
-
-  it('remembers N while keep is off and saves null', () => {
-    const draft = draftFromRules({ ...DEFAULT_VIDEO_RULES, keepDays: null }, 45);
-    expect(draft).toMatchObject({ keep: false, keepDays: 45 });
-    const result = rulesFromDraft(draft, 'channel');
-    expect(result.ok && result.rules.library === 'video' && result.rules.keepDays).toBeNull();
-    const on = rulesFromDraft(videoDraft({ keep: true, keepDays: 7 }), 'channel');
-    expect(on.ok && on.rules.library === 'video' && on.rules.keepDays).toBe(7);
-  });
-
-  it('maps the inline fields and trims the title', () => {
-    const result = rulesFromDraft(
-      videoDraft({ titleOn: true, title: '  Artemis ', afterOn: true, after: '2026-01-01' }),
-      'channel',
-    );
-    expect(result).toMatchObject({
-      ok: true,
-      rules: { titleFilter: 'Artemis', publishedAfter: '2026-01-01' },
-    });
-    // Unchecked rows ignore their text.
-    const off = rulesFromDraft(videoDraft({ title: 'x', after: 'nonsense' }), 'channel');
-    expect(off).toMatchObject({ ok: true, rules: { titleFilter: null, publishedAfter: null } });
-  });
-
-  it('rejects checked rows without a usable value', () => {
-    expect(rulesFromDraft(videoDraft({ titleOn: true, title: ' ' }), 'channel').ok).toBe(false);
-    expect(rulesFromDraft(videoDraft({ afterOn: true, after: '' }), 'channel').ok).toBe(false);
-    expect(
-      rulesFromDraft(videoDraft({ titleOn: true, title: 'x'.repeat(201) }), 'channel').ok,
-    ).toBe(false);
-  });
-
-  it('keeps sync order for playlists only', () => {
-    const draft = videoDraft({ syncOrder: true });
-    expect(rulesFromDraft(draft, 'playlist')).toMatchObject({ rules: { syncOrder: true } });
-    expect(rulesFromDraft(draft, 'channel')).toMatchObject({ rules: { syncOrder: false } });
-  });
-});
 
 const source: Source = {
   id: 1,
@@ -83,7 +16,8 @@ const source: Source = {
   name: 'NASA',
   avatarUrl: null,
   subscribed: true,
-  rules: DEFAULT_VIDEO_RULES,
+  matcher: DEFAULT_VIDEO_MATCHER,
+  options: DEFAULT_SOURCE_OPTIONS,
   lastCheckedAt: null,
   itemCount: 0,
   sizeBytes: 0,

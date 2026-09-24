@@ -4,7 +4,15 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { ResolvedSource, Source, SourceConflict } from '@mytube/shared';
+import {
+  DEFAULT_MUSIC_MATCHER,
+  ResolvedSource,
+  RulesPreview,
+  Source,
+  SourceConflict,
+  and,
+  not,
+} from '@mytube/shared';
 import BetterSqlite3 from 'better-sqlite3';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -25,6 +33,12 @@ const CatalogRow = z.object({
   name: z.string(),
   item_count: z.number().optional(),
 });
+
+const DEFAULT_TREE = and(not({ type: 'is_short' }), not({ type: 'older_than_days', days: 30 }));
+const PLAYLIST_TREE = and(
+  { type: 'channel_is', channel: 'NASA' },
+  { type: 'in_playlist_position_under', position: 3 },
+);
 
 describe('Sources (e2e)', () => {
   let app: INestApplication;
@@ -148,19 +162,15 @@ describe('Sources (e2e)', () => {
   describe('source lifecycle', () => {
     let channelId: number;
 
-    it('creates a video channel with Settings → Video defaults and the given rules', async () => {
+    it('creates a video channel with the Settings → Video default rules', async () => {
       await request(server())
         .patch('/api/settings')
-        .send({ video: { keepDays: 30 } })
+        .send({ video: { defaultRules: DEFAULT_TREE } })
         .expect(200);
 
       const response = await request(server())
         .post('/api/sources')
-        .send({
-          url: 'https://www.youtube.com/@NASA',
-          library: 'video',
-          rules: { library: 'video', titleFilter: 'Moon' },
-        })
+        .send({ url: 'https://www.youtube.com/@NASA', library: 'video' })
         .expect(201);
       const source = Source.parse(response.body);
       channelId = source.id;
@@ -171,14 +181,8 @@ describe('Sources (e2e)', () => {
         url: `https://www.youtube.com/channel/${NASA}`,
         name: 'NASA',
         subscribed: true,
-        rules: {
-          library: 'video',
-          skipShorts: true,
-          keepDays: 30,
-          publishedAfter: null,
-          titleFilter: 'Moon',
-          syncOrder: false,
-        },
+        matcher: DEFAULT_TREE,
+        options: { embedCoverArt: true, syncOrder: false },
         lastCheckedAt: null,
         itemCount: 0,
         sizeBytes: 0,
@@ -209,13 +213,20 @@ describe('Sources (e2e)', () => {
       const bodies = [
         // An artist in the Video library.
         { url: 'https://www.youtube.com/@NASA', library: 'video', kind: 'artist' },
-        // Music rules on a video source.
-        { url: 'https://www.youtube.com/@NASA', library: 'video', rules: { library: 'music' } },
-        // Sync order on a channel.
+        // The old flat rules are gone.
+        { url: 'https://www.youtube.com/@NASA', library: 'video', rules: { library: 'video' } },
+        // Sync order and playlist-only conditions on a channel.
+        { url: 'https://www.youtube.com/@NASA', library: 'video', options: { syncOrder: true } },
         {
           url: 'https://www.youtube.com/@NASA',
           library: 'video',
-          rules: { library: 'video', syncOrder: true },
+          matcher: and({ type: 'channel_is', channel: 'NASA' }),
+        },
+        // An invalid regular expression.
+        {
+          url: 'https://www.youtube.com/@NASA',
+          library: 'video',
+          matcher: { type: 'title_matches', pattern: '([' },
         },
         // A playlist link as a channel.
         {
@@ -223,12 +234,8 @@ describe('Sources (e2e)', () => {
           library: 'video',
           kind: 'channel',
         },
-        // Unknown rule field, missing library, unsupported link.
-        {
-          url: 'https://www.youtube.com/@NASA',
-          library: 'video',
-          rules: { library: 'video', x: 1 },
-        },
+        // Unknown option, missing library, unsupported link.
+        { url: 'https://www.youtube.com/@NASA', library: 'video', options: { x: 1 } },
         { url: 'https://www.youtube.com/@NASA' },
         { url: 'https://vimeo.com/1', library: 'video' },
       ];
@@ -256,7 +263,8 @@ describe('Sources (e2e)', () => {
         library: 'music',
         kind: 'artist',
         url: `https://music.youtube.com/channel/${NASA}`,
-        rules: { library: 'music', skipLiveRecordings: false, embedCoverArt: true },
+        matcher: DEFAULT_MUSIC_MATCHER,
+        options: { embedCoverArt: true, syncOrder: false },
       });
       expect(catalogRow('artists', NASA)).toMatchObject({ source_id: artist.id });
 
@@ -267,14 +275,16 @@ describe('Sources (e2e)', () => {
             .send({
               url: `https://www.youtube.com/playlist?list=${PLAYLIST}`,
               library: 'video',
-              rules: { library: 'video', syncOrder: true, keepDays: null },
+              matcher: PLAYLIST_TREE,
+              options: { syncOrder: true },
             })
             .expect(201)
         ).body,
       );
       expect(playlist).toMatchObject({
         kind: 'playlist',
-        rules: { syncOrder: true, keepDays: null },
+        matcher: PLAYLIST_TREE,
+        options: { embedCoverArt: true, syncOrder: true },
       });
       expect(catalogRow('playlists', PLAYLIST)).toMatchObject({
         source_id: playlist.id,
@@ -306,22 +316,25 @@ describe('Sources (e2e)', () => {
       await request(server()).get('/api/sources/abc').expect(400);
     });
 
-    it('updates rules over the current ones and bumps updatedAt', async () => {
+    it('replaces the rules, overlays options and bumps updatedAt', async () => {
       const before = Source.parse((await request(server()).get(`/api/sources/${channelId}`)).body);
+      const tree = and(not({ type: 'older_than_days', days: 7 }));
       const response = await request(server())
         .patch(`/api/sources/${channelId}`)
-        .send({ rules: { library: 'video', keepDays: 7, skipShorts: false }, name: 'NASA (main)' })
+        .send({ matcher: tree, options: { embedCoverArt: false }, name: 'NASA (main)' })
         .expect(200);
       const after = Source.parse(response.body);
-      expect(after.rules).toEqual({ ...before.rules, keepDays: 7, skipShorts: false });
+      expect(after.matcher).toEqual(tree);
+      expect(after.options).toEqual({ embedCoverArt: false, syncOrder: false });
       expect(after.name).toBe('NASA (main)');
       expect(after.updatedAt > before.updatedAt).toBe(true);
 
       const badBodies = [
         {},
-        { rules: { library: 'music', embedCoverArt: false } },
-        { rules: { library: 'video', syncOrder: true } },
-        { rules: { library: 'video', keepDays: 0 } },
+        { rules: { library: 'video', keepDays: 7 } },
+        { options: { syncOrder: true } },
+        { matcher: { type: 'older_than_days', days: 0 } },
+        { matcher: and({ type: 'in_playlist_position_under', position: 5 }) },
         { library: 'music' },
       ];
       const statuses = [];
@@ -345,7 +358,8 @@ describe('Sources (e2e)', () => {
         ).body,
       );
       expect(off.subscribed).toBe(false);
-      expect(off.rules).toEqual(before.rules);
+      expect(off.matcher).toEqual(before.matcher);
+      expect(off.options).toEqual(before.options);
       expect(catalogRow('channels', NASA)).toMatchObject({ source_id: channelId });
       const got = Source.parse((await request(server()).get(`/api/sources/${channelId}`)).body);
       expect(got.subscribed).toBe(false);
@@ -356,6 +370,34 @@ describe('Sources (e2e)', () => {
         .expect(200);
       expect(Source.parse(on.body).subscribed).toBe(true);
       await request(server()).patch(`/api/sources/${channelId}/subscribed`).send({}).expect(400);
+    });
+
+    it('previews what new rules would remove, changing nothing', async () => {
+      const preview = RulesPreview.parse(
+        (
+          await request(server())
+            .post(`/api/sources/${channelId}/rules/preview`)
+            .send({ matcher: and({ type: 'is_short' }) })
+            .expect(200)
+        ).body,
+      );
+      // Nothing of this source is on disk in this suite (the activity e2e covers removals).
+      expect(preview).toEqual({ wouldRemove: [], wouldKeep: 0 });
+      await request(server())
+        .post('/api/sources/9999/rules/preview')
+        .send({ matcher: and() })
+        .expect(404);
+      await request(server())
+        .post(`/api/sources/${channelId}/rules/preview`)
+        .send({ matcher: { type: 'nope' } })
+        .expect(400);
+      const playlistOnly = await request(server())
+        .post(`/api/sources/${channelId}/rules/preview`)
+        .send({ matcher: and({ type: 'channel_is', channel: 'NASA' }) })
+        .expect(400);
+      expect(playlistOnly.body.issues).toEqual([
+        { path: ['matcher'], message: 'The channel condition only applies to playlists' },
+      ]);
     });
 
     it('deletes the source row only; the catalog row stays, unlinked', async () => {

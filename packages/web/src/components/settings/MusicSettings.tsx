@@ -13,6 +13,7 @@ import { SettingsCard } from '../ui/SettingsCard';
 import { ToggleRow } from '../ui/Toggle';
 import { LibraryCard } from './LibraryCard';
 import { ON_OFF_OPTIONS, optionsOf, qualityLabel, schemaError } from './fields';
+import { DefaultRulesEditor } from './DefaultRulesEditor';
 import { SettingsTab } from './SettingsTab';
 
 const audioOptions = optionsOf(AUDIO_QUALITIES, qualityLabel);
@@ -23,7 +24,10 @@ export function validateMusicTemplate(template: string): string | undefined {
   return schemaError(MusicSettingsSchema.shape.pathTemplate, template);
 }
 
-/** Settings → Music: Library, Format and Behaviour. Every change saves immediately. */
+/**
+ * Settings → Music: Library, Format, Behaviour and Defaults for new artists. Every change saves
+ * immediately, except the default rules, which have their own Save.
+ */
 export function MusicSettings() {
   const update = useUpdateSettings();
   const { data: info } = useSystemInfo();
@@ -68,15 +72,16 @@ export function MusicSettings() {
           <SettingsCard title="Behaviour">
             <ToggleRow
               label="Embed cover art and tags"
-              description="Artist, album, track number, year."
+              description="Artist, album, track number, year. The default for new artists."
               checked={music.embedCoverArt}
               onChange={(embedCoverArt) => save({ embedCoverArt })}
             />
-            <ToggleRow
-              label="Skip live recordings"
-              description={'Ignore tracks whose title contains "live".'}
-              checked={music.skipLiveRecordings}
-              onChange={(skipLiveRecordings) => save({ skipLiveRecordings })}
+          </SettingsCard>
+          <SettingsCard title="Defaults for new artists">
+            <DefaultRulesEditor
+              value={music.defaultRules}
+              onSave={(defaultRules) => save({ defaultRules })}
+              appliesTo="artists and playlists"
             />
           </SettingsCard>
         </>

@@ -13,8 +13,8 @@ import {
   sourceIssues,
   type CreateSource,
   type Library,
+  type Matcher,
   type ResolvedSource,
-  type Rules,
   type SourceIssue,
   type SourceKind,
   type UpdateSource,
@@ -33,7 +33,7 @@ import {
   imageUrl,
   initialRules,
   kindForLibrary,
-  mergeRules,
+  mergeOptions,
 } from './resolve.js';
 
 /** Entries fetched per level when resolving: enough for the cadence, quick to list. */
@@ -51,11 +51,13 @@ type SourceRow = typeof sources.$inferSelect;
  *
  * Nothing here deletes media or enqueues work. Removing a source deletes its row only; the
  * catalog rows (`channels`, `artists`, `playlists`) stay and are unlinked, and files are never
- * touched. Unsubscribing only flips `subscribed`. The sync listens through `onCreated`.
+ * touched. Unsubscribing only flips `subscribed`. The sync listens through `onCreated` (check a
+ * new source) and `onRulesChanged` (revalidate its files against the new rules).
  */
 @Injectable()
 export class SourcesService {
   private readonly createdListeners = new Set<(source: Source) => void>();
+  private readonly rulesListeners = new Set<(source: Source) => void>();
 
   constructor(
     @Inject(DATABASE) private readonly db: Database,
@@ -126,9 +128,9 @@ export class SourcesService {
   }
 
   /**
-   * Resolves `url` again, fills the rules (library defaults, Settings → Video for video
-   * sources, then the client's rules), inserts the source subscribed and links or creates its
-   * catalog row. 409 with the existing `sourceId` when the library already has it.
+   * Resolves `url` again, fills the rules (the client's tree, else the library's default tree
+   * from Settings) and options, inserts the source subscribed and links or creates its catalog
+   * row. 409 with the existing `sourceId` when the library already has it.
    */
   async create(body: CreateSource): Promise<Source> {
     const resolved = await this.resolve(body.url);
@@ -145,11 +147,8 @@ export class SourcesService {
         },
       ]);
     }
-    if (body.rules && body.rules.library !== library) {
-      throw invalid([{ path: ['rules', 'library'], message: `Rules must be ${library} rules` }]);
-    }
-    const rules = initialRules(library, this.settings.get(), body.rules);
-    const issues = sourceIssues({ library, kind, rules });
+    const { matcher, options } = initialRules(library, this.settings.get(), body);
+    const issues = sourceIssues({ library, kind, matcher, options });
     if (issues.length > 0) throw invalid(issues);
 
     const music = library === 'music' || resolved.url.startsWith('https://music.');
@@ -176,7 +175,8 @@ export class SourcesService {
           name: resolved.name,
           avatarUrl: resolved.avatarUrl,
           subscribed: true,
-          rules,
+          matcher,
+          options,
         })
         .returning()
         .get();
@@ -193,32 +193,42 @@ export class SourcesService {
     return () => this.createdListeners.delete(listener);
   }
 
-  /** Changes rules (overlaid on the current ones), subscribed and/or name. */
+  /** Called after a source's rules (its matcher) were saved (revalidation runs at once). */
+  onRulesChanged(listener: (source: Source) => void): () => void {
+    this.rulesListeners.add(listener);
+    return () => this.rulesListeners.delete(listener);
+  }
+
+  /**
+   * Replaces the rules (`matcher`), overlays options and changes subscribed and/or name. A
+   * changed matcher notifies `onRulesChanged`.
+   */
   update(id: number, body: UpdateSource): Source {
     const row = this.row(id);
-    let rules: Rules | undefined;
-    if (body.rules) {
-      if (body.rules.library !== row.library) {
-        throw invalid([
-          { path: ['rules', 'library'], message: `Rules must be ${row.library} rules` },
-        ]);
-      }
-      rules = mergeRules(row.rules, body.rules);
-      const issues = sourceIssues({ library: row.library, kind: row.kind, rules });
+    const matcher: Matcher = body.matcher ?? row.matcher;
+    const options = mergeOptions(row.options, body.options);
+    if (body.matcher !== undefined || body.options !== undefined) {
+      const issues = sourceIssues({ library: row.library, kind: row.kind, matcher, options });
       if (issues.length > 0) throw invalid(issues);
     }
-    const updated = this.db
-      .update(sources)
-      .set({
-        ...(rules !== undefined && { rules }),
-        ...(body.subscribed !== undefined && { subscribed: body.subscribed }),
-        ...(body.name !== undefined && { name: body.name }),
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(sources.id, id))
-      .returning()
-      .get();
-    return toSource(updated);
+    const updated = toSource(
+      this.db
+        .update(sources)
+        .set({
+          ...(body.matcher !== undefined && { matcher }),
+          ...(body.options !== undefined && { options }),
+          ...(body.subscribed !== undefined && { subscribed: body.subscribed }),
+          ...(body.name !== undefined && { name: body.name }),
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(sources.id, id))
+        .returning()
+        .get(),
+    );
+    const changed =
+      body.matcher !== undefined && JSON.stringify(body.matcher) !== JSON.stringify(row.matcher);
+    if (changed) for (const listener of this.rulesListeners) listener(updated);
+    return updated;
   }
 
   /** The bell. Unsubscribing only stops future checks; nothing is deleted. */

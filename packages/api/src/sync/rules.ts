@@ -1,4 +1,9 @@
-import type { Rules, SkipReason } from '@mytube/shared';
+import {
+  evaluateMatcher,
+  type Matcher,
+  type MatcherContext,
+  type SkipReason,
+} from '@mytube/shared';
 import type { SourceEntry } from '../ytdlp/metadata.js';
 
 export type RuleVerdict =
@@ -12,72 +17,59 @@ export type RuleVerdict =
        * next check evaluates them again.
        */
       transient: boolean;
+      /** The conditions the entry failed (`no shorts`), for logs. Empty for transient ones. */
+      failing: string[];
     };
 
-const DAY_MS = 86_400_000;
-/** "live" as a word: matches "Live at Wembley", "(Live)", not "Olive" or "Delivery". */
-const LIVE_WORD = /\blive\b/i;
+/** Where an entry sits: the facts the matcher needs that the entry itself does not carry. */
+export interface EntryContext {
+  now: Date;
+  /**
+   * The uploader when the entry does not name one: a channel source's own listing is flat and
+   * carries no uploader per entry.
+   */
+  channelName: string | null;
+  channelId: string | null;
+  /** 1-based position in a playlist source's listing; null for channels and artists. */
+  playlistPosition: number | null;
+}
 
 /**
  * Decides whether a source's rules accept a fetched entry. Pure: no database, no clock (the
- * caller passes `now`), no yt-dlp. The first failing rule wins, in this order:
+ * caller passes `now`), no yt-dlp.
  *
- * Both libraries:
- * - `upcoming`: a scheduled premiere or stream (`liveStatus` `is_upcoming`).
- * - `live`: a stream that is on air or still processing (`is_live`, `post_live`). Never
- *   download an ongoing stream. Both are `transient`: the sync should not store them as a
- *   permanent skip but evaluate the entry again on the next check.
+ * Before the rules, in both libraries: a scheduled premiere or stream (`is_upcoming` →
+ * `upcoming`) and a stream on air or still processing (`is_live`, `post_live` → `live`) are
+ * never downloaded. Both are `transient`: the sync does not store them but looks again on the
+ * next check. Then the source's matcher decides (`evaluateMatcher`); a miss is `no_match`.
  *
- * Video rules:
- * - `short` when `skipShorts` and the entry is a short (`/shorts/` URL or the Shorts tab).
- * - `published_before` when `publishedAfter` is set and the entry's date is before it. The
- *   same day is accepted.
- * - `older_than_keep_days` when `keepDays` is set and the entry is older than the window
- *   (`now` minus `keepDays` days, compared by UTC date, so the boundary day is accepted).
- *   Retention would delete such a file on its next run, so downloading it is wasted work. A
- *   new source with `keepDays = 90` therefore downloads only the last 90 days.
- * - `title_filter` when `titleFilter` is set and the title does not contain it
- *   (case-insensitive plain substring). An entry without a title never matches.
- *
- * Entries without a date are accepted by the date rules: flat channel listings sometimes omit
- * it, and dropping them would silently lose uploads. yt-dlp's flat dates are approximate (a
- * day, derived from "3 weeks ago"), so the date rules are day-granular.
- *
- * Music rules:
- * - `live` when `skipLiveRecordings` and the title contains the word "live".
- *
- * An artist source downloads all of the artist's releases, albums and singles alike; there is
- * no album-only rule.
+ * Entries without a date or duration are not dropped for it: the matcher treats the missing
+ * value as unknown, and unknown counts as a match (flat listings sometimes omit dates, and
+ * yt-dlp's flat dates are approximate to the day).
  */
-export function evaluateItem(entry: SourceEntry, rules: Rules, now: Date): RuleVerdict {
+export function evaluateItem(entry: SourceEntry, matcher: Matcher, ctx: EntryContext): RuleVerdict {
   if (entry.liveStatus === 'is_upcoming') return reject('upcoming', true);
   if (entry.liveStatus === 'is_live' || entry.liveStatus === 'post_live') {
     return reject('live', true);
   }
-
-  if (rules.library === 'video') {
-    if (rules.skipShorts && entry.isShort) return reject('short');
-    const date = entryDate(entry);
-    if (date !== null && rules.publishedAfter !== null && date < rules.publishedAfter) {
-      return reject('published_before');
-    }
-    if (date !== null && rules.keepDays !== null && date < keepCutoff(now, rules.keepDays)) {
-      return reject('older_than_keep_days');
-    }
-    if (rules.titleFilter !== null) {
-      const title = (entry.title ?? '').toLowerCase();
-      if (!title.includes(rules.titleFilter.toLowerCase())) return reject('title_filter');
-    }
-    return { accept: true };
-  }
-
-  if (rules.skipLiveRecordings && LIVE_WORD.test(entry.title ?? '')) return reject('live');
-  return { accept: true };
+  const result = evaluateMatcher(matcher, entryContext(entry, ctx));
+  if (result.matches) return { accept: true };
+  return reject('no_match', false, result.failing);
 }
 
-/** The oldest upload date (`YYYY-MM-DD`, UTC) a `keepDays` window still accepts. */
-export function keepCutoff(now: Date, keepDays: number): string {
-  return new Date(now.getTime() - keepDays * DAY_MS).toISOString().slice(0, 10);
+/** The matcher's view of a fetched entry. */
+export function entryContext(entry: SourceEntry, ctx: EntryContext): MatcherContext {
+  return {
+    title: entry.title,
+    isShort: entry.isShort,
+    publishedAt: entryDate(entry),
+    durationSeconds: entry.duration === null ? null : Math.round(entry.duration),
+    liveStatus: entry.liveStatus,
+    channelName: entry.channel ?? ctx.channelName,
+    channelId: entry.channelId ?? ctx.channelId,
+    playlistPosition: ctx.playlistPosition,
+    now: ctx.now,
+  };
 }
 
 function entryDate(entry: SourceEntry): string | null {
@@ -86,6 +78,6 @@ function entryDate(entry: SourceEntry): string | null {
   return null;
 }
 
-function reject(reason: SkipReason, transient = false): RuleVerdict {
-  return { accept: false, reason, transient };
+function reject(reason: SkipReason, transient: boolean, failing: string[] = []): RuleVerdict {
+  return { accept: false, reason, transient, failing };
 }

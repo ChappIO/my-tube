@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_MUSIC_RULES,
-  DEFAULT_VIDEO_RULES,
-  Rules,
+  DEFAULT_MUSIC_MATCHER,
+  DEFAULT_VIDEO_MATCHER,
+  and,
+  evaluateMatcher,
+  not,
+} from './matchers.js';
+import {
+  DEFAULT_SOURCE_OPTIONS,
+  LIVE_WORD_PATTERN,
   Source,
-  defaultRules,
-  describeRules,
+  SourceOptions,
+  convertLegacyRules,
+  describeOptions,
+  describeSource,
   sourceIssues,
 } from './rules.js';
 
@@ -18,7 +26,8 @@ const baseSource = {
   name: 'Abc',
   avatarUrl: null,
   subscribed: true,
-  rules: DEFAULT_VIDEO_RULES,
+  matcher: DEFAULT_VIDEO_MATCHER,
+  options: DEFAULT_SOURCE_OPTIONS,
   lastCheckedAt: null,
   itemCount: 0,
   sizeBytes: 0,
@@ -26,132 +35,46 @@ const baseSource = {
   updatedAt: '2026-09-24T19:35:10.000Z',
 };
 
-describe('Rules', () => {
-  it('fills the handoff defaults per library', () => {
-    expect(DEFAULT_VIDEO_RULES).toEqual({
-      library: 'video',
-      skipShorts: true,
-      keepDays: 90,
-      publishedAfter: null,
-      titleFilter: null,
-      syncOrder: false,
-    });
-    expect(DEFAULT_MUSIC_RULES).toEqual({
-      library: 'music',
-      skipLiveRecordings: false,
-      embedCoverArt: true,
-    });
-    expect(defaultRules('video')).toEqual(DEFAULT_VIDEO_RULES);
-    expect(defaultRules('music')).toEqual(DEFAULT_MUSIC_RULES);
-    expect(defaultRules('video')).not.toBe(DEFAULT_VIDEO_RULES);
+describe('SourceOptions', () => {
+  it('fills defaults and strips unknown fields', () => {
+    expect(SourceOptions.parse({ extra: 1 })).toEqual({ embedCoverArt: true, syncOrder: false });
   });
 
-  it('strips fields of the other library and unknown fields', () => {
-    expect(Rules.parse({ library: 'music', skipShorts: false, extra: 1 })).toEqual(
-      DEFAULT_MUSIC_RULES,
-    );
-  });
-
-  it('trims the title filter', () => {
-    expect(Rules.parse({ library: 'video', titleFilter: '  Deep Dive ' })).toMatchObject({
-      titleFilter: 'Deep Dive',
-    });
-  });
-
-  it('accepts a published-after date next to a keep window', () => {
-    expect(
-      Rules.parse({ library: 'video', publishedAfter: '2024-02-29', keepDays: 30 }),
-    ).toMatchObject({ publishedAfter: '2024-02-29', keepDays: 30 });
-  });
-
-  it.each([
-    { library: 'podcast' },
-    { library: 'video', publishedAfter: '2025-02-30' },
-    { library: 'video', publishedAfter: '2025-1-5' },
-    { library: 'video', publishedAfter: '2025-01-05T00:00:00Z' },
-    { library: 'video', publishedAfter: '' },
-    {},
-    { library: 'video', keepDays: 0 },
-    { library: 'video', keepDays: 3651 },
-    { library: 'video', keepDays: 1.5 },
-    { library: 'video', titleFilter: '   ' },
-    { library: 'video', titleFilter: 'x'.repeat(201) },
-    { library: 'video', skipShorts: 'yes' },
-    { library: 'music', embedCoverArt: null },
-  ])('rejects %j', (input) => {
-    expect(Rules.safeParse(input).success).toBe(false);
-  });
-});
-
-describe('describeRules', () => {
-  it('matches the handoff chips for a video source', () => {
-    expect(
-      describeRules({
-        library: 'video',
-        skipShorts: true,
-        keepDays: 90,
-        publishedAfter: '2025-01-01',
-        titleFilter: 'Monologue',
-        syncOrder: true,
-      }),
-    ).toEqual(['no shorts', 'keep 90 days', 'since 2025-01-01', 'only "Monologue"', 'sync order']);
-  });
-
-  it('omits rules that are off and uses the singular for one day', () => {
-    expect(
-      describeRules({
-        library: 'video',
-        skipShorts: false,
-        keepDays: null,
-        publishedAfter: null,
-        titleFilter: null,
-        syncOrder: false,
-      }),
-    ).toEqual([]);
-    expect(describeRules({ ...DEFAULT_VIDEO_RULES, keepDays: 1 })).toEqual([
-      'no shorts',
-      'keep 1 day',
+  it('describes options as chips', () => {
+    expect(describeOptions({ embedCoverArt: true, syncOrder: true }, 'video')).toEqual([
+      'sync order',
     ]);
+    expect(describeOptions({ embedCoverArt: true, syncOrder: false }, 'music')).toEqual([
+      'cover art',
+    ]);
+    expect(describeOptions({ embedCoverArt: false, syncOrder: false }, 'music')).toEqual([]);
   });
 
-  it('describes music rules', () => {
-    expect(describeRules(DEFAULT_MUSIC_RULES)).toEqual(['cover art']);
+  it('puts rule chips before option chips', () => {
     expect(
-      describeRules({
-        library: 'music',
-        skipLiveRecordings: true,
-        embedCoverArt: false,
+      describeSource({
+        library: 'video',
+        matcher: DEFAULT_VIDEO_MATCHER,
+        options: { embedCoverArt: true, syncOrder: true },
       }),
-    ).toEqual(['no live']);
+    ).toEqual(['no shorts', 'not older than 90 days', 'sync order']);
   });
 });
 
 describe('Source', () => {
-  it('accepts a valid row', () => {
-    expect(Source.parse(baseSource)).toEqual(baseSource);
+  it('accepts a valid row and strips the legacy rules column', () => {
+    expect(Source.parse({ ...baseSource, rules: { library: 'video' } })).toEqual(baseSource);
   });
 
-  it('accepts sync order on a playlist and an artist in Music', () => {
+  it('accepts playlist-only conditions and sync order on a playlist', () => {
     expect(
       Source.safeParse({
         ...baseSource,
         kind: 'playlist',
-        rules: { ...DEFAULT_VIDEO_RULES, syncOrder: true },
+        matcher: and({ type: 'channel_is', channel: 'NASA' }),
+        options: { embedCoverArt: true, syncOrder: true },
       }).success,
     ).toBe(true);
-    expect(
-      Source.safeParse({
-        ...baseSource,
-        library: 'music',
-        kind: 'artist',
-        rules: DEFAULT_MUSIC_RULES,
-      }).success,
-    ).toBe(true);
-  });
-
-  it('rejects rules of the other library', () => {
-    const result = Source.safeParse({ ...baseSource, rules: DEFAULT_MUSIC_RULES });
-    expect(result.error?.issues.map((issue) => issue.path)).toEqual([['rules', 'library']]);
   });
 
   it('rejects an artist in the Video library', () => {
@@ -159,20 +82,123 @@ describe('Source', () => {
     expect(result.error?.issues.map((issue) => issue.path)).toEqual([['kind']]);
   });
 
-  it('rejects sync order outside playlists', () => {
+  it('rejects sync order and playlist-only conditions outside playlists', () => {
     expect(
       sourceIssues({
         library: 'video',
         kind: 'channel',
-        rules: { ...DEFAULT_VIDEO_RULES, syncOrder: true },
+        matcher: not({ type: 'in_playlist_position_under', position: 5 }),
+        options: { syncOrder: true },
       }),
-    ).toEqual([{ path: ['rules', 'syncOrder'], message: 'Sync order only applies to playlists' }]);
+    ).toEqual([
+      { path: ['options', 'syncOrder'], message: 'Sync order only applies to playlists' },
+      {
+        path: ['matcher'],
+        message: 'The playlist position condition only applies to playlists',
+      },
+    ]);
+    expect(
+      sourceIssues({
+        library: 'music',
+        kind: 'artist',
+        matcher: and({ type: 'channel_is', channel: 'x' }),
+      }),
+    ).toEqual([{ path: ['matcher'], message: 'The channel condition only applies to playlists' }]);
   });
 
-  it('rejects non-ISO timestamps and negative counts', () => {
+  it('rejects invalid matchers, timestamps and counts', () => {
+    expect(Source.safeParse({ ...baseSource, matcher: { type: 'and' } }).success).toBe(false);
     expect(Source.safeParse({ ...baseSource, lastCheckedAt: '2026-09-24 19:35:10' }).success).toBe(
       false,
     );
     expect(Source.safeParse({ ...baseSource, sizeBytes: -1 }).success).toBe(false);
+  });
+});
+
+describe('convertLegacyRules', () => {
+  const now = new Date('2026-09-24T12:00:00Z');
+
+  it('maps the old video defaults to the new video default', () => {
+    expect(convertLegacyRules({ library: 'video' })).toEqual({
+      matcher: DEFAULT_VIDEO_MATCHER,
+      options: { embedCoverArt: true, syncOrder: false },
+    });
+  });
+
+  it('maps the old music defaults to the new music default', () => {
+    expect(convertLegacyRules({ library: 'music' })).toEqual({
+      matcher: DEFAULT_MUSIC_MATCHER,
+      options: { embedCoverArt: true, syncOrder: false },
+    });
+  });
+
+  it('maps every video rule, in order', () => {
+    expect(
+      convertLegacyRules({
+        library: 'video',
+        skipShorts: true,
+        keepDays: 30,
+        publishedAfter: '2025-01-01',
+        titleFilter: ' Monologue ',
+        syncOrder: true,
+      }),
+    ).toEqual({
+      matcher: and(
+        not({ type: 'is_short' }),
+        not({ type: 'older_than_days', days: 30 }),
+        { type: 'published_after', date: '2025-01-01' },
+        { type: 'title_contains', text: 'Monologue' },
+      ),
+      options: { embedCoverArt: true, syncOrder: true },
+    });
+  });
+
+  it.each([
+    [{ skipShorts: false, keepDays: null }, and()],
+    [{ skipShorts: true, keepDays: null }, and(not({ type: 'is_short' }))],
+    [{ skipShorts: false, keepDays: 7 }, and(not({ type: 'older_than_days', days: 7 }))],
+    [
+      { skipShorts: false, keepDays: null, publishedAfter: '2024-02-29' },
+      and({ type: 'published_after', date: '2024-02-29' }),
+    ],
+    [
+      { skipShorts: false, keepDays: null, titleFilter: 'Deep Dive' },
+      and({ type: 'title_contains', text: 'Deep Dive' }),
+    ],
+  ])('maps video %j', (fields, matcher) => {
+    expect(convertLegacyRules({ library: 'video', ...fields }).matcher).toEqual(matcher);
+  });
+
+  it('maps skip live recordings to a word regex and cover art to an option', () => {
+    const converted = convertLegacyRules({
+      library: 'music',
+      skipLiveRecordings: true,
+      embedCoverArt: false,
+    });
+    expect(converted).toEqual({
+      matcher: and(not({ type: 'title_matches', pattern: LIVE_WORD_PATTERN })),
+      options: { embedCoverArt: false, syncOrder: false },
+    });
+    const title = (value: string) =>
+      evaluateMatcher(converted.matcher, {
+        title: value,
+        isShort: false,
+        publishedAt: null,
+        durationSeconds: null,
+        liveStatus: null,
+        channelName: null,
+        channelId: null,
+        playlistPosition: null,
+        now,
+      }).matches;
+    expect(title('Song (Live)')).toBe(false);
+    expect(title('Live at Wembley')).toBe(false);
+    expect(title('Olive Tree')).toBe(true);
+  });
+
+  it('ignores stripped fields of the other library and rejects invalid rules', () => {
+    expect(convertLegacyRules({ library: 'music', skipShorts: true }).matcher).toEqual(and());
+    expect(() => convertLegacyRules({ library: 'video', keepDays: 0 })).toThrow();
+    expect(() => convertLegacyRules({ library: 'podcast' })).toThrow();
   });
 });

@@ -1,4 +1,11 @@
-import { DEFAULT_MUSIC_RULES, DEFAULT_VIDEO_RULES, Source, describeRules } from '@mytube/shared';
+import {
+  DEFAULT_SOURCE_OPTIONS,
+  DEFAULT_VIDEO_MATCHER,
+  Source,
+  and,
+  describeSource,
+  not,
+} from '@mytube/shared';
 import type BetterSqlite3 from 'better-sqlite3';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -17,7 +24,8 @@ describe('sources schema', () => {
     youtubeId: 'UCmonologue',
     url: 'https://www.youtube.com/@monologue',
     name: 'Monologue',
-    rules: { ...DEFAULT_VIDEO_RULES, titleFilter: 'Monologue' },
+    matcher: and(not({ type: 'is_short' }), { type: 'title_contains' as const, text: 'Monologue' }),
+    options: DEFAULT_SOURCE_OPTIONS,
   };
 
   beforeEach(() => {
@@ -47,13 +55,16 @@ describe('sources schema', () => {
     expect(row?.updatedAt).toBe(row?.createdAt);
     // The row maps one to one onto the shared DTO.
     const dto = Source.parse(row);
-    expect(describeRules(dto.rules)).toEqual(['no shorts', 'keep 90 days', 'only "Monologue"']);
+    expect(describeSource(dto)).toEqual(['no shorts', 'only "Monologue"']);
 
     const raw = client
-      .prepare<[], { subscribed: number; rules: string }>('SELECT subscribed, rules FROM sources')
+      .prepare<[], { subscribed: number; matcher: string; options: string }>(
+        'SELECT subscribed, matcher, options FROM sources',
+      )
       .get();
     expect(raw?.subscribed).toBe(1);
-    expect(JSON.parse(raw?.rules ?? '')).toEqual(channelSource.rules);
+    expect(JSON.parse(raw?.matcher ?? '')).toEqual(channelSource.matcher);
+    expect(JSON.parse(raw?.options ?? '')).toEqual(DEFAULT_SOURCE_OPTIONS);
   });
 
   it('keeps youtube ids unique per library', () => {
@@ -61,31 +72,33 @@ describe('sources schema', () => {
     expect(() => db.insert(sources).values(channelSource).run()).toThrow(/UNIQUE/);
     // The same channel may also be a source in the other library.
     db.insert(sources)
-      .values({ ...channelSource, library: 'music', rules: DEFAULT_MUSIC_RULES })
+      .values({ ...channelSource, library: 'music', matcher: DEFAULT_VIDEO_MATCHER })
       .run();
     expect(db.select().from(sources).all()).toHaveLength(2);
   });
 
-  it('rejects bad enums and rules of the other library', () => {
+  it('rejects bad enums and invalid JSON rules', () => {
     expect(() =>
       client
         .prepare(
-          `INSERT INTO sources (library, kind, youtube_id, url, name, rules)
-           VALUES ('podcast', 'channel', 'x', 'https://x', 'x', '{"library":"podcast"}')`,
+          `INSERT INTO sources (library, kind, youtube_id, url, name, matcher)
+           VALUES ('podcast', 'channel', 'x', 'https://x', 'x', '{"type":"and","items":[]}')`,
         )
         .run(),
     ).toThrow(/CHECK/);
     expect(() =>
-      db
-        .insert(sources)
-        .values({ ...channelSource, rules: DEFAULT_MUSIC_RULES })
+      client
+        .prepare(
+          `INSERT INTO sources (library, kind, youtube_id, url, name, matcher)
+           VALUES ('video', 'channel', 'x', 'https://x', 'x', 'not json')`,
+        )
         .run(),
-    ).toThrow(/CHECK/);
+    ).toThrow(/CHECK|malformed JSON/);
     expect(() =>
       client
         .prepare(
-          `INSERT INTO sources (library, kind, youtube_id, url, name, rules)
-           VALUES ('video', 'channel', 'x', 'https://x', 'x', 'not json')`,
+          `INSERT INTO sources (library, kind, youtube_id, url, name, options)
+           VALUES ('video', 'channel', 'x', 'https://x', 'x', '{')`,
         )
         .run(),
     ).toThrow(/CHECK|malformed JSON/);

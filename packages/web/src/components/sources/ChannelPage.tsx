@@ -1,4 +1,4 @@
-import { type Source, describeRules } from '@mytube/shared';
+import { type Source, describeSource } from '@mytube/shared';
 import { linkOptions, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ApiError, apiErrorMessage } from '../../api/client';
@@ -66,7 +66,7 @@ function ChannelHeader({ source }: { source: Source }) {
           <Body muted as="div" className="mt-[6px]">
             {sourceMeta(source)} · {checkedAgo(source.lastCheckedAt, now)}
           </Body>
-          <RuleChips chips={describeRules(source.rules)} size="page" className="mt-[10px]" />
+          <RuleChips chips={describeSource(source)} size="page" className="mt-[10px]" />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outlined" onClick={() => setEditing(true)}>

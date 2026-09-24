@@ -1,5 +1,10 @@
 import { readFileSync } from 'node:fs';
-import { DEFAULT_MUSIC_RULES, DEFAULT_SETTINGS, DEFAULT_VIDEO_RULES } from '@mytube/shared';
+import {
+  DEFAULT_MUSIC_MATCHER,
+  DEFAULT_SETTINGS,
+  DEFAULT_VIDEO_MATCHER,
+  and,
+} from '@mytube/shared';
 import { describe, expect, it } from 'vitest';
 import { parseSourceMetadata, type SourceEntry } from '../ytdlp/metadata.js';
 import {
@@ -8,7 +13,7 @@ import {
   imageUrl,
   initialRules,
   kindForLibrary,
-  mergeRules,
+  mergeOptions,
 } from './resolve.js';
 
 const fixture = (name: string) =>
@@ -119,44 +124,47 @@ describe('cadence', () => {
 });
 
 describe('initialRules', () => {
-  it('overlays Settings → Video on the video defaults', () => {
-    const settings = { video: { ...DEFAULT_SETTINGS.video, keepDays: 30, skipShorts: false } };
+  const tree = and({ type: 'title_contains', text: 'Deep Dive' });
+
+  it('starts from the library default tree in Settings', () => {
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      video: { ...DEFAULT_SETTINGS.video, defaultRules: tree },
+    };
     expect(initialRules('video', settings)).toEqual({
-      ...DEFAULT_VIDEO_RULES,
-      keepDays: 30,
-      skipShorts: false,
+      matcher: tree,
+      options: { embedCoverArt: true, syncOrder: false },
     });
-    const forever = { video: { ...DEFAULT_SETTINGS.video, keepDays: null } };
-    expect(initialRules('video', forever)).toMatchObject({ keepDays: null });
+    expect(initialRules('music', settings).matcher).toEqual(DEFAULT_MUSIC_MATCHER);
   });
 
-  it('lets the client rules win over settings and defaults', () => {
-    const settings = { video: { ...DEFAULT_SETTINGS.video, keepDays: 30 } };
+  it('lets the client tree and options win', () => {
     expect(
-      initialRules('video', settings, { library: 'video', keepDays: 7, titleFilter: 'Deep Dive' }),
-    ).toEqual({ ...DEFAULT_VIDEO_RULES, keepDays: 7, titleFilter: 'Deep Dive' });
+      initialRules('video', DEFAULT_SETTINGS, { matcher: tree, options: { syncOrder: true } }),
+    ).toEqual({ matcher: tree, options: { embedCoverArt: true, syncOrder: true } });
+    expect(initialRules('video', DEFAULT_SETTINGS).matcher).toEqual(DEFAULT_VIDEO_MATCHER);
   });
 
-  it('uses the music defaults for music sources, ignoring video settings', () => {
-    const settings = { video: { ...DEFAULT_SETTINGS.video, keepDays: 30 } };
-    expect(initialRules('music', settings)).toEqual(DEFAULT_MUSIC_RULES);
-    expect(initialRules('music', settings, { library: 'music', embedCoverArt: false })).toEqual({
-      ...DEFAULT_MUSIC_RULES,
-      embedCoverArt: false,
+  it('takes cover art for music sources from Settings → Music', () => {
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      music: { ...DEFAULT_SETTINGS.music, embedCoverArt: false },
+    };
+    expect(initialRules('music', settings).options.embedCoverArt).toBe(false);
+    expect(initialRules('music', settings, { options: { embedCoverArt: true } }).options).toEqual({
+      embedCoverArt: true,
+      syncOrder: false,
     });
   });
 });
 
-describe('mergeRules', () => {
+describe('mergeOptions', () => {
   it('changes only the given fields', () => {
-    const current = { ...DEFAULT_VIDEO_RULES, keepDays: 30, titleFilter: 'Monologue' };
-    expect(mergeRules(current, { library: 'video', skipShorts: false })).toEqual({
-      ...current,
-      skipShorts: false,
+    const current = { embedCoverArt: false, syncOrder: true };
+    expect(mergeOptions(current, { syncOrder: false })).toEqual({
+      embedCoverArt: false,
+      syncOrder: false,
     });
-    expect(mergeRules(current, { library: 'video', titleFilter: null })).toEqual({
-      ...current,
-      titleFilter: null,
-    });
+    expect(mergeOptions(current)).toEqual(current);
   });
 });

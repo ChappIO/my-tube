@@ -35,10 +35,10 @@ describe('SettingsService', () => {
 
   it('merges stored rows over the defaults', () => {
     insert('general.theme', '"dark"');
-    insert('video.keepDays', 'null');
+    insert('video.defaultRules', '{"type":"and","items":[]}');
     const settings = service.get();
     expect(settings.general).toEqual({ ...DEFAULT_SETTINGS.general, theme: 'dark' });
-    expect(settings.video.keepDays).toBeNull();
+    expect(settings.video.defaultRules).toEqual({ type: 'and', items: [] });
     expect(settings.music).toEqual(DEFAULT_SETTINGS.music);
   });
 

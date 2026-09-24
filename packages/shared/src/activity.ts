@@ -9,7 +9,7 @@ export const HISTORY_KINDS = ['video', 'music', 'system'] as const;
 export const HistoryKind = z.enum(HISTORY_KINDS);
 export type HistoryKind = z.infer<typeof HistoryKind>;
 
-/** One `history` row: a finished download, a retention deletion, a yt-dlp install or update. */
+/** One `history` row: a finished download, a file removed by revalidation, a yt-dlp install or update. */
 export const HistoryEntry = z.object({
   id: z.number().int().positive(),
   /** ISO 8601 UTC. */
@@ -17,9 +17,9 @@ export const HistoryEntry = z.object({
   kind: HistoryKind,
   /** A video or track title, `yt-dlp 2026.09.22 installed`, a source name. */
   title: z.string(),
-  /** `done`, `installed`, `updated`, `failed`, `removed, older than 90 days`, … */
+  /** `done`, `installed`, `updated`, `failed`, `removed`, … */
   result: z.string(),
-  /** Free text: the file path of a download, an error message. */
+  /** Free text: the file path of a download, an error message, `no longer matches: <condition>`. */
   details: z.string().nullable(),
   /** The job that produced the row; its yt-dlp output is at `GET /api/jobs/:id/log`. */
   jobId: z.number().int().positive().nullable(),

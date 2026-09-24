@@ -25,7 +25,7 @@ const job = {
 describe('items', () => {
   it('lists the status and job type enums from the architecture', () => {
     expect(ITEM_STATUSES).toEqual(['wanted', 'downloading', 'on_disk', 'missing', 'skipped']);
-    expect(JOB_TYPES).toEqual(['download', 'check_source', 'retention', 'rescan', 'backup']);
+    expect(JOB_TYPES).toEqual(['download', 'check_source', 'revalidate', 'rescan', 'backup']);
   });
 
   it('parses a queue row and rejects out-of-range progress', () => {

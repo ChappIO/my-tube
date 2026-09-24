@@ -8,9 +8,10 @@ import { z } from 'zod';
  * - `wanted`: accepted by the source's rules, not on disk yet (a download job is queued).
  * - `downloading`: a download job is running for it.
  * - `on_disk`: the file exists at `filePath`.
- * - `missing`: it was on disk and is not any more (rescan found no file, or retention deleted
- *   it). Known but not on disk is what the library screens show as "missing".
- * - `skipped`: the source's rules rejected it when it was fetched; `skipReason` says why.
+ * - `missing`: it was on disk and is not any more (a rescan found no file). Known but not on
+ *   disk is what the library screens show as "missing".
+ * - `skipped`: the source's rules do not match it; `skipReason` says why. Revalidation moves
+ *   a file the rules no longer match here too (`no_longer_matches`, file removed).
  */
 
 export const ITEM_STATUSES = ['wanted', 'downloading', 'on_disk', 'missing', 'skipped'] as const;
@@ -18,15 +19,22 @@ export const ItemStatus = z.enum(ITEM_STATUSES);
 export type ItemStatus = z.infer<typeof ItemStatus>;
 
 /**
- * Why an item is not downloaded: the rules rejected it when it was fetched (`evaluateItem` in
- * the sync module), or, for `unavailable`, YouTube refused the download for good (removed,
- * private, members-only). Only an explicit retry tries an `unavailable` item again.
+ * Why an item is not downloaded:
+ *
+ * - `no_match`: the source's rules (its matcher) did not match it at sync.
+ * - `no_longer_matches`: it was on disk and revalidation removed the file because the current
+ *   rules no longer match it.
+ * - `live`, `upcoming`: a stream on air or a premiere that has not aired. Never stored: the
+ *   sync looks at them again on the next check.
+ * - `unavailable`: YouTube refused the download for good (removed, private, members-only).
+ *   Only an explicit retry tries it again.
+ *
+ * A later sync or revalidation moves `no_match` and `no_longer_matches` items back to `wanted`
+ * when the rules match them again.
  */
 export const SKIP_REASONS = [
-  'short',
-  'title_filter',
-  'published_before',
-  'older_than_keep_days',
+  'no_match',
+  'no_longer_matches',
   'live',
   'upcoming',
   'unavailable',
@@ -34,7 +42,7 @@ export const SKIP_REASONS = [
 export const SkipReason = z.enum(SKIP_REASONS);
 export type SkipReason = z.infer<typeof SkipReason>;
 
-export const JOB_TYPES = ['download', 'check_source', 'retention', 'rescan', 'backup'] as const;
+export const JOB_TYPES = ['download', 'check_source', 'revalidate', 'rescan', 'backup'] as const;
 export const JobType = z.enum(JOB_TYPES);
 export type JobType = z.infer<typeof JobType>;
 

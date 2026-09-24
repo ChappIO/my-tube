@@ -4,8 +4,9 @@ import {
   type ItemStatus,
   type JobStatus,
   type JobType,
-  type Rules,
+  type Matcher,
   type SkipReason,
+  type SourceOptions,
 } from '@mytube/shared';
 import { sql } from 'drizzle-orm';
 import {
@@ -49,9 +50,13 @@ export const sources = sqliteTable(
     name: text('name').notNull(),
     avatarUrl: text('avatar_url'),
     subscribed: integer('subscribed', { mode: 'boolean' }).notNull().default(true),
-    /** The shared `Rules` schema; parse with `Rules` when reading untrusted rows. */
-    rules: text('rules', { mode: 'json' }).$type<Rules>().notNull(),
+    /** The rules: the shared `Matcher` tree (migration 20260926090000_matcher_rules). */
+    matcher: text('matcher', { mode: 'json' }).$type<Matcher>().notNull(),
+    /** The shared `SourceOptions` (cover art, sync order). */
+    options: text('options', { mode: 'json' }).$type<SourceOptions>().notNull(),
     lastCheckedAt: text('last_checked_at'),
+    /** Last revalidation of the files against the rules; null before the first. */
+    lastRevalidatedAt: text('last_revalidated_at'),
     itemCount: integer('item_count').notNull().default(0),
     sizeBytes: integer('size_bytes').notNull().default(0),
     ...timestamps,
@@ -104,7 +109,7 @@ export const playlists = sqliteTable(
 /** Kinds of history entries, matching the Activity screen's kind chip (shared `HistoryKind`). */
 export { HISTORY_KINDS, type HistoryKind };
 
-/** Audit trail: downloads, retention deletions, yt-dlp installs and updates. */
+/** Audit trail: downloads, files removed by revalidation, yt-dlp installs and updates. */
 export const history = sqliteTable(
   'history',
   {
@@ -132,7 +137,8 @@ export const ytdlpState = sqliteTable('ytdlp_state', {
   lastError: text('last_error'),
 });
 
-// Items and the jobs queue (migration 20260925090000_items). Status lifecycle: database skill.
+// Items and the jobs queue (migration 20260925090000_items; jobs rebuilt by
+// 20260926090000_matcher_rules for the `revalidate` type). Status lifecycle: database skill.
 
 /** A known video. `status` is the shared `ItemStatus`; `skipReason` a `SkipReason`. */
 export const videos = sqliteTable(

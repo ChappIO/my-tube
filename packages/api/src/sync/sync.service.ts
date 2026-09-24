@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { Rules, SkipReason } from '@mytube/shared';
+import type { SkipReason } from '@mytube/shared';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.module.js';
 import { channels, playlistItems, playlists, sources, videos } from '../database/schema.js';
@@ -175,8 +175,8 @@ export class SyncService {
    * work in one transaction; `now` is the rules' clock.
    */
   applyListing(source: SourceRow, metadata: SourceMetadata, now: Date): ListingResult {
-    const rules: Rules = source.rules;
     const entries = metadata.entries.filter((entry) => entry.kind === 'video');
+    const playlist = source.kind === 'playlist';
     return this.db.transaction((tx) => {
       const channelIds = new Map<string, number>();
       const channelOf = (youtubeId: string | null, name: string | null): number | null => {
@@ -207,8 +207,15 @@ export class SyncService {
       const wantedIds: number[] = [];
       const positions: number[] = [];
 
-      for (const entry of entries) {
-        const verdict = evaluateItem(entry, rules, now);
+      for (const [index, entry] of entries.entries()) {
+        const verdict = evaluateItem(entry, source.matcher, {
+          now,
+          // A channel's flat listing names no uploader: it is the channel itself. A playlist's
+          // entries name theirs; the owner is not a stand-in for them.
+          channelName: playlist ? null : source.name,
+          channelId: playlist ? null : source.youtubeId,
+          playlistPosition: playlist ? index + 1 : null,
+        });
         if (!verdict.accept && verdict.transient) continue;
         const channelId =
           (source.kind === 'playlist' ? channelOf(entry.channelId, entry.channel) : null) ??

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_VIDEO_RULES } from './rules.js';
+import { DEFAULT_VIDEO_MATCHER } from './matchers.js';
 import {
   CreateSource,
-  RulesInput,
+  RulesPreviewRequest,
+  SourceOptionsInput,
   UpdateSource,
   guessLibrary,
   parseYoutubeUrl,
@@ -166,18 +167,25 @@ describe('uploadsPerWeek', () => {
 });
 
 describe('source inputs', () => {
-  it('RulesInput keeps only the given fields (no defaults)', () => {
-    expect(RulesInput.parse({ library: 'video', skipShorts: false })).toEqual({
-      library: 'video',
-      skipShorts: false,
-    });
-    expect(RulesInput.parse({ ...DEFAULT_VIDEO_RULES })).toEqual(DEFAULT_VIDEO_RULES);
+  it('SourceOptionsInput keeps only the given fields (no defaults)', () => {
+    expect(SourceOptionsInput.parse({ syncOrder: true })).toEqual({ syncOrder: true });
+    expect(SourceOptionsInput.safeParse({ skipShorts: true }).success).toBe(false);
   });
 
-  it('RulesInput rejects fields of the other library and bad values', () => {
-    expect(RulesInput.safeParse({ library: 'video', embedCoverArt: true }).success).toBe(false);
-    expect(RulesInput.safeParse({ library: 'video', keepDays: 0 }).success).toBe(false);
-    expect(RulesInput.safeParse({ skipShorts: true }).success).toBe(false);
+  it('CreateSource and UpdateSource take a matcher and options', () => {
+    expect(
+      CreateSource.safeParse({
+        url: '@NASA',
+        library: 'video',
+        matcher: DEFAULT_VIDEO_MATCHER,
+        options: { syncOrder: false },
+      }).success,
+    ).toBe(true);
+    expect(UpdateSource.safeParse({ matcher: { type: 'and', items: [] } }).success).toBe(true);
+    expect(UpdateSource.safeParse({ matcher: { type: 'bogus' } }).success).toBe(false);
+    expect(UpdateSource.safeParse({ rules: { library: 'video' } }).success).toBe(false);
+    expect(RulesPreviewRequest.safeParse({ matcher: DEFAULT_VIDEO_MATCHER }).success).toBe(true);
+    expect(RulesPreviewRequest.safeParse({}).success).toBe(false);
   });
 
   it('CreateSource requires url and library', () => {
