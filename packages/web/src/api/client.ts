@@ -23,6 +23,16 @@ export async function apiGet<T>(path: string, schema: z.ZodType<T>): Promise<T> 
   return parseResponse(response, schema);
 }
 
+/** POST (an optional JSON body) and validate the response against its shared schema. */
+export async function apiPost<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: { accept: 'application/json', 'content-type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  return parseResponse(response, schema);
+}
+
 /** PATCH a JSON body and validate the response against its shared schema. */
 export async function apiPatch<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
   const response = await fetch(path, {

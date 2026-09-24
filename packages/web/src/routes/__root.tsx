@@ -1,7 +1,7 @@
 import { Outlet, createRootRoute, useLocation } from '@tanstack/react-router';
 import { useThemeFromSettings } from '../api/settings';
 import { AppShell } from '../components/shell/AppShell';
-import { SidebarFooter } from '../components/shell/Sidebar';
+import { YtdlpFooter } from '../components/shell/YtdlpFooter';
 
 export const Route = createRootRoute({ component: RootLayout });
 
@@ -12,11 +12,8 @@ function RootLayout() {
   // /dev/* reference pages are standalone: they render their own <main> and padding.
   if (pathname === '/dev' || pathname.startsWith('/dev/')) return <Outlet />;
   return (
-    // Stage 2 feeds the yt-dlp status and the queue count from the API.
-    <AppShell
-      activityCount={0}
-      sidebarFooter={<SidebarFooter version="—" status="not installed" />}
-    >
+    // Stage 4 feeds the queue count from the API.
+    <AppShell activityCount={0} sidebarFooter={<YtdlpFooter />}>
       <Outlet />
     </AppShell>
   );

@@ -24,10 +24,12 @@ Migrations are plain SQL files in `packages/api/src/database/migrations`, applie
 
 ## Tables
 
-| Table        | Columns                                                                                                                                          |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `migrations` | `name` (file name, PK), `applied_at`. Owned by the migration runner.                                                                             |
-| `settings`   | `key` (dotted path such as `general.theme`, PK), `value` (JSON text), `updated_at`. One row per changed field; see the backend skill "Settings". |
+| Table         | Columns                                                                                                                                                                                                                                                        |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `migrations`  | `name` (file name, PK), `applied_at`. Owned by the migration runner.                                                                                                                                                                                           |
+| `settings`    | `key` (dotted path such as `general.theme`, PK), `value` (JSON text), `updated_at`. One row per changed field; see the backend skill "Settings".                                                                                                               |
+| `history`     | `id` (PK), `at` (ISO UTC, default now, indexed as `history_at`), `kind` (`video`, `music`, `system`; CHECK), `title`, `result` (`done`, `installed`, `updated`, `failed`, ...), `details` (nullable free text). Append-only; written through `HistoryService`. |
+| `ytdlp_state` | Single row, `id` = 1 (CHECK): `installed_version`, `latest_version`, `last_checked_at`, `last_updated_at`, `last_error`, all nullable. Owned by the yt-dlp binary manager; not user settings.                                                                  |
 
 ### Sources and catalog
 

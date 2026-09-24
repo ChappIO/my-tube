@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
+import { ActivityModule } from './activity/activity.module.js';
 import { ConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
@@ -10,6 +12,8 @@ import { YtdlpModule } from './ytdlp/ytdlp.module.js';
   imports: [
     ConfigModule,
     DatabaseModule,
+    ScheduleModule.forRoot(),
+    ActivityModule,
     HealthModule,
     SettingsModule,
     YtdlpModule,
