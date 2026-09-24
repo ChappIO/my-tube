@@ -23,7 +23,7 @@ Working checklist for building MyTube. Stages come from the architecture skill a
 
 Skills: frontend. Handoff: Brand, Design Tokens, Layout, Sidebar, Interactions (theme, breakpoint).
 
-- [ ] **Design tokens and fonts.** Light and dark color tokens as Tailwind theme variables, Archivo and Space Mono loaded, type scale utilities, radii and shadow tokens. Theme is a body-level attribute; default follows `prefers-color-scheme`. Done when a token demo route renders every token in both themes.
+- [x] **Design tokens and fonts.** Light and dark color tokens as Tailwind theme variables, Archivo and Space Mono loaded, type scale utilities, radii and shadow tokens. Theme is a body-level attribute; default follows `prefers-color-scheme`. Done when a token demo route renders every token in both themes.
 - [x] **Logo and icon set.** The tile-and-glyph logo as an SVG component in the listed sizes and variants, the wordmark, the favicon, and a 16 to 20px icon set (Lucide) replacing the prototype's placeholder glyphs including the bell path. Done when the header lockup matches the handoff at 28px tile and 20px wordmark.
 - [ ] **App shell.** Layout route with the 232px sidebar on wide screens and the top bar plus five-item bottom tab bar below 760px. Nav items, active states, Add button, sidebar footer placeholder, Activity badge slot. Done when all five screens are reachable in both layouts with plain empty states.
 - [ ] **Routes.** `/`, `/music/$tab`, `/video/$tab`, `/video/channel/$id`, `/activity`, `/settings/$tab` with typed params, default tabs (Albums, Videos, General) and redirects for bare `/music`, `/video`, `/settings`. Done when navigation and browser back work and the sidebar reflects the route.

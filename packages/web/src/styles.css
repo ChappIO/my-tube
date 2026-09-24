@@ -1,1 +1,201 @@
 @import 'tailwindcss';
+
+/*
+ * Design tokens from design_handoff_mytube/README.md ("Design Tokens").
+ * Token names are a contract: components use them as Tailwind utilities
+ * (bg-bg, text-ink, border-line, rounded-tile, shadow-modal, font-mono) or as
+ * CSS variables (var(--color-red)). The default Tailwind palette is removed so
+ * every color in the app has to come from here.
+ */
+@theme {
+  --color-*: initial;
+  --color-bg: #ffffff;
+  --color-side: #fafafa;
+  --color-surface: #f3f4f6;
+  --color-surface2: #e3e6ea;
+  --color-line: #eceef1;
+  --color-ink: #151618;
+  --color-muted: #6f747c;
+  --color-red: #ea333e;
+  --color-ok: #2f9e6a;
+  /* Glyphs and text on red (primary buttons, subscribed bell). Same in both themes. */
+  --color-white: #ffffff;
+
+  --font-sans:
+    'Archivo Variable', 'Archivo', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-mono:
+    'Space Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    monospace;
+
+  --radius-pill: 999px;
+  --radius-tile: 12px;
+  --radius-card: 14px;
+  --radius-modal: 18px;
+  --radius-nav: 10px;
+  --radius-chip: 6px;
+  --radius-badge: 4px;
+
+  --shadow-tile: 0 12px 28px -12px rgba(0, 0, 0, 0.35);
+  --shadow-modal: 0 40px 80px -30px rgba(0, 0, 0, 0.5);
+  --shadow-preview: 0 40px 80px -30px rgba(0, 0, 0, 0.6);
+
+  /* The handoff's single responsive breakpoint: narrow below, wide at and above. */
+  --breakpoint-wide: 760px;
+}
+
+/*
+ * Theme switching. `data-theme="light" | "dark"` on <html> forces a theme;
+ * without the attribute the device preference decides. red and ok are the
+ * same in both themes, and so is white. Keep the two dark blocks identical.
+ */
+:root {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-bg: #0f1012;
+  --color-side: #131417;
+  --color-surface: #1a1c20;
+  --color-surface2: #26282c;
+  --color-line: #23252a;
+  --color-ink: #f2f3f5;
+  --color-muted: #8b9098;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --color-bg: #0f1012;
+    --color-side: #131417;
+    --color-surface: #1a1c20;
+    --color-surface2: #26282c;
+    --color-line: #23252a;
+    --color-ink: #f2f3f5;
+    --color-muted: #8b9098;
+  }
+}
+
+@layer base {
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/*
+ * Type scale: one utility per role in the handoff's Typography table.
+ * Each sets family, size, weight, line height, tracking and case, never color.
+ * Pair with a color utility; the handoff makes labels and meta lines text-muted.
+ * Roles without a line height in the handoff use `normal`, like the prototype.
+ */
+@utility text-h1 {
+  font-family: var(--font-sans);
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  @media (width < 760px) {
+    font-size: 26px;
+  }
+}
+
+@utility text-modal-title {
+  font-family: var(--font-sans);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: normal;
+  letter-spacing: -0.02em;
+}
+
+@utility text-section-title {
+  font-family: var(--font-sans);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: normal;
+}
+
+@utility text-row-title {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: normal;
+}
+
+@utility text-nav {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: normal;
+}
+
+@utility text-tile-title {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+@utility text-body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: normal;
+}
+
+@utility text-tile-meta {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: normal;
+}
+
+@utility text-section-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@utility text-table-header {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+@utility text-meta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: normal;
+}
+
+@utility text-meta-sm {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: normal;
+}
+
+@utility text-nav-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: normal;
+}
+
+@utility text-duration {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: normal;
+}

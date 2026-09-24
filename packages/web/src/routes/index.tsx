@@ -14,7 +14,7 @@ function Home() {
   return (
     <main className="p-8 font-sans">
       <h1 className="text-2xl font-bold">MyTube</h1>
-      <p className="mt-2 text-sm text-neutral-500">
+      <p className="mt-2 text-sm text-muted">
         {health.isPending && 'Checking the API…'}
         {health.isError && `API unreachable: ${health.error.message}`}
         {health.data && `API ${health.data.version} is ${health.data.status}.`}

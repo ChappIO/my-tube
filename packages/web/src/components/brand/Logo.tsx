@@ -4,7 +4,8 @@ import { glyphGeometry, glyphShapes, tileGeometry } from './geometry';
 // Tokens come from styles.css; the fallbacks keep the brand correct before or without them.
 const RED = 'var(--color-red, #EA333E)';
 const INK = 'var(--color-ink, #151618)';
-const WHITE = 'var(--color-bg, #FFFFFF)';
+// The mark's white is fixed; --color-bg turns near-black in dark.
+const WHITE = 'var(--color-white, #FFFFFF)';
 const FONT = 'var(--font-sans, Archivo, system-ui, sans-serif)';
 
 export type LogoMarkVariant = 'tile' | 'inverted' | 'glyph';
