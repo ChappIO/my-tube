@@ -21,6 +21,7 @@ const fieldSchemas = new Map<string, Map<string, z.ZodType>>(
 export class SettingsService {
   private readonly logger = new Logger(SettingsService.name);
   private readonly warned = new Set<string>();
+  private readonly changeListeners = new Set<(settings: Settings) => void>();
 
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
@@ -60,7 +61,18 @@ export class SettingsService {
           .run();
       }
     });
-    return this.get();
+    const merged = this.get();
+    for (const listener of this.changeListeners) listener(merged);
+    return merged;
+  }
+
+  /**
+   * Called with the merged settings after every successful `patch`. For the few consumers that
+   * must push a value somewhere instead of reading it at use time (the logger's level).
+   */
+  onChange(listener: (settings: Settings) => void): () => void {
+    this.changeListeners.add(listener);
+    return () => this.changeListeners.delete(listener);
   }
 
   private readRow(

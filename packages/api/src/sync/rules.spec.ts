@@ -22,6 +22,8 @@ function entry(overrides: Partial<SourceEntry> = {}): SourceEntry {
     liveStatus: null,
     isShort: false,
     tab: 'videos',
+    channelId: null,
+    channel: null,
     thumbnails: [],
     ...overrides,
   };

@@ -51,10 +51,12 @@ type SourceRow = typeof sources.$inferSelect;
  *
  * Nothing here deletes media or enqueues work. Removing a source deletes its row only; the
  * catalog rows (`channels`, `artists`, `playlists`) stay and are unlinked, and files are never
- * touched. Unsubscribing only flips `subscribed`. Syncs and downloads arrive in Stage 4.
+ * touched. Unsubscribing only flips `subscribed`. The sync listens through `onCreated`.
  */
 @Injectable()
 export class SourcesService {
+  private readonly createdListeners = new Set<(source: Source) => void>();
+
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly runner: YtdlpRunner,
@@ -151,7 +153,7 @@ export class SourcesService {
     if (issues.length > 0) throw invalid(issues);
 
     const music = library === 'music' || resolved.url.startsWith('https://music.');
-    return this.db.transaction((tx) => {
+    const created = this.db.transaction((tx) => {
       const existing = tx
         .select({ id: sources.id })
         .from(sources)
@@ -181,6 +183,14 @@ export class SourcesService {
       linkCatalog(tx, row, resolved.itemCount);
       return toSource(row);
     });
+    for (const listener of this.createdListeners) listener(created);
+    return created;
+  }
+
+  /** Called after a source was created (the sync scheduler checks it at once). */
+  onCreated(listener: (source: Source) => void): () => void {
+    this.createdListeners.add(listener);
+    return () => this.createdListeners.delete(listener);
   }
 
   /** Changes rules (overlaid on the current ones), subscribed and/or name. */

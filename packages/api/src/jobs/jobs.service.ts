@@ -130,6 +130,7 @@ export class JobsService {
         progress: null,
         speedBytesPerSec: null,
         etaSeconds: null,
+        totalBytes: null,
       })
       .where(and(inArray(jobs.id, next), eq(jobs.status, 'queued')))
       .returning()
@@ -146,6 +147,7 @@ export class JobsService {
       set.speedBytesPerSec = wholeOrNull(update.speedBytesPerSec);
     }
     if (update.etaSeconds !== undefined) set.etaSeconds = wholeOrNull(update.etaSeconds);
+    if (update.totalBytes !== undefined) set.totalBytes = wholeOrNull(update.totalBytes);
     this.db
       .update(jobs)
       .set(set)
@@ -153,8 +155,11 @@ export class JobsService {
       .run();
   }
 
-  /** Marks a running job done and records the outcome in history. */
-  complete(id: number, outcome: JobOutcome): boolean {
+  /**
+   * Marks a running job done and records the outcome in history (linked to the job). A null
+   * outcome records nothing (a routine source check, a download with nothing left to do).
+   */
+  complete(id: number, outcome: JobOutcome | null): boolean {
     return this.db.transaction((tx) => {
       const now = this.now();
       const done = tx
@@ -172,7 +177,7 @@ export class JobsService {
         .returning({ id: jobs.id })
         .get();
       if (!done) return false;
-      this.history.record(outcome);
+      if (outcome) this.history.record({ ...outcome, jobId: id });
       return true;
     });
   }
@@ -219,26 +224,120 @@ export class JobsService {
         title: titleOf(job),
         result: 'failed',
         details: error,
+        jobId: id,
       });
       return failed;
     });
   }
 
   /**
-   * Cancels a queued or running job. A running job's runner is aborted by the worker. Returns
-   * the job, or undefined when it does not exist. Finished jobs are returned unchanged.
+   * Cancels a queued or running job. A running job's runner is aborted by the worker. A failed
+   * job is dismissed the same way (it leaves the Activity queue). Returns the job, or undefined
+   * when it does not exist. Done and cancelled jobs are returned unchanged.
    */
   cancel(id: number): JobRow | undefined {
     const now = this.now();
     const cancelled = this.db
       .update(jobs)
       .set({ status: 'cancelled', finishedAt: now, updatedAt: now, speedBytesPerSec: null })
-      .where(and(eq(jobs.id, id), inArray(jobs.status, ['queued', 'running'])))
+      .where(and(eq(jobs.id, id), inArray(jobs.status, ['queued', 'running', 'failed'])))
       .returning()
       .get();
     if (!cancelled) return this.get(id);
     for (const listener of this.cancelListeners) listener(id);
     return cancelled;
+  }
+
+  /**
+   * Puts a failed or cancelled job back in the queue as a fresh job: attempts, error and
+   * timestamps reset, runnable at once. When another job with the same type and key is already
+   * queued or running, that job is returned instead and this one stays as it was. Returns
+   * undefined when the job does not exist; a queued, running or done job is returned unchanged.
+   */
+  retry(id: number): JobRow | undefined {
+    const result = this.db.transaction((tx): { job: JobRow | undefined; requeued: boolean } => {
+      const job = tx.select().from(jobs).where(eq(jobs.id, id)).get();
+      if (!job || (job.status !== 'failed' && job.status !== 'cancelled')) {
+        return { job, requeued: false };
+      }
+      if (job.dedupeKey !== null) {
+        const active = tx
+          .select()
+          .from(jobs)
+          .where(
+            and(
+              eq(jobs.type, job.type),
+              eq(jobs.dedupeKey, job.dedupeKey),
+              inArray(jobs.status, ['queued', 'running']),
+            ),
+          )
+          .get();
+        if (active) return { job: active, requeued: false };
+      }
+      const row = tx
+        .update(jobs)
+        .set({
+          ...requeued(this.now()),
+          attempts: 0,
+          error: null,
+          runAfter: null,
+          finishedAt: null,
+        })
+        .where(eq(jobs.id, id))
+        .returning()
+        .get();
+      return { job: row, requeued: true };
+    });
+    if (result.requeued) for (const listener of this.enqueueListeners) listener();
+    return result.job;
+  }
+
+  /** The newest job of a type and key, whatever its status (the sync's "was it given up?"). */
+  latestForKey(type: JobType, key: string): JobRow | undefined {
+    return this.db
+      .select()
+      .from(jobs)
+      .where(and(eq(jobs.type, type), eq(jobs.dedupeKey, key)))
+      .orderBy(desc(jobs.id))
+      .limit(1)
+      .get();
+  }
+
+  /**
+   * The Activity queue: running jobs, then queued ones in pick order, then jobs that failed
+   * for good within `failedWithinMs` (default a day) and were not retried or superseded by a
+   * newer job with the same key, newest first. Failed rows stay until retried or dismissed.
+   */
+  queueView(failedWithinMs = 86_400_000): Job[] {
+    const since = new Date(this.clock().getTime() - failedWithinMs).toISOString();
+    const failed = this.db
+      .select()
+      .from(jobs)
+      .where(
+        and(
+          eq(jobs.status, 'failed'),
+          sql`${jobs.finishedAt} >= ${since}`,
+          sql`NOT EXISTS (SELECT 1 FROM jobs newer WHERE newer.type = ${jobs.type}
+            AND newer.dedupe_key = ${jobs.dedupeKey} AND newer.id > ${jobs.id})`,
+        ),
+      )
+      .orderBy(desc(jobs.finishedAt), desc(jobs.id))
+      .all()
+      .map(toJobDto);
+    return [...this.listQueue(), ...failed];
+  }
+
+  /** Counts for the sidebar badge (`GET /api/activity/summary`). */
+  summary(): { activeDownloads: number; queued: number } {
+    const row = this.db
+      .select({
+        activeDownloads: sql<number>`coalesce(sum(${jobs.type} = 'download'), 0)`,
+        queued: sql<number>`coalesce(sum(${jobs.status} = 'queued'), 0)`,
+      })
+      .from(jobs)
+      .where(inArray(jobs.status, ['queued', 'running']))
+      .get();
+    return { activeDownloads: row?.activeDownloads ?? 0, queued: row?.queued ?? 0 };
   }
 
   /** Puts a running job back in the queue without counting an attempt (shutdown). */
@@ -309,6 +408,7 @@ function requeued(now: string) {
     progress: null,
     speedBytesPerSec: null,
     etaSeconds: null,
+    totalBytes: null,
   };
 }
 
@@ -323,7 +423,7 @@ function titleOf(job: JobRow): string {
 
 /** The Activity queue's view of a row. */
 export function toJobDto(job: JobRow): Job {
-  const subtitle = job.payload.subtitle;
+  const { subtitle, detail } = job.payload;
   return {
     id: job.id,
     type: job.type,
@@ -333,6 +433,8 @@ export function toJobDto(job: JobRow): Job {
     progress: job.progress,
     speedBytesPerSec: job.speedBytesPerSec,
     etaSeconds: job.etaSeconds,
+    totalBytes: job.totalBytes,
+    detail: typeof detail === 'string' ? detail : null,
     error: job.error,
     attempts: job.attempts,
     maxAttempts: job.maxAttempts,

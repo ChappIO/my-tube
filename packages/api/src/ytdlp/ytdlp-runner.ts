@@ -8,8 +8,21 @@ import { parseOutputLine, type DownloadProgress } from './progress.js';
 import { YTDLP_BINARY, type YtdlpBinaryLocator } from './ytdlp-binary.js';
 import { YtdlpError } from './ytdlp-error.js';
 
-export type MetadataOptions = Omit<MetadataArgs, 'url'> & { signal?: AbortSignal };
-export type DownloadOptions = Omit<DownloadArgs, 'url'> & { signal?: AbortSignal };
+/**
+ * Receives the full output of one yt-dlp run for a job log: first the command line (`$ …`,
+ * cookies path and proxy credentials masked), then every stdout and stderr line as it arrives,
+ * then `exit <code>`.
+ */
+export type YtdlpLogSink = (line: string) => void;
+
+interface CallOptions {
+  signal?: AbortSignal;
+  /** Job log sink; see `YtdlpLogSink`. */
+  log?: YtdlpLogSink;
+}
+
+export type MetadataOptions = Omit<MetadataArgs, 'url'> & CallOptions;
+export type DownloadOptions = Omit<DownloadArgs, 'url'> & CallOptions;
 
 export interface DownloadResult {
   /** Final path of the file after merging and moving, as yt-dlp reports it. */
@@ -22,6 +35,7 @@ interface RunOptions {
   onLine?: (line: string, stream: 'stdout' | 'stderr') => void;
   /** Keep stdout in memory and return it (metadata). Otherwise it is only streamed. */
   collectStdout?: boolean;
+  log?: YtdlpLogSink;
 }
 
 interface RunResult {
@@ -56,9 +70,10 @@ export class YtdlpRunner implements OnModuleDestroy {
 
   /** Lists a channel, playlist or video without downloading anything. */
   async metadata(url: string, options: MetadataOptions = {}): Promise<SourceMetadata> {
-    const { signal, ...rest } = options;
+    const { signal, log, ...rest } = options;
     const { stdout } = await this.run(buildArgs({ kind: 'metadata', url, ...rest }), {
       signal,
+      log,
       collectStdout: true,
     });
     let json: unknown;
@@ -86,10 +101,11 @@ export class YtdlpRunner implements OnModuleDestroy {
     options: DownloadOptions,
     onProgress?: (progress: DownloadProgress) => void,
   ): Promise<DownloadResult> {
-    const { signal, ...rest } = options;
+    const { signal, log, ...rest } = options;
     let filePath: string | null = null;
     await this.run(buildArgs({ kind: 'download', url, ...rest }), {
       signal,
+      log,
       onLine: (line) => {
         const parsed = parseOutputLine(line);
         if (parsed.type === 'file') filePath = parsed.path;
@@ -105,7 +121,16 @@ export class YtdlpRunner implements OnModuleDestroy {
   }
 
   private run(args: string[], options: RunOptions): Promise<RunResult> {
-    const { signal, onLine, collectStdout = false } = options;
+    const { signal, collectStdout = false, log } = options;
+    const onLine =
+      log && options.onLine
+        ? (line: string, stream: 'stdout' | 'stderr') => {
+            log(line);
+            options.onLine?.(line, stream);
+          }
+        : log
+          ? (line: string) => log(line)
+          : options.onLine;
     const binary = this.binary.path();
 
     return new Promise<RunResult>((resolve, reject) => {
@@ -123,6 +148,7 @@ export class YtdlpRunner implements OnModuleDestroy {
       }
 
       this.logger.debug(`${binary} ${describeArgs(args)}`);
+      log?.(`$ ${binary} ${describeArgs(args)}`);
       const child = spawn(binary, args, {
         stdio: ['ignore', 'pipe', 'pipe'],
         // Own process group, so aborting also stops ffmpeg children (see `kill`).
@@ -175,6 +201,7 @@ export class YtdlpRunner implements OnModuleDestroy {
         signal?.removeEventListener('abort', onAbort);
         stdoutLines.end();
         stderrLines.end();
+        log?.(`exit ${code ?? closeSignal}${aborted ? ' (aborted)' : ''}`);
         if (aborted) {
           fail(new YtdlpError('yt-dlp was aborted', 'aborted', code, [...tail]));
         } else if (code !== 0) {

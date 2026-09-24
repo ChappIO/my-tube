@@ -1,4 +1,12 @@
-import type { ItemStatus, JobStatus, JobType, Rules, SkipReason } from '@mytube/shared';
+import {
+  HISTORY_KINDS,
+  type HistoryKind,
+  type ItemStatus,
+  type JobStatus,
+  type JobType,
+  type Rules,
+  type SkipReason,
+} from '@mytube/shared';
 import { sql } from 'drizzle-orm';
 import {
   index,
@@ -93,9 +101,8 @@ export const playlists = sqliteTable(
   (table) => [index('playlists_source_id').on(table.sourceId)],
 );
 
-/** Kinds of history entries, matching the Activity screen's kind chip. */
-export const HISTORY_KINDS = ['video', 'music', 'system'] as const;
-export type HistoryKind = (typeof HISTORY_KINDS)[number];
+/** Kinds of history entries, matching the Activity screen's kind chip (shared `HistoryKind`). */
+export { HISTORY_KINDS, type HistoryKind };
 
 /** Audit trail: downloads, retention deletions, yt-dlp installs and updates. */
 export const history = sqliteTable(
@@ -109,6 +116,8 @@ export const history = sqliteTable(
     title: text('title').notNull(),
     result: text('result').notNull(),
     details: text('details'),
+    /** The job that wrote the row (migration 20260925120000_history_job_id); its log is kept. */
+    jobId: integer('job_id').references(() => jobs.id),
   },
   (table) => [index('history_at').on(table.at)],
 );
@@ -243,6 +252,8 @@ export const jobs = sqliteTable(
     progress: real('progress'),
     speedBytesPerSec: integer('speed_bytes_per_sec'),
     etaSeconds: integer('eta_seconds'),
+    /** Expected download size (migration 20260925120100_jobs_total_bytes). */
+    totalBytes: integer('total_bytes'),
     error: text('error'),
     createdAt: text('created_at').notNull().default(now),
     startedAt: text('started_at'),

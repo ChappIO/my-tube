@@ -1,6 +1,9 @@
 import { type DynamicModule, Module, type ModuleMetadata, type Type } from '@nestjs/common';
+import { ActivityController } from '../activity/activity.controller.js';
 import { SettingsModule } from '../settings/settings.module.js';
+import { JobLogsService } from './job-logs.service.js';
 import { JOB_RUNNERS, type JobRunner } from './job-runner.js';
+import { JobsController } from './jobs.controller.js';
 import { JobsService } from './jobs.service.js';
 import { JobsWorker } from './jobs.worker.js';
 
@@ -19,7 +22,9 @@ export interface JobsModuleOptions {
  * JobsModule.forRoot({ imports: [YtdlpModule], runners: [DownloadRunner, CheckSourceRunner] })
  * ```
  *
- * The runners are collected into the `JOB_RUNNERS` array the worker reads.
+ * The runners are collected into the `JOB_RUNNERS` array the worker reads. `JobLogsService`
+ * (per-job yt-dlp logs) is exported with it; `JobsController` serves a job's log, cancel and
+ * retry.
  */
 @Module({})
 export class JobsModule {
@@ -29,9 +34,12 @@ export class JobsModule {
       module: JobsModule,
       global: true,
       imports: [SettingsModule, ...(options.imports ?? [])],
+      // The Activity endpoints read the queue, so they live with it.
+      controllers: [JobsController, ActivityController],
       providers: [
         JobsService,
         JobsWorker,
+        JobLogsService,
         ...runners,
         {
           provide: JOB_RUNNERS,
@@ -39,7 +47,7 @@ export class JobsModule {
           useFactory: (...list: JobRunner[]): JobRunner[] => list,
         },
       ],
-      exports: [JobsService],
+      exports: [JobsService, JobLogsService],
     };
   }
 }

@@ -104,3 +104,89 @@ export function validatePathTemplate(
   }
   return { unknownTags, errors };
 }
+
+/** Values for `renderPathTemplate`, by tag name. Missing, null and empty values render as ''. */
+export type PathTemplateValues = Readonly<Record<string, string | number | null | undefined>>;
+
+/** Longest folder or file name `renderPathTemplate` produces, in UTF-8 bytes. */
+export const PATH_SEGMENT_MAX_BYTES = 200;
+
+/** Returned when every segment of a rendered template is empty. */
+export const EMPTY_PATH_FALLBACK = 'untitled';
+
+// Characters that are invalid in file names on some filesystem (Windows, SMB shares, exFAT)
+// plus control characters. `/` and `\` would split the name.
+// oxlint-disable-next-line no-control-regex -- control characters are exactly what is removed
+const UNSAFE_CHARS = /[/\\:*?"<>|\u0000-\u001f\u007f]/g;
+
+/**
+ * Fills a folder structure template (already validated against its tag list) and returns a
+ * relative path with `/` separators. Pure; for the download job and the library read models.
+ *
+ * - Each `{tag}` is replaced by its value; `{tag:02}` zero-pads a number to 2 digits. Unknown
+ *   tags and missing values render as nothing.
+ * - Every folder and file name is sanitised on its own, after substitution: characters that
+ *   are invalid on common filesystems (`/ \ : * ? " < > |` and control characters) are
+ *   removed, whitespace runs become one space, leading and trailing dots and spaces are trimmed
+ *   (so `.` and `..` become empty), and the name is cut to `PATH_SEGMENT_MAX_BYTES` UTF-8 bytes
+ *   without splitting a character. A value can therefore never add a folder or climb out of
+ *   the library: a title of `../../etc` becomes the name `etc`.
+ * - Empty names are dropped (`{playlist}` outside a playlist); an entirely empty result is
+ *   `untitled`.
+ *
+ * The file extension is not part of the template; the caller appends it.
+ */
+export function renderPathTemplate(template: string, values: PathTemplateValues): string {
+  const segments = template
+    .split(/[/\\]/)
+    .map((segment) =>
+      sanitizePathSegment(
+        segment.replace(TOKEN, (_match, inner: string) => {
+          const parsed = TAG_WITH_MODIFIER.exec(inner);
+          if (!parsed?.[1]) return '';
+          return tagValue(values[parsed[1]], parsed[2] === PATH_TAG_PAD_MODIFIER);
+        }),
+      ),
+    )
+    .filter((segment) => segment.length > 0);
+  return segments.length > 0 ? segments.join('/') : EMPTY_PATH_FALLBACK;
+}
+
+/** One folder or file name made safe for every common filesystem (see `renderPathTemplate`). */
+export function sanitizePathSegment(name: string): string {
+  const cleaned = name
+    .normalize('NFC')
+    // Tabs and newlines become spaces before the other control characters are removed.
+    .replace(/\s+/g, ' ')
+    .replace(UNSAFE_CHARS, '')
+    .replace(/ {2,}/g, ' ')
+    .replace(/^[\s.]+|[\s.]+$/g, '');
+  const cut = truncateUtf8(cleaned, PATH_SEGMENT_MAX_BYTES);
+  // Cutting may leave a trailing space or dot.
+  return cut === cleaned ? cut : cut.replace(/[\s.]+$/, '');
+}
+
+function tagValue(value: string | number | null | undefined, pad: boolean): string {
+  if (value === null || value === undefined) return '';
+  const text = String(value);
+  return pad && /^\d+$/.test(text) ? text.padStart(2, '0') : text;
+}
+
+/** UTF-8 length of one code point (shared has neither DOM nor Node types for TextEncoder). */
+function utf8Length(char: string): number {
+  const code = char.codePointAt(0) ?? 0;
+  return code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4;
+}
+
+function truncateUtf8(text: string, maxBytes: number): string {
+  let out = '';
+  let bytes = 0;
+  // Iterating a string yields whole code points, so surrogate pairs stay together.
+  for (const char of text) {
+    const size = utf8Length(char);
+    if (bytes + size > maxBytes) return out;
+    out += char;
+    bytes += size;
+  }
+  return out;
+}

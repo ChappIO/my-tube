@@ -82,6 +82,8 @@ describe('parseSourceMetadata', () => {
       liveStatus: 'was_live',
       uploadDate: null,
       tab: null,
+      channelId: 'UCLA_DiR1FfKNvjuUpBHmylQ',
+      channel: 'NASA',
     });
   });
 

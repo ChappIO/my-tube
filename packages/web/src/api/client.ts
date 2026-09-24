@@ -69,6 +69,12 @@ export async function apiPost<T>(path: string, body: unknown, schema: z.ZodType<
   return parseResponse(response, schema);
 }
 
+/** POST without a body to an endpoint that answers 204 No Content. Throws `ApiError` on non-2xx. */
+export async function apiPostEmpty(path: string): Promise<void> {
+  const response = await fetch(path, { method: 'POST', headers: { accept: 'application/json' } });
+  if (!response.ok) throw new ApiError(response.status, await response.text());
+}
+
 /** PATCH a JSON body and validate the response against its shared schema. */
 export async function apiPatch<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
   const response = await fetch(path, {

@@ -37,6 +37,8 @@ describe('Sources (e2e)', () => {
     configDir = mkdtempSync(join(tmpdir(), 'mytube-sources-e2e-'));
     process.env.CONFIG_DIR = configDir;
     process.env.YTDLP_PATH = FAKE_YTDLP;
+    // Created sources are checked and downloaded at once (Stage 4); keep the files here.
+    process.env.VIDEO_DIR = join(configDir, 'video');
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication({ logger: false });
     app.setGlobalPrefix('api');
@@ -51,6 +53,7 @@ describe('Sources (e2e)', () => {
   afterAll(async () => {
     catalog.close();
     await app.close();
+    delete process.env.VIDEO_DIR;
     rmSync(configDir, { recursive: true, force: true });
   });
 

@@ -17,7 +17,11 @@ export const ITEM_STATUSES = ['wanted', 'downloading', 'on_disk', 'missing', 'sk
 export const ItemStatus = z.enum(ITEM_STATUSES);
 export type ItemStatus = z.infer<typeof ItemStatus>;
 
-/** Why the rules rejected a fetched item (`evaluateItem` in the sync module). */
+/**
+ * Why an item is not downloaded: the rules rejected it when it was fetched (`evaluateItem` in
+ * the sync module), or, for `unavailable`, YouTube refused the download for good (removed,
+ * private, members-only). Only an explicit retry tries an `unavailable` item again.
+ */
 export const SKIP_REASONS = [
   'short',
   'title_filter',
@@ -25,6 +29,7 @@ export const SKIP_REASONS = [
   'older_than_keep_days',
   'live',
   'upcoming',
+  'unavailable',
 ] as const;
 export const SkipReason = z.enum(SKIP_REASONS);
 export type SkipReason = z.infer<typeof SkipReason>;
@@ -53,6 +58,10 @@ export const Job = z.object({
   progress: z.number().min(0).max(1).nullable(),
   speedBytesPerSec: z.number().int().nonnegative().nullable(),
   etaSeconds: z.number().int().nonnegative().nullable(),
+  /** Expected size in bytes of what a download fetches (all streams), once yt-dlp knows it. */
+  totalBytes: z.number().int().nonnegative().nullable(),
+  /** Short fact for the queue meta line, such as the quality (`1080p`), or null. */
+  detail: z.string().nullable(),
   /** Error of the last failed attempt (kept while a retry waits). */
   error: z.string().nullable(),
   attempts: z.number().int().nonnegative(),

@@ -34,6 +34,8 @@ describe('JobsService', () => {
       progress: null,
       speedBytesPerSec: null,
       etaSeconds: null,
+      totalBytes: null,
+      detail: null,
       error: null,
       attempts: 0,
       maxAttempts: 3,
@@ -232,5 +234,72 @@ describe('JobsService', () => {
     });
     expect(jobs.recoverInterrupted()).toBe(0);
     expect(jobs.claimNext(['download'])?.id).toBe(job.id);
+  });
+
+  it('completes without history for a null outcome and links history rows to the job', () => {
+    const { jobs, history } = createJobsHarness();
+    const quiet = jobs.enqueue({ type: 'check_source', payload: { title: 'NASA' } }).job;
+    jobs.claimNext(['check_source']);
+    expect(jobs.complete(quiet.id, null)).toBe(true);
+    expect(history.recent()).toEqual([]);
+
+    const loud = jobs.enqueue({ type: 'download', payload: { title: 'Clip' } }).job;
+    jobs.claimNext(['download']);
+    jobs.complete(loud.id, { title: 'Clip', result: 'done', kind: 'video' });
+    const failing = jobs.enqueue({ type: 'download', payload: { title: 'Bad' } }).job;
+    jobs.claimNext(['download']);
+    jobs.fail(failing.id, 'gone', { retryable: false });
+    expect(history.recent().map((entry) => [entry.title, entry.jobId])).toEqual([
+      ['Bad', failing.id],
+      ['Clip', loud.id],
+    ]);
+  });
+
+  it('shows recent failures in the queue view until retried, dismissed or superseded', () => {
+    const { jobs, advance } = createJobsHarness();
+    const failed = jobs.enqueue({ type: 'download', key: 'video:a', payload: { title: 'A' } }).job;
+    jobs.claimNext(['download']);
+    jobs.updateProgress(failed.id, { totalBytes: 1234.4 });
+    expect(jobs.listQueue()[0]?.totalBytes).toBe(1234);
+    jobs.fail(failed.id, 'gone', { retryable: false });
+    jobs.enqueue({ type: 'download', key: 'video:b', payload: { title: 'B', detail: '720p' } });
+
+    expect(jobs.queueView().map((job) => [job.title, job.status, job.detail])).toEqual([
+      ['B', 'queued', '720p'],
+      ['A', 'failed', null],
+    ]);
+    expect(jobs.summary()).toEqual({ activeDownloads: 1, queued: 1 });
+    expect(jobs.latestForKey('download', 'video:a')?.status).toBe('failed');
+
+    // Retry: back in the queue as a fresh job.
+    const retried = jobs.retry(failed.id);
+    expect(retried).toMatchObject({ status: 'queued', attempts: 0, error: null, finishedAt: null });
+    expect(jobs.summary()).toEqual({ activeDownloads: 2, queued: 2 });
+
+    // Dismiss (cancel) a failed job: it leaves the view.
+    jobs.claimNext(['download']);
+    jobs.fail(failed.id, 'gone again', { retryable: false });
+    expect(jobs.cancel(failed.id)?.status).toBe('cancelled');
+    expect(jobs.queueView().map((job) => job.title)).toEqual(['B']);
+
+    // A failure older than a day drops out; a newer job with the same key supersedes one.
+    const old = jobs.enqueue({ type: 'download', key: 'video:c', payload: { title: 'C' } }).job;
+    jobs.claimNext(['download']);
+    jobs.claimNext(['download']);
+    jobs.fail(old.id, 'x', { retryable: false });
+    expect(jobs.queueView().map((job) => job.title)).toContain('C');
+    advance(25 * 3_600_000);
+    expect(jobs.queueView().map((job) => job.title)).not.toContain('C');
+  });
+
+  it('retries only failed or cancelled jobs and defers to an active job with the same key', () => {
+    const { jobs } = createJobsHarness();
+    const first = jobs.enqueue({ type: 'download', key: 'video:a', payload: { title: 'A' } }).job;
+    expect(jobs.retry(first.id)?.status).toBe('queued'); // unchanged
+    jobs.cancel(first.id);
+    const second = jobs.enqueue({ type: 'download', key: 'video:a', payload: { title: 'A' } }).job;
+    expect(jobs.retry(first.id)?.id).toBe(second.id);
+    expect(jobs.get(first.id)?.status).toBe('cancelled');
+    expect(jobs.retry(999)).toBeUndefined();
   });
 });
