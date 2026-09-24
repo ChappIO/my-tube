@@ -41,7 +41,8 @@ export function applyThemeChoice(choice: ThemeChoice): void {
 let current: ThemeChoice | undefined;
 const listeners = new Set<() => void>();
 
-function getChoice(): ThemeChoice {
+/** The current choice, read from localStorage on first use. */
+export function getThemeChoice(): ThemeChoice {
   current ??= readStoredChoice();
   return current;
 }
@@ -50,6 +51,11 @@ function notify(): void {
   for (const listener of listeners) listener();
 }
 
+/**
+ * Applies a choice and caches it in localStorage for the pre-paint script. The settings table
+ * (`general.theme`) is the source of truth: screens change the theme through
+ * `useUpdateSettings`, which calls this.
+ */
 export function setTheme(choice: ThemeChoice): void {
   current = choice;
   writeStoredChoice(choice);
@@ -92,7 +98,7 @@ export function useTheme(): {
   resolvedTheme: ResolvedTheme;
   setTheme: (choice: ThemeChoice) => void;
 } {
-  const theme = useSyncExternalStore(subscribeChoice, getChoice, () => 'system' as const);
+  const theme = useSyncExternalStore(subscribeChoice, getThemeChoice, () => 'system' as const);
   const system = useSyncExternalStore(subscribeSystem, getSystemTheme, () => 'light' as const);
   const set = useCallback((choice: ThemeChoice) => setTheme(choice), []);
   return { theme, resolvedTheme: theme === 'system' ? system : theme, setTheme: set };

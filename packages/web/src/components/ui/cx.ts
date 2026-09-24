@@ -26,3 +26,11 @@ export const minHit = 'min-h-11 wide:min-h-9';
  */
 export const hitArea =
   "relative before:absolute before:top-1/2 before:left-1/2 before:size-11 before:-translate-1/2 before:content-[''] wide:before:size-9";
+
+/**
+ * The Settings value box (handoff Screen 6 key/value grid): `surface` fill, Space Mono 13,
+ * 9px 12px, radius 8. Full width on narrow screens; on wide ones at least 160px and as wide as
+ * its content. Shared by `KeyValueText`, `Select` and `Input shape="value"`.
+ */
+export const valueBox =
+  'box-border w-full rounded-[8px] bg-surface px-3 py-[9px] font-mono text-[13px] font-normal text-ink wide:w-max wide:min-w-40';
