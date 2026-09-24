@@ -5,7 +5,7 @@ description: How the MyTube web app (Vite, React, TanStack Router, React Query, 
 
 # Frontend
 
-`packages/web` is a Vite + React 19 single-page app. It talks to the API only through `/api/*` on the same origin: the Vite dev server proxies to the API on port 8080, and in production Nest serves the built app. There is no CORS and no API base URL. See the tooling skill for commands.
+`packages/web` is a Vite + React 19 single-page app. It talks to the API only through `/api/*` on the same origin: the Vite dev server proxies to the API on `API_PORT` (default 8080), and in production Nest serves the built app. There is no CORS and no API base URL. See the tooling skill for commands.
 
 ## Layout
 

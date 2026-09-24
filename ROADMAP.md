@@ -18,8 +18,8 @@ Working checklist for building MyTube. Stages come from the architecture skill a
 - [x] Vite web app with TanStack Router, React Query, Tailwind
 - [x] oxlint, oxfmt, Vitest, CI, Docker image, release workflow
 - [x] Skills: architecture, tooling, backend, database, frontend, deployment
-- [ ] **Per-worktree dev stacks.** `pnpm dev` should take `PORT`/`API_PORT` so several checkouts run side by side for previews (the Vite proxy already reads `API_PORT`; the api dev script and CONFIG_DIR default still assume one checkout). Done when two worktrees can run `pnpm dev` at once without port or database collisions.
-- [ ] **Infra linters in CI.** Run actionlint, hadolint and shellcheck in the check job (see `pnpm lint:infra`). Done when a deliberate Dockerfile smell fails CI.
+- [x] **Per-worktree dev stacks.** `pnpm dev` should take `PORT`/`API_PORT` so several checkouts run side by side for previews (the Vite proxy already reads `API_PORT`; the api dev script and CONFIG_DIR default still assume one checkout). Done when two worktrees can run `pnpm dev` at once without port or database collisions.
+- [x] **Infra linters in CI.** Run actionlint, hadolint and shellcheck in the check job (see `pnpm lint:infra`). Done when a deliberate Dockerfile smell fails CI.
 
 ## Stage 1: Shell and design system
 
