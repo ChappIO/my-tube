@@ -10,7 +10,8 @@ export default defineConfig({
     // The API is always reached under /api, in development via this proxy and in
     // production because Nest serves both. No CORS anywhere.
     proxy: {
-      '/api': 'http://localhost:8080',
+      // API_PORT lets several checkouts run side by side (one API per worktree).
+      '/api': `http://localhost:${process.env.API_PORT ?? '8080'}`,
     },
   },
 });

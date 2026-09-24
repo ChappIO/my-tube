@@ -17,6 +17,7 @@ Working checklist for building MyTube. Stages come from the architecture skill a
 - [x] Vite web app with TanStack Router, React Query, Tailwind
 - [x] oxlint, oxfmt, Vitest, CI, Docker image, release workflow
 - [x] Skills: architecture, tooling, backend, database, frontend, deployment
+- [ ] **Per-worktree dev stacks.** `pnpm dev` should take `PORT`/`API_PORT` so several checkouts run side by side for previews (the Vite proxy already reads `API_PORT`; the api dev script and CONFIG_DIR default still assume one checkout). Done when two worktrees can run `pnpm dev` at once without port or database collisions.
 - [ ] **Infra linters in CI.** Run actionlint, hadolint and shellcheck in the check job (see `pnpm lint:infra`). Done when a deliberate Dockerfile smell fails CI.
 
 ## Stage 1: Shell and design system
@@ -31,6 +32,10 @@ Skills: frontend. Handoff: Brand, Design Tokens, Layout, Sidebar, Interactions (
 - [x] **Media components.** Square media tile with fixed and slide-up chins, open music tile with circle variant for artists, playlist stack, bell toggle in circle and pill forms, duration badge. Done when the Home tile spec and the playlist stack spec are reproduced pixel-close with sample data.
 - [ ] **Focus and motion.** Global focus style (2px red outline, offset 2px) and motion tokens or utilities for tile hover, chin reveal and the toggle knob per the handoff's Motion section. Done when the core and media components use them instead of ad-hoc transitions.
 - [ ] **Dev routes out of production.** Exclude `src/routes/dev/**` from production builds (router plugin filtering or an env gate) so demo pages are not served by the container. Done when `/dev/tokens` 404s in the Docker image and still works in `pnpm dev`.
+- [ ] **Narrow tab pills.** At 375px the four Music pills with icons overflow the track (440px needed, 343px available). Decide and implement: hide icons below 760px (recommended), keep inside-scroll, or icon-only inactive pills. Done when Music tabs fit at 375px without a cut-off pill.
+- [ ] **Shared button sizes.** `Button` has no size matching the sidebar "Add to library" pill (Archivo 700 15px, 13px padding) so the sidebar keeps a local pill. Add an `xl` size or decide the local pill stays, and document. Done when the sidebar uses the shared component or the skill says why not.
+- [ ] **Modal follow-ups.** Focus trap, a header-less variant for Preview, safe nested Escape handling, and a `--color-scrim` token instead of the raw overlay rgba. Done when Preview can use `Modal` without a title row.
+- [ ] **Tile accessibility.** `MediaTile` nests a channel `<button>` inside a `role="button"` tile. Move to an overlay-link pattern so interactive content is not nested. Done when axe reports no nested-interactive violation on `/dev/media`.
 - [ ] **Logo demo polish.** On `/dev/logo` the "on white" and "on ink" grounds follow the theme instead of staying fixed; use fixed colors. Consider a pixel-snapped 16px favicon or ICO fallback. Done when the demo reads correctly in dark mode.
 
 ## Stage 2: yt-dlp manager and Settings
