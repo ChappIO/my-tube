@@ -40,4 +40,6 @@ The prototypes are design references, not production code.
 
 ## Working in this repo
 
-Technology choices and conventions live in skills under `.claude/skills`, one per area: `tooling` (workspace, scripts, lint, CI), `backend`, `database`, `frontend` and `deployment`. Read the relevant skill before changing that area. `pnpm dev` starts everything; `pnpm check` runs what CI runs.
+Technology choices and conventions live in skills under `.claude/skills`, one per area: `architecture` (how the app works, domain model, delivery order), `tooling` (workspace, scripts, lint, CI), `backend`, `database`, `frontend` and `deployment`. Read the relevant skill before changing that area. `pnpm dev` starts everything; `pnpm check` runs what CI runs.
+
+`ROADMAP.md` is the working checklist. Pick tasks from it in order, and check them off in the pull request that finishes them.
