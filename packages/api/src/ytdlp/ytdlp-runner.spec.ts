@@ -9,7 +9,7 @@ import { ConfigModule } from '../config/config.module.js';
 import type { DownloadProgress } from './progress.js';
 import { defaultBinaryLocator, YTDLP_BINARY, type YtdlpBinaryLocator } from './ytdlp-binary.js';
 import { YtdlpError } from './ytdlp-error.js';
-import { YtdlpRunner } from './ytdlp-runner.js';
+import { lineSplitter, YtdlpRunner } from './ytdlp-runner.js';
 import { YtdlpModule } from './ytdlp.module.js';
 
 const FAKE = join(import.meta.dirname, '../../test/fixtures/fake-yt-dlp');
@@ -184,5 +184,19 @@ describe('YtdlpBinaryLocator', () => {
     } finally {
       delete process.env.YTDLP_PATH;
     }
+  });
+});
+
+describe('lineSplitter', () => {
+  it('keeps multibyte characters split across chunks intact', () => {
+    const lines: string[] = [];
+    const splitter = lineSplitter((line) => lines.push(line));
+    const bytes = Buffer.from('[mytube-file] /media/Café — 日本語.mkv\r\nnext', 'utf8');
+    // Split inside the three-byte encoding of 日.
+    const cut = bytes.indexOf(Buffer.from('日', 'utf8')) + 1;
+    splitter.push(bytes.subarray(0, cut));
+    splitter.push(bytes.subarray(cut));
+    splitter.end();
+    expect(lines).toEqual(['[mytube-file] /media/Café — 日本語.mkv', 'next']);
   });
 });

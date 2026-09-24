@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { StringDecoder } from 'node:string_decoder';
 import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import { z } from 'zod';
 import { buildArgs, describeArgs, type DownloadArgs, type MetadataArgs } from './args.js';
@@ -190,17 +191,22 @@ export class YtdlpRunner implements OnModuleDestroy {
   }
 }
 
-/** Buffers chunks and calls `onLine` per complete line (CR and LF both end a line). */
-function lineSplitter(onLine: (line: string) => void) {
+/**
+ * Buffers chunks and calls `onLine` per complete line (CR and LF both end a line). A
+ * multibyte UTF-8 character split across chunks is held back until it is complete.
+ */
+export function lineSplitter(onLine: (line: string) => void) {
+  const decoder = new StringDecoder('utf8');
   let pending = '';
   return {
     push(chunk: Buffer) {
-      pending += chunk.toString('utf8');
+      pending += decoder.write(chunk);
       const lines = pending.split(/\r\n|\r|\n/);
       pending = lines.pop() ?? '';
       for (const line of lines) onLine(line);
     },
     end() {
+      pending += decoder.end();
       if (pending) onLine(pending);
       pending = '';
     },
