@@ -5,6 +5,7 @@ import {
   DEFAULT_SETTINGS_TAB,
   SETTINGS_TABS,
   type SettingsTab,
+  TAB_ICONS,
   TAB_LABELS,
   parseTab,
 } from '../navigation';
@@ -12,6 +13,7 @@ import {
 const settingsTabItems = SETTINGS_TABS.map((tab) => ({
   id: tab,
   label: TAB_LABELS[tab],
+  icon: TAB_ICONS[tab],
   link: linkOptions({ to: '/settings/$tab', params: { tab } }),
 }));
 

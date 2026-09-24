@@ -7,6 +7,7 @@ import {
   NAV_SECTIONS,
   NAV_SECTION_LABELS,
   SETTINGS_TABS,
+  TAB_ICONS,
   TAB_LABELS,
   VIDEO_TABS,
   parseTab,
@@ -39,6 +40,12 @@ describe('tab metadata', () => {
   it('labels every tab', () => {
     for (const tab of [...MUSIC_TABS, ...VIDEO_TABS, ...SETTINGS_TABS]) {
       expect(TAB_LABELS[tab]).toMatch(/^[A-Z]/);
+    }
+  });
+
+  it('gives every tab an icon', () => {
+    for (const tab of [...MUSIC_TABS, ...VIDEO_TABS, ...SETTINGS_TABS]) {
+      expect(TAB_ICONS[tab]).toBeTypeOf('function');
     }
   });
 });

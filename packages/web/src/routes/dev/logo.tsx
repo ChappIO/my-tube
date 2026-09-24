@@ -1,29 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import type { ComponentType, ReactNode } from 'react';
 import { LogoLockup, LogoMark, type LogoMarkVariant, Wordmark } from '../../components/brand/Logo';
-import {
-  ActivityIcon,
-  BackIcon,
-  BellIcon,
-  CheckIcon,
-  ChevronDownIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  ChevronUpIcon,
-  CloseIcon,
-  ExternalLinkIcon,
-  HomeIcon,
-  MoreIcon,
-  MusicIcon,
-  PauseIcon,
-  PlayIcon,
-  PlusIcon,
-  RefreshIcon,
-  SearchIcon,
-  SettingsIcon,
-  TrashIcon,
-  VideoIcon,
-} from '../../components/icons';
+import { BellIcon, listIcons } from '../../components/icons';
 
 export const Route = createFileRoute('/dev/logo')({ component: LogoDemo });
 
@@ -41,27 +19,9 @@ const GROUNDS = [
   { name: 'red', bg: RED, fg: WHITE },
 ];
 
-const ICONS: [string, ComponentType<{ size?: number }>][] = [
-  ['HomeIcon', HomeIcon],
-  ['MusicIcon', MusicIcon],
-  ['VideoIcon', VideoIcon],
-  ['ActivityIcon', ActivityIcon],
-  ['SettingsIcon', SettingsIcon],
-  ['PlusIcon', PlusIcon],
-  ['CloseIcon', CloseIcon],
-  ['SearchIcon', SearchIcon],
-  ['PlayIcon', PlayIcon],
-  ['PauseIcon', PauseIcon],
-  ['TrashIcon', TrashIcon],
-  ['CheckIcon', CheckIcon],
-  ['ExternalLinkIcon', ExternalLinkIcon],
-  ['RefreshIcon', RefreshIcon],
-  ['MoreIcon', MoreIcon],
-  ['BackIcon', BackIcon],
-  ['ChevronLeftIcon', ChevronLeftIcon],
-  ['ChevronRightIcon', ChevronRightIcon],
-  ['ChevronUpIcon', ChevronUpIcon],
-  ['ChevronDownIcon', ChevronDownIcon],
+// Every registry icon plus the non-Lucide bell, so new icons show up here automatically.
+const ICONS: (readonly [string, ComponentType<{ size?: number }>])[] = [
+  ...listIcons(),
   ['BellIcon', BellIcon],
 ];
 

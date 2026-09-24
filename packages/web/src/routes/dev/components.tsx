@@ -2,7 +2,7 @@ import { createFileRoute, linkOptions } from '@tanstack/react-router';
 import { type ReactNode, useState } from 'react';
 import { PlusIcon, RefreshIcon, SearchIcon, TrashIcon } from '../../components/icons';
 import { BackLink } from '../../components/ui/BackLink';
-import { MUSIC_TABS, TAB_LABELS } from '../../navigation';
+import { MUSIC_TABS, TAB_ICONS, TAB_LABELS } from '../../navigation';
 import { Button } from '../../components/ui/Button';
 import { CheckboxRow } from '../../components/ui/CheckboxRow';
 import { IconButton } from '../../components/ui/IconButton';
@@ -43,6 +43,7 @@ type MusicTab = (typeof musicTabs)[number]['id'];
 const musicTabLinks = MUSIC_TABS.map((tab) => ({
   id: tab,
   label: TAB_LABELS[tab],
+  icon: TAB_ICONS[tab],
   link: linkOptions({ to: '/music/$tab', params: { tab } }),
 }));
 

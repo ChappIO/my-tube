@@ -1,5 +1,20 @@
 // Tabbed sections of the app: the tab ids used in URLs, their defaults and their
-// display labels. Routes, the app shell and the screens all import from here.
+// display labels and icons. Routes, the app shell and the screens all import from here.
+
+import type { ComponentType } from 'react';
+import {
+  AdvancedIcon,
+  AlbumsIcon,
+  ArtistsIcon,
+  ChannelsIcon,
+  GeneralIcon,
+  type IconProps,
+  MusicIcon,
+  PlaylistsIcon,
+  TracksIcon,
+  VideoIcon,
+  VideosIcon,
+} from './components/icons';
 
 export const MUSIC_TABS = ['artists', 'albums', 'playlists', 'tracks'] as const;
 export const VIDEO_TABS = ['videos', 'channels'] as const;
@@ -24,6 +39,23 @@ export const TAB_LABELS: Record<MusicTab | VideoTab | SettingsTab, string> = {
   music: 'Music',
   video: 'Video',
   advanced: 'Advanced',
+};
+
+/**
+ * Icon per tab id, shown before the label in the tab pills. An addition to the handoff
+ * (its pills are text only), requested by the owner.
+ */
+export const TAB_ICONS: Record<MusicTab | VideoTab | SettingsTab, ComponentType<IconProps>> = {
+  artists: ArtistsIcon,
+  albums: AlbumsIcon,
+  playlists: PlaylistsIcon,
+  tracks: TracksIcon,
+  videos: VideosIcon,
+  channels: ChannelsIcon,
+  general: GeneralIcon,
+  music: MusicIcon,
+  video: VideoIcon,
+  advanced: AdvancedIcon,
 };
 
 /** Returns `value` as one of `tabs`, or undefined when it is not one. Tab ids are lowercase. */

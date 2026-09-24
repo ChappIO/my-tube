@@ -60,6 +60,7 @@ The screens are still placeholders built on `src/components/PlaceholderPage.tsx`
 - `MusicTab`, `VideoTab`, `SettingsTab`: their union types.
 - `DEFAULT_MUSIC_TAB` (`albums`), `DEFAULT_VIDEO_TAB` (`videos`), `DEFAULT_SETTINGS_TAB` (`general`).
 - `TAB_LABELS`: display label per tab id (`albums` → `Albums`). The ids are unique across sections.
+- `TAB_ICONS`: icon component per tab id for the tab pills (see Icon registry).
 - `parseTab(tabs, value)`: the tab, or `undefined` when `value` is not one of `tabs` (exact, lowercase).
 
 ### Typed params and redirects
@@ -143,9 +144,49 @@ Self-hosted through Fontsource, imported in `main.tsx`: `@fontsource-variable/ar
 - `src/components/brand/geometry.ts` has the mark's geometry. Sizes drawn in the handoff (16, 24, 28, 32, 40, 48, 64, 88, 96) use its pixel-hinted values; other sizes scale the 96px tile.
 - Brand components reference `--color-red`, `--color-ink`, `--color-white` and `--font-sans` with the handoff values as fallbacks. The mark's white is `--color-white`, never `--color-bg` (which is near-black in dark).
 - Favicon: `public/favicon.svg`, the 16px tile, linked from `index.html`. Keep it in sync with the 16px values in `geometry.ts`.
-- Icons: Lucide (`lucide-react`). Import icons only from `src/components/icons.tsx`, never from `lucide-react` directly. That file wraps each icon with the app defaults (16px, stroke 2, `aria-hidden`, no flex shrink); use 16 to 20px. Add new icons there with an app-level name (`CloseIcon`, not `X`).
+- Icons: Lucide (`lucide-react`). Import icons only from `src/components/icons.tsx`, never from `lucide-react` directly. That file wraps each icon with the app defaults (16px, stroke 2, `aria-hidden`, no flex shrink); use 16 to 20px.
 - `BellIcon` is not Lucide: it draws the handoff's own bell path (24×24 viewBox, filled with `currentColor`, 14px by default).
 - Do not use YouTube's logo or play-button shape anywhere.
+
+### Icon registry
+
+**One icon, one meaning.** `ICON_REGISTRY` in `icons.tsx` maps every export name to its Lucide glyph, its single meaning and where it is used; the exports are built from it and each carries a one-line doc comment. Name an icon after its meaning (`ChannelsIcon`, not `TvIcon`) so swapping the glyph never renames a usage. Reuse the existing icon for a meaning; when a new meaning needs a glyph that is already taken, pick a different glyph. `icons.spec.ts` fails when two icons share a glyph or a meaning, or when an export is missing from the registry. `/dev/logo` lists the registry. Keep this table in sync with the file.
+
+| Icon               | Lucide glyph        | Meaning                      | Used in                                       |
+| ------------------ | ------------------- | ---------------------------- | --------------------------------------------- |
+| `HomeIcon`         | `House`             | Home section                 | sidebar nav, tab bar                          |
+| `MusicIcon`        | `Music`             | Music library                | sidebar nav, tab bar, Settings → Music tab    |
+| `VideoIcon`        | `Video`             | Video library                | sidebar nav, tab bar, Settings → Video tab    |
+| `ActivityIcon`     | `ArrowDownToLine`   | Activity section (downloads) | sidebar nav, tab bar                          |
+| `SettingsIcon`     | `Settings`          | Settings section             | sidebar nav, tab bar                          |
+| `ArtistsIcon`      | `Users`             | Artists                      | Music → Artists tab                           |
+| `AlbumsIcon`       | `Disc3`             | Albums                       | Music → Albums tab                            |
+| `PlaylistsIcon`    | `ListMusic`         | Playlists                    | Music → Playlists tab                         |
+| `TracksIcon`       | `AudioLines`        | Tracks                       | Music → Tracks tab                            |
+| `VideosIcon`       | `Film`              | Videos (individual items)    | Video → Videos tab                            |
+| `ChannelsIcon`     | `Tv`                | Channels                     | Video → Channels tab                          |
+| `GeneralIcon`      | `SlidersHorizontal` | General settings             | Settings → General tab                        |
+| `AdvancedIcon`     | `Wrench`            | Advanced settings            | Settings → Advanced tab                       |
+| `PlusIcon`         | `Plus`              | Add to library               | sidebar Add button, top bar "+", Add triggers |
+| `CloseIcon`        | `X`                 | Close / dismiss              | Modal close button                            |
+| `SearchIcon`       | `Search`            | Search                       | search inputs                                 |
+| `PlayIcon`         | `Play`              | Play (preview)               | preview player                                |
+| `PauseIcon`        | `Pause`             | Pause (preview)              | preview player                                |
+| `TrashIcon`        | `Trash2`            | Delete files                 | explicit delete actions                       |
+| `CheckIcon`        | `Check`             | Checked / selected           | CheckboxRow tick                              |
+| `ExternalLinkIcon` | `ExternalLink`      | Open on YouTube / external   | external links                                |
+| `RefreshIcon`      | `RefreshCw`         | Check now / re-sync          | Check now buttons (yt-dlp, subscriptions)     |
+| `MoreIcon`         | `Ellipsis`          | More actions menu            | row menus                                     |
+| `BackIcon`         | `ArrowLeft`         | Back to parent page          | `BackLink` ("← Video")                        |
+| `ChevronLeftIcon`  | `ChevronLeft`       | Previous                     | pagers (not used yet)                         |
+| `ChevronRightIcon` | `ChevronRight`      | Next                         | pagers (not used yet)                         |
+| `ChevronUpIcon`    | `ChevronUp`         | Collapse / sort ascending    | Tracks table sort                             |
+| `ChevronDownIcon`  | `ChevronDown`       | Expand / sort descending     | Tracks table sort, selects                    |
+| `BellIcon`         | none (handoff path) | Subscribed / subscribe       | `BellToggle`, `MusicTile` subscribed badge    |
+
+Settings → Music and Settings → Video reuse `MusicIcon` and `VideoIcon` on purpose: those tabs configure the music and video libraries, which is the same meaning as the sections. Settings → General gets its own `GeneralIcon`, not `SettingsIcon`, because "general settings" is not "the Settings section".
+
+**Tab icons** (`TAB_ICONS` in `navigation.ts`, one per tab id) are an addition to the handoff, whose tab pills are text only; the owner asked for them. On a 375px screen the four Music pills with icons are wider than the track (440px of content against 343px), so the track scrolls sideways inside itself and keeps the active pill in view. Even the `sm` size does not fit (404px).
 
 ## Dev demo routes
 
@@ -158,8 +199,8 @@ Routes under `src/routes/dev/` (`/dev/*`) are visual reference pages for buildin
 - `typography.tsx`: `PageTitle` (h1), `ModalTitle` (h2), `SectionTitle` (h2), `SectionLabel` (h2, muted), `TableHeaderLabel` (span, muted), `Meta` (span; `size="md" | "sm"`, `tone="muted" | "ink" | "ok" | "red"`), `Body` (p; `muted`), `FieldLabel` (label; `htmlFor`). All take `as`, `id`, `className`.
 - `PageHeader`: `title`, `sub?`, `actions?` (a `StatCardGroup` or `TabPills`). Bottom-aligned, wraps on narrow.
 - `StatCard`: `label`, `value`. `StatCardGroup` lays out several with gap 10.
-- `TabPills<T>`: `items: {id, label}[]`, `value`, `onChange(id)`, `label` (group aria-label), `size="md" | "sm"`. Controlled toggle buttons with `aria-pressed`; the track scrolls inside itself instead of widening the page.
-- `TabPillLinks<T>` (same file): the routed variant for tabs that live in the URL. `items: {id, label, link}[]` where `link` comes from `linkOptions({ to, params })`, `value` (the current tab from `Route.useParams()`), `label` (nav aria-label), `size`. Renders a `<nav>` of `Link`s with the identical track and item classes (shared `trackClass`/`itemClass` helpers, never copy them), `aria-current="page"` on the active pill. Build the items once at module level from `navigation.ts`: `MUSIC_TABS.map((tab) => ({ id: tab, label: TAB_LABELS[tab], link: linkOptions({ to: '/music/$tab', params: { tab } }) }))`, and pass the track as `PageHeader`'s `actions`.
+- `TabPills<T>`: `items: {id, label, icon?}[]`, `value`, `onChange(id)`, `label` (group aria-label), `size="md" | "sm"`. Controlled toggle buttons with `aria-pressed`. `icon` is an icon component from `components/icons`, drawn at 16px, 8px before the label. The track scrolls inside itself instead of widening the page and scrolls the active pill into view. The scroll runs one task after render, because TanStack's scroll restoration otherwise copies the old `scrollLeft` back after navigation.
+- `TabPillLinks<T>` (same file): the routed variant for tabs that live in the URL. `items: {id, label, icon?, link}[]` where `link` comes from `linkOptions({ to, params })`, `value` (the current tab from `Route.useParams()`), `label` (nav aria-label), `size`. Renders a `<nav>` of `Link`s with the identical track and item classes (shared `trackClass`/`itemClass` helpers, never copy them), `aria-current="page"` on the active pill. Build the items once at module level from `navigation.ts`: `MUSIC_TABS.map((tab) => ({ id: tab, label: TAB_LABELS[tab], icon: TAB_ICONS[tab], link: linkOptions({ to: '/music/$tab', params: { tab } }) }))`, and pass the track as `PageHeader`'s `actions`.
 - `BackLink`: `link` (from `linkOptions`), children (the destination's name). "← Video" above a detail page header: back arrow + Archivo 600 13, muted, hover ink.
 - `Button`: `variant="primary" | "secondary" | "outlined"` (default secondary), `size="md" | "lg"`, `icon?` (leading), `fullWidth?`, plus native button props.
 - `IconButton`: `label` (required, becomes `aria-label`), `size="sm" | "md" | "lg"` (32/36/40px), `tone="surface" | "red"`, icon as the child.

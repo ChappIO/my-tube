@@ -1,11 +1,19 @@
 import { createFileRoute, linkOptions, redirect } from '@tanstack/react-router';
 import { PlaceholderPage } from '../components/PlaceholderPage';
 import { TabPillLinks } from '../components/ui/TabPills';
-import { DEFAULT_MUSIC_TAB, MUSIC_TABS, type MusicTab, TAB_LABELS, parseTab } from '../navigation';
+import {
+  DEFAULT_MUSIC_TAB,
+  MUSIC_TABS,
+  type MusicTab,
+  TAB_ICONS,
+  TAB_LABELS,
+  parseTab,
+} from '../navigation';
 
 const musicTabItems = MUSIC_TABS.map((tab) => ({
   id: tab,
   label: TAB_LABELS[tab],
+  icon: TAB_ICONS[tab],
   link: linkOptions({ to: '/music/$tab', params: { tab } }),
 }));
 
