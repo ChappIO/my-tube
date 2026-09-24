@@ -44,17 +44,31 @@ export interface KeyValueRowProps {
    * read-only value so the key is plain text.
    */
   control?: boolean;
+  /**
+   * `center` (default) centers the key on the value. `start` pins the key to the first line of
+   * the value box, for values with something under the box (Folder structure and its tags).
+   */
+  align?: 'center' | 'start';
 }
 
 /** One key/value pair of a `KeyValueGrid`: two grid cells, key then value. */
-export function KeyValueRow({ label, children, control = true }: KeyValueRowProps) {
+export function KeyValueRow({
+  label,
+  children,
+  control = true,
+  align = 'center',
+}: KeyValueRowProps) {
   const id = useId();
   const Key = control ? 'label' : 'span';
   return (
     <>
       <Key
         htmlFor={control ? id : undefined}
-        className="mt-2 font-sans text-[14px] font-normal text-muted wide:mt-0"
+        className={cx(
+          'mt-2 font-sans text-[14px] font-normal text-muted',
+          // 8px down aligns the key with the text inside a 36px value box.
+          align === 'start' ? 'wide:mt-2 wide:self-start' : 'wide:mt-0',
+        )}
       >
         {label}
       </Key>
@@ -67,7 +81,12 @@ export function KeyValueRow({ label, children, control = true }: KeyValueRowProp
   );
 }
 
-/** A read-only value in the value box ("/media/music", "282 GB · 3,104 tracks"). */
+/**
+ * A read-only value in the value box ("/media/music", "282 GB · 3,104 tracks"). A value longer
+ * than the cell (a deep dev path) wraps anywhere instead of overflowing the card.
+ */
 export function KeyValueText({ children }: { children: ReactNode }) {
-  return <span className={cx(valueBox, 'block')}>{children}</span>;
+  return (
+    <span className={cx(valueBox, 'block max-w-full [overflow-wrap:anywhere]')}>{children}</span>
+  );
 }

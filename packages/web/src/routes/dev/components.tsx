@@ -7,6 +7,16 @@ import { Button } from '../../components/ui/Button';
 import { CheckboxRow } from '../../components/ui/CheckboxRow';
 import { IconButton } from '../../components/ui/IconButton';
 import { Input } from '../../components/ui/Input';
+import { KeyValueGrid, KeyValueRow, KeyValueText } from '../../components/ui/KeyValueGrid';
+import { NumberInput } from '../../components/ui/NumberInput';
+import { Select } from '../../components/ui/Select';
+import {
+  SettingsCard,
+  SettingsColumn,
+  SettingsNote,
+  SettingsRow,
+} from '../../components/ui/SettingsCard';
+import { TextValueInput } from '../../components/ui/TextValueInput';
 import { Modal, ModalActions } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { StatCard, StatCardGroup } from '../../components/ui/StatCard';
@@ -45,6 +55,11 @@ const musicTabLinks = MUSIC_TABS.map((tab) => ({
   label: TAB_LABELS[tab],
   icon: TAB_ICONS[tab],
   link: linkOptions({ to: '/music/$tab', params: { tab } }),
+}));
+
+const qualityOptions = ['best available', '1080p', '720p'].map((value) => ({
+  value,
+  label: value,
 }));
 
 const backToVideo = linkOptions({ to: '/video/$tab', params: { tab: 'channels' } });
@@ -89,6 +104,11 @@ function ComponentsDemo() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [library, setLibrary] = useState<Library>('video');
   const [url, setUrl] = useState('');
+  const [quality, setQuality] = useState('1080p');
+  const [downloads, setDownloads] = useState(2);
+  const [template, setTemplate] = useState('{channel}/{title} ({date})');
+  const [rateLimit, setRateLimit] = useState('');
+  const [thumbnails, setThumbnails] = useState(true);
 
   const setRule = (id: string, on: boolean) => setRules((r) => ({ ...r, [id]: on }));
 
@@ -100,7 +120,10 @@ function ComponentsDemo() {
         actions={<TabPills label="Theme" items={themeItems} value={theme} onChange={setTheme} />}
       />
 
-      <Story name="PageHeader" note="title, sub, actions (stat cards or tab pills); wraps">
+      <Story
+        name="PageHeader"
+        note="title, sub, actions (stat cards or tab pills); wraps · without sub the sub line is still reserved, so pills sit at the same height"
+      >
         <div className="grid gap-8">
           <PageHeader
             title="What's new"
@@ -119,6 +142,17 @@ function ComponentsDemo() {
             actions={
               <TabPills
                 label="Music view"
+                items={musicTabs}
+                value={musicTab}
+                onChange={setMusicTab}
+              />
+            }
+          />
+          <PageHeader
+            title="Settings"
+            actions={
+              <TabPills
+                label="Music view (no sub)"
                 items={musicTabs}
                 value={musicTab}
                 onChange={setMusicTab}
@@ -221,6 +255,56 @@ function ComponentsDemo() {
             <Input id="demo-path" mono defaultValue="/config/cookies.txt" />
           </div>
         </div>
+      </Story>
+
+      <Story
+        name="Settings: SettingsCard, KeyValueGrid, SettingsNote"
+        note="card 22px 24px radius 14 gap 16 · grid 180px 1fr · value box surface Space Mono 13 · text commits on blur or Enter"
+      >
+        <SettingsColumn>
+          <SettingsCard title="Format">
+            <SettingsRow description="SettingsRow: a description with a control on the right.">
+              <Button variant="outlined">Check now</Button>
+            </SettingsRow>
+            <KeyValueGrid>
+              <KeyValueRow label="Path" control={false}>
+                <KeyValueText>/media/video</KeyValueText>
+              </KeyValueRow>
+              <KeyValueRow label="Quality">
+                <Select options={qualityOptions} value={quality} onChange={setQuality} />
+              </KeyValueRow>
+              <KeyValueRow label="Downloads at once">
+                <NumberInput min={1} max={5} value={downloads} onChange={setDownloads} />
+              </KeyValueRow>
+              <KeyValueRow label="Folder structure">
+                <TextValueInput value={template} onCommit={setTemplate} />
+              </KeyValueRow>
+              <KeyValueRow label="Rate limit">
+                <TextValueInput
+                  value={rateLimit}
+                  placeholder="none"
+                  validate={(text) =>
+                    text === '' || /^\d+[KMG]?$/i.test(text)
+                      ? undefined
+                      : 'Use a rate such as 500K or 5M'
+                  }
+                  onCommit={setRateLimit}
+                />
+              </KeyValueRow>
+            </KeyValueGrid>
+            <ToggleRow
+              label="Save thumbnails"
+              description="As a sidecar file, for Plex."
+              checked={thumbnails}
+              onChange={setThumbnails}
+            />
+            <SettingsNote size="small">SettingsNote size=small: a note inside a card.</SettingsNote>
+          </SettingsCard>
+          <SettingsNote>SettingsNote: a status line under the cards.</SettingsNote>
+          <SettingsNote size="small">
+            Paths are container mounts. Change them in your Docker configuration.
+          </SettingsNote>
+        </SettingsColumn>
       </Story>
 
       <Story name="Toggle, ToggleRow" note="44×26 switch, knob left 3px → 21px, left .15s">

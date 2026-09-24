@@ -1,7 +1,9 @@
+import type { ReactNode } from 'react';
 import { createFileRoute, linkOptions, redirect } from '@tanstack/react-router';
-import { PlaceholderPage } from '../components/PlaceholderPage';
 import { AdvancedSettings } from '../components/settings/AdvancedSettings';
 import { GeneralSettings } from '../components/settings/GeneralSettings';
+import { MusicSettings } from '../components/settings/MusicSettings';
+import { VideoSettings } from '../components/settings/VideoSettings';
 import { PageHeader } from '../components/ui/PageHeader';
 import { TabPillLinks } from '../components/ui/TabPills';
 import {
@@ -39,24 +41,24 @@ export const Route = createFileRoute('/settings/$tab')({
   component: SettingsPage,
 });
 
+const TAB_CONTENT: Record<SettingsTab, () => ReactNode> = {
+  general: GeneralSettings,
+  music: MusicSettings,
+  video: VideoSettings,
+  advanced: AdvancedSettings,
+};
+
 function SettingsPage() {
   const { tab } = Route.useParams();
-  const tabs = <TabPillLinks label="Settings section" items={settingsTabItems} value={tab} />;
-  const content =
-    tab === 'general' ? <GeneralSettings /> : tab === 'advanced' ? <AdvancedSettings /> : null;
-  if (content) {
-    return (
-      <>
-        <PageHeader title="Settings" actions={tabs} />
-        {content}
-      </>
-    );
-  }
+  const Content = TAB_CONTENT[tab];
   return (
-    <PlaceholderPage
-      title="Settings"
-      sub={`${TAB_LABELS[tab]}. Nothing here yet.`}
-      actions={tabs}
-    />
+    <>
+      {/* No sub: the handoff shows "Settings" and the tab pills only. */}
+      <PageHeader
+        title="Settings"
+        actions={<TabPillLinks label="Settings section" items={settingsTabItems} value={tab} />}
+      />
+      <Content />
+    </>
   );
 }
