@@ -23,6 +23,8 @@ packages/api/src
   activity/             HistoryService over the history table (global module; controller in Stage 4)
   sources/              URL resolution, source CRUD, rules and the subscribe toggle
   system/               GET /api/system/info and /logs, the backup and rescan stubs (see System)
+  jobs/                 the jobs queue (JobsService), the worker pool (JobsWorker) and the JobRunner seam
+  sync/                 rule evaluation (evaluateItem); the sync scheduler joins it in Stage 4
 packages/api/test       end-to-end tests booting the real AppModule
 ```
 
@@ -163,6 +165,49 @@ The contract is `packages/shared/src/rules.ts`; the tables are in the database s
 The API test suite has no network: `test/setup.ts` (a Vitest setup file) replaces `fetch` with one that rejects, so booting `AppModule` in an e2e test starts an install that fails at once. Tests that need GitHub stub `fetch` with `vi.stubGlobal` (see `ytdlp-binary.service.spec.ts`, which serves a fake release whose asset is a tiny shell script printing a version, and `test/ytdlp.e2e.spec.ts`, whose fetch never answers).
 
 `packages/api/test/fixtures/fake-yt-dlp` is a Node script that stands in for yt-dlp without network access. Construct the runner with `new YtdlpRunner({ path: () => FAKE })`, set `YTDLP_PATH` to it, or override `YTDLP_BINARY` in a testing module. It serves the trimmed real JSON in `test/fixtures/ytdlp` (`channel.json` for channel URLs, `playlist.json` for `list=` URLs, `video.json` for `watch?v=` URLs), prints real-shaped progress lines for downloads and writes the output file. Env switches: `FAKE_YTDLP_FAIL`, `FAKE_YTDLP_EXIT`, `FAKE_YTDLP_DELAY_MS`, `FAKE_YTDLP_STDOUT`, `FAKE_YTDLP_FIXTURE`, `FAKE_YTDLP_ARGS_FILE` (records argv), `FAKE_YTDLP_VERSION`. Never call the real binary from the test suite.
+
+## Jobs
+
+`src/jobs/` owns the `jobs` table (see the database skill) and runs it. `JobsModule.forRoot({ imports?, runners? })` is registered once in `AppModule` and is global, so any module can inject `JobsService`.
+
+- **Enqueue**: `jobs.enqueue({ type, payload, key?, priority?, maxAttempts? })` → `{ job, created }`. `payload` is JSON with a `title` (the queue row title), optional `subtitle` (channel or artist) and `historyKind` (`video`/`music`/`system`, used for a final failure's history row), plus whatever the runner needs (`{ videoId }`, `{ sourceId }`). `key` de-duplicates: while a job with the same `type` and `key` is queued or running, the existing job is returned (`created: false`). Use `video:<youtube id>`, `track:<youtube id>`, `source:<id>`. Higher `priority` runs first, then the oldest id.
+- **Queue view**: `listQueue(): Job[]` (shared `Job` DTO: running first, then queued, each in pick order) and `activeCount()` for the badge. The Activity endpoints wrap these and `HistoryService.recent()`.
+- **Control**: `cancel(id)` marks a queued or running job `cancelled` and aborts its runner; `updateProgress(id, { progress, speedBytesPerSec, etaSeconds })` (running jobs only). `complete`, `fail`, `claimNext`, `requeue` and `recoverInterrupted` are the worker's.
+- **Retries**: `attempts` counts failed attempts. A failure below `max_attempts` (default 3) requeues the job with `run_after` 1, 5, then 25 minutes later (`retryDelayMs`) and keeps the error on the row; the last failure marks it `failed` and records a `failed` history row with the error as details. A runner throws `PermanentJobError` when a retry cannot help (fails at once). yt-dlp errors are recorded by their `reason` (the last `ERROR:` line).
+- **Worker** (`JobsWorker`): starts on `onApplicationBootstrap`, first moving jobs left `running` by a crash back to `queued` (attempts unchanged). Polls every 2 s and at once after an enqueue or a finished job. Runs up to `general.downloadsAtOnce` `download` jobs at once (read from settings on every poll, so a change applies without a restart; lowering it lets running jobs finish) and at most one job of each other type. Claims are one `UPDATE … WHERE id IN (SELECT … LIMIT 1) AND status = 'queued' RETURNING` (SQLite is single-writer). Success marks the job `done` and records the runner's outcome in history. On shutdown it aborts running jobs and requeues them. Jobs of a type without a runner stay queued.
+- **Adding a runner**: implement `JobRunner` (`src/jobs/job-runner.ts`):
+
+  ```ts
+  @Injectable()
+  export class DownloadRunner implements JobRunner {
+    readonly type = 'download';
+    async run(job: JobRow, { signal, progress }: JobContext): Promise<JobOutcome> {
+      // pass `signal` to runner.download(); call progress({ progress, speedBytesPerSec, etaSeconds })
+      return { kind: 'video', title: job.payload.title, result: 'done', details: null };
+    }
+  }
+  ```
+
+  and list it in `AppModule`: `JobsModule.forRoot({ imports: [YtdlpModule, …], runners: [DownloadRunner] })`. Runner classes become providers of `JobsModule` (so they can inject `JobsService` to enqueue follow-up work) and are collected into the `JOB_RUNNERS` array the worker reads; one runner per type. Honour `signal`: a cancel or shutdown aborts it, and the worker ignores the run's result afterwards. Progress writes are throttled to one per 500 ms.
+
+- **Tests**: `jobs.service.spec.ts` and `jobs.worker.spec.ts` use `test/jobs-harness.ts` (in-memory database, real `JobsService`/`SettingsService`/`HistoryService`, a hand-moved clock via the `JOBS_CLOCK` seam) and fake runners whose runs the test resolves or rejects.
+
+## Sync rules
+
+`src/sync/rules.ts` holds `evaluateItem(entry, rules, now)`: a pure function over one `SourceMetadata` entry (optionally with `albumType`) and a source's `Rules`, returning `{ accept: true }` or `{ accept: false, reason: SkipReason, transient }`. The first failing rule wins:
+
+| Library | Rule                 | Reason                 | Rejects                                                                                              |
+| ------- | -------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------- |
+| both    | (always)             | `upcoming` (transient) | `liveStatus` `is_upcoming`                                                                           |
+| both    | (always)             | `live` (transient)     | `liveStatus` `is_live` or `post_live`: never download an ongoing stream                              |
+| video   | `skipShorts`         | `short`                | `isShort`                                                                                            |
+| video   | `publishedAfter`     | `published_before`     | upload date before the date; the same day is accepted                                                |
+| video   | `keepDays`           | `older_than_keep_days` | upload date before `now` minus `keepDays` days (UTC date; the boundary day is accepted)              |
+| video   | `titleFilter`        | `title_filter`         | title without the case-insensitive substring (no title never matches)                                |
+| music   | `skipLiveRecordings` | `live`                 | title with the word "live" (`\blive\b`, case-insensitive: "Live at…", "(Live)", not "Olive")         |
+| music   | `downloadFullAlbums` | `not_album`            | `albumType === 'single'`; flat listings carry no album info, so unknown is accepted (Stage 6 groups) |
+
+Entries without a date pass the date rules (flat listings omit dates now and then; yt-dlp's flat dates are approximate to the day). The sync stores non-transient rejections as `skipped` items with the reason and leaves transient ones for the next check.
 
 ## Testing
 

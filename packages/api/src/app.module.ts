@@ -4,6 +4,7 @@ import { ActivityModule } from './activity/activity.module.js';
 import { ConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
+import { JobsModule } from './jobs/jobs.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { SourcesModule } from './sources/sources.module.js';
 import { SystemModule } from './system/system.module.js';
@@ -17,6 +18,8 @@ import { YtdlpModule } from './ytdlp/ytdlp.module.js';
     ScheduleModule.forRoot(),
     ActivityModule,
     HealthModule,
+    // Queue and worker. Stage 4's sync and download runners register here.
+    JobsModule.forRoot(),
     SettingsModule,
     SourcesModule,
     SystemModule,

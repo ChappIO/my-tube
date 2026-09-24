@@ -1,6 +1,14 @@
-import type { Rules } from '@mytube/shared';
+import type { ItemStatus, JobStatus, JobType, Rules, SkipReason } from '@mytube/shared';
 import { sql } from 'drizzle-orm';
-import { index, integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core';
+import {
+  index,
+  integer,
+  real,
+  sqliteTable,
+  text,
+  unique,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
 
 /**
  * Drizzle schema. This is the typed view of the tables; the tables themselves are
@@ -114,3 +122,148 @@ export const ytdlpState = sqliteTable('ytdlp_state', {
   lastUpdatedAt: text('last_updated_at'),
   lastError: text('last_error'),
 });
+
+// Items and the jobs queue (migration 20260925090000_items). Status lifecycle: database skill.
+
+/** A known video. `status` is the shared `ItemStatus`; `skipReason` a `SkipReason`. */
+export const videos = sqliteTable(
+  'videos',
+  {
+    id: integer('id').primaryKey(),
+    channelId: integer('channel_id')
+      .notNull()
+      .references(() => channels.id),
+    sourceId: integer('source_id').references(() => sources.id, { onDelete: 'set null' }),
+    youtubeId: text('youtube_id').notNull().unique(),
+    title: text('title').notNull(),
+    durationSeconds: integer('duration_seconds'),
+    publishedAt: text('published_at'),
+    thumbnailUrl: text('thumbnail_url'),
+    isShort: integer('is_short', { mode: 'boolean' }).notNull().default(false),
+    liveStatus: text('live_status'),
+    status: text('status').$type<ItemStatus>().notNull().default('wanted'),
+    skipReason: text('skip_reason').$type<SkipReason>(),
+    filePath: text('file_path'),
+    fileSizeBytes: integer('file_size_bytes'),
+    downloadedAt: text('downloaded_at'),
+    ...timestamps,
+  },
+  (table) => [
+    index('videos_channel_id').on(table.channelId),
+    index('videos_source_id').on(table.sourceId),
+    index('videos_status').on(table.status),
+    index('videos_published_at').on(table.publishedAt),
+  ],
+);
+
+export const albums = sqliteTable(
+  'albums',
+  {
+    id: integer('id').primaryKey(),
+    artistId: integer('artist_id')
+      .notNull()
+      .references(() => artists.id),
+    youtubeId: text('youtube_id').unique(),
+    title: text('title').notNull(),
+    year: integer('year'),
+    coverUrl: text('cover_url'),
+    trackCount: integer('track_count'),
+    ...timestamps,
+  },
+  (table) => [index('albums_artist_id').on(table.artistId)],
+);
+
+/** A known track. `albumId` is null until album grouping assigns one. */
+export const tracks = sqliteTable(
+  'tracks',
+  {
+    id: integer('id').primaryKey(),
+    albumId: integer('album_id').references(() => albums.id),
+    artistId: integer('artist_id')
+      .notNull()
+      .references(() => artists.id),
+    sourceId: integer('source_id').references(() => sources.id, { onDelete: 'set null' }),
+    youtubeId: text('youtube_id').notNull().unique(),
+    title: text('title').notNull(),
+    trackNumber: integer('track_number'),
+    discNumber: integer('disc_number'),
+    durationSeconds: integer('duration_seconds'),
+    publishedAt: text('published_at'),
+    thumbnailUrl: text('thumbnail_url'),
+    status: text('status').$type<ItemStatus>().notNull().default('wanted'),
+    skipReason: text('skip_reason').$type<SkipReason>(),
+    filePath: text('file_path'),
+    fileSizeBytes: integer('file_size_bytes'),
+    downloadedAt: text('downloaded_at'),
+    ...timestamps,
+  },
+  (table) => [
+    index('tracks_album_id').on(table.albumId),
+    index('tracks_artist_id').on(table.artistId),
+    index('tracks_source_id').on(table.sourceId),
+    index('tracks_status').on(table.status),
+    index('tracks_published_at').on(table.publishedAt),
+  ],
+);
+
+/** Ordered playlist entries; exactly one of `videoId` and `trackId` is set (CHECK). */
+export const playlistItems = sqliteTable(
+  'playlist_items',
+  {
+    id: integer('id').primaryKey(),
+    playlistId: integer('playlist_id')
+      .notNull()
+      .references(() => playlists.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull(),
+    videoId: integer('video_id').references(() => videos.id),
+    trackId: integer('track_id').references(() => tracks.id),
+  },
+  (table) => [
+    unique().on(table.playlistId, table.position),
+    index('playlist_items_video_id').on(table.videoId),
+    index('playlist_items_track_id').on(table.trackId),
+  ],
+);
+
+/** The work queue. Written through `JobsService` only. */
+export const jobs = sqliteTable(
+  'jobs',
+  {
+    id: integer('id').primaryKey(),
+    type: text('type').$type<JobType>().notNull(),
+    status: text('status').$type<JobStatus>().notNull().default('queued'),
+    /** JSON: always `title` (and optionally `subtitle`) plus runner-specific fields. */
+    payload: text('payload', { mode: 'json' }).$type<JobPayload>().notNull(),
+    /** Identifies the work for de-duplication among queued and running jobs. */
+    dedupeKey: text('dedupe_key'),
+    priority: integer('priority').notNull().default(0),
+    attempts: integer('attempts').notNull().default(0),
+    maxAttempts: integer('max_attempts').notNull().default(3),
+    runAfter: text('run_after'),
+    progress: real('progress'),
+    speedBytesPerSec: integer('speed_bytes_per_sec'),
+    etaSeconds: integer('eta_seconds'),
+    error: text('error'),
+    createdAt: text('created_at').notNull().default(now),
+    startedAt: text('started_at'),
+    finishedAt: text('finished_at'),
+    updatedAt: text('updated_at').notNull().default(now),
+  },
+  (table) => [
+    index('jobs_pick').on(table.status, table.priority, table.runAfter, table.id),
+    uniqueIndex('jobs_active_key')
+      .on(table.type, table.dedupeKey)
+      .where(sql`dedupe_key IS NOT NULL AND status IN ('queued', 'running')`),
+  ],
+);
+
+/** The JSON in `jobs.payload`: display fields plus whatever the job's runner needs. */
+export interface JobPayload {
+  /** Shown as the queue row title. */
+  title: string;
+  /** Shown under the title (channel or artist), when set. */
+  subtitle?: string | null;
+  /** History kind of a final failure (`system` when absent). Success uses the runner's. */
+  historyKind?: HistoryKind;
+  [field: string]: unknown;
+}

@@ -46,6 +46,10 @@ Every item row (video, track) carries: youtube id, title, duration, published da
 
 Job types: `download`, `check_source`, `retention`, `rescan`, `backup`.
 
+Job statuses: `queued`, `running`, `done`, `failed`, `cancelled`. Retries back off 1, 5 and 25 minutes; the worker runs up to "Downloads at once" downloads and one job of each other type at a time (backend skill "Jobs").
+
+**`keepDays` also limits what is downloaded.** A video source's keep window is applied at fetch time as well as by retention: the sync skips entries older than `keepDays` (`older_than_keep_days`) because retention would delete them on its next run, so downloading them is wasted bandwidth and disk churn. A newly added channel with `keep 90 days` downloads only the last 90 days. `publishedAfter` is the fixed-date counterpart; both may apply. Ongoing and upcoming streams are never downloaded in either library; they are evaluated again on the next check.
+
 ## Backend modules
 
 One folder per module under `packages/api/src` (see the backend skill for conventions).
