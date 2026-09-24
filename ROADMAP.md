@@ -59,6 +59,12 @@ Skills: backend, database, frontend. Handoff: Screen 3 Channels tab and Channel 
 - [x] **Add modal.** URL input with detection, source card, Save-to switch that swaps the rule set, rule checkbox rows, Cancel and Subscribe. Done when subscribing closes the modal and the new source appears in Channels.
 - [x] **Channels tab and channel page.** Channel rows with rule chips, checked-ago, bell toggle and Edit rules, the collapse below 760px, and the channel page header with back link. Bell state shared between list and page with optimistic updates. Done when both screens match the handoff with real sources.
 
+## Stage 3b: Matcher rules
+
+Skills: architecture (settled decisions), backend, database, frontend. Decided by Thomas on 2026-09-25 while validating Stage 3.
+
+- [ ] **Matcher rules.** Replace the flat per-source rules with an expression tree: AND, OR, NOT gates over predicates (title contains, title matches regex, is short, published before/after a date, older than N days, duration under/over, live status, channel name for playlists). One tree per source decides both what is downloaded at sync and what stays: a periodic revalidation re-evaluates on-disk items against the current tree and removes files that no longer match, recording each removal in history (this replaces the Stage 7 retention job; "keep the last N days" is `NOT(older than N days)`). Saving a rule change previews what it would remove. Options that are not predicates (subtitles, thumbnails, cover art and tags, playlist-order numbering) stay as plain source options. Builder-only UI in the Add and Edit modals, seeded from per-library default trees in Settings → Video and Settings → Music, edited with the same builder; chips render from the tree. One-time conversion of stored rules. Done when a nested rule such as `no shorts AND (title contains "Artemis" OR title contains "Orion") AND NOT older than 90 days` can be built, saved, applied by a sync, and shown as chips, and a tightened rule removes a downloaded file after revalidation with a history entry.
+
 ## Stage 4: Sync, queue and Activity
 
 Skills: backend, database, frontend. Handoff: Screen 5 Activity, Sidebar badge.
@@ -92,7 +98,7 @@ Skills: frontend, backend, database. Handoff: Screen 2 Music, Components open mu
 
 Skills: backend, database. Handoff: Screen 6 Advanced, Screen 5 History entries.
 
-- [ ] **Retention job.** Scheduled deletion of files older than a source's keep window, items marked missing, history entries with the "removed, older than N days" result. Done when a test proves an unsubscribed source is never cleaned by retention alone.
+- [x] **Retention job.** Superseded by Stage 3b: retention is the matcher revalidation.
 - [ ] **Rescan.** Walk the mounts, reconcile on-disk status and sizes, report counts. Wired to the Settings button (replaces the 501 stub of `POST /api/system/rescan`). Fill the Settings → Music / Video Library "Size" rows (`282 GB · 3,104 tracks`), which show "— · —" until then. Done when deleting a file outside the app shows as missing after a rescan.
 - [ ] **Backups.** Scheduled database backup into `CONFIG_DIR/backups` with rotation and Back up now (replaces the 501 stub of `POST /api/system/backup`). The log file (`CONFIG_DIR/logs/mytube.log`, rotated, at `data.logLevel`) and per-job yt-dlp logs were pulled forward into Stage 4 and are done. Done when the Data card shows the last backup time.
 - [ ] **Empty and error states.** Plain muted copy for every screen with no data and for API failures. Done when a fresh install shows sensible text on every route.
