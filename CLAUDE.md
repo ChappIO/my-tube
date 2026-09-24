@@ -25,7 +25,7 @@ The owner and a few friends. No public marketing. UI copy is dry and technical. 
 
 - **Library**: Music or Video. Every downloaded item belongs to exactly one.
 - **Subscription**: an artist, channel or playlist that is checked for new content on a schedule, with its own rules.
-- **Rules**: per-subscription filters such as skip shorts, keep last N days, only titles matching, skip live recordings, download full albums.
+- **Rules**: per-subscription filters such as skip shorts, keep last N days, only titles matching, skip live recordings.
 - **Queue**: downloads in progress or waiting.
 - **History**: completed downloads, retention deletions, and yt-dlp updates.
 - **On disk / missing**: whether a known track or video actually exists in the library mount.

@@ -36,12 +36,6 @@ export function RuleRows({ draft, onChange, kind }: RuleRowsProps) {
             onChange={(skipLiveRecordings) => onChange({ ...draft, skipLiveRecordings })}
           />
           <CheckboxRow
-            label="Download full albums"
-            hint="not singles"
-            checked={draft.downloadFullAlbums}
-            onChange={(downloadFullAlbums) => onChange({ ...draft, downloadFullAlbums })}
-          />
-          <CheckboxRow
             label="Embed cover art"
             hint="from YouTube Music"
             checked={draft.embedCoverArt}

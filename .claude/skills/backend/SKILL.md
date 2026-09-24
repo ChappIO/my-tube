@@ -101,8 +101,8 @@ Env (`AppConfig`) stays for what is known before the database exists: mount path
 The contract is `packages/shared/src/rules.ts`; the tables are in the database skill ("Sources and catalog").
 
 - `Library` (`video`, `music`) and `SourceKind` (`channel`, `artist`, `playlist`).
-- `Rules` is a discriminated union on `library`. Video: `skipShorts` (true), `keepDays` (90, null keeps forever), `publishedAfter` (null; ISO `YYYY-MM-DD`, only items published on or after it are downloaded; independent of `keepDays`: the date decides what comes in, the day window decides what retention deletes, both may be set; the sync maps it to yt-dlp `--dateafter`), `titleFilter` (null; case-insensitive plain substring, no wildcards or regex), `syncOrder` (false; playlists only). Music: `skipLiveRecordings` (false), `downloadFullAlbums` (true), `embedCoverArt` (true). `DEFAULT_VIDEO_RULES`, `DEFAULT_MUSIC_RULES` and `defaultRules(library)` are the handoff defaults; new video sources should take `keepDays` and `skipShorts` from Settings → Video.
-- `describeRules(rules)` returns the handoff's chip labels in order: `no shorts`, `keep 90 days` (`keep 1 day`), `since 2025-01-01`, `only "Monologue"`, `sync order`, `no live`, `full albums`, `cover art`. Rules that are off give no chip.
+- `Rules` is a discriminated union on `library`. Video: `skipShorts` (true), `keepDays` (90, null keeps forever), `publishedAfter` (null; ISO `YYYY-MM-DD`, only items published on or after it are downloaded; independent of `keepDays`: the date decides what comes in, the day window decides what retention deletes, both may be set; the sync maps it to yt-dlp `--dateafter`), `titleFilter` (null; case-insensitive plain substring, no wildcards or regex), `syncOrder` (false; playlists only). Music: `skipLiveRecordings` (false), `embedCoverArt` (true). There is no album-only rule: an artist source downloads albums and singles alike. `DEFAULT_VIDEO_RULES`, `DEFAULT_MUSIC_RULES` and `defaultRules(library)` are the handoff defaults; new video sources should take `keepDays` and `skipShorts` from Settings → Video.
+- `describeRules(rules)` returns the handoff's chip labels in order: `no shorts`, `keep 90 days` (`keep 1 day`), `since 2025-01-01`, `only "Monologue"`, `sync order`, `no live`, `cover art`. Rules that are off give no chip.
 - `Source` is the DTO for one `sources` row: `id`, `library`, `kind`, `youtubeId`, `url`, `name`, `avatarUrl`, `subscribed`, `rules`, `lastCheckedAt`, `itemCount`, `sizeBytes`, `createdAt`, `updatedAt`. A Drizzle row parses directly.
 - `sourceIssues({ library, kind, rules })` lists invalid combinations (rules of the other library, an artist outside Music, sync order on a non-playlist). `Source` applies it; reuse it in create and update inputs.
 
@@ -194,18 +194,17 @@ The API test suite has no network: `test/setup.ts` (a Vitest setup file) replace
 
 ## Sync rules
 
-`src/sync/rules.ts` holds `evaluateItem(entry, rules, now)`: a pure function over one `SourceMetadata` entry (optionally with `albumType`) and a source's `Rules`, returning `{ accept: true }` or `{ accept: false, reason: SkipReason, transient }`. The first failing rule wins:
+`src/sync/rules.ts` holds `evaluateItem(entry, rules, now)`: a pure function over one `SourceMetadata` entry and a source's `Rules`, returning `{ accept: true }` or `{ accept: false, reason: SkipReason, transient }`. The first failing rule wins:
 
-| Library | Rule                 | Reason                 | Rejects                                                                                              |
-| ------- | -------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------- |
-| both    | (always)             | `upcoming` (transient) | `liveStatus` `is_upcoming`                                                                           |
-| both    | (always)             | `live` (transient)     | `liveStatus` `is_live` or `post_live`: never download an ongoing stream                              |
-| video   | `skipShorts`         | `short`                | `isShort`                                                                                            |
-| video   | `publishedAfter`     | `published_before`     | upload date before the date; the same day is accepted                                                |
-| video   | `keepDays`           | `older_than_keep_days` | upload date before `now` minus `keepDays` days (UTC date; the boundary day is accepted)              |
-| video   | `titleFilter`        | `title_filter`         | title without the case-insensitive substring (no title never matches)                                |
-| music   | `skipLiveRecordings` | `live`                 | title with the word "live" (`\blive\b`, case-insensitive: "Live at…", "(Live)", not "Olive")         |
-| music   | `downloadFullAlbums` | `not_album`            | `albumType === 'single'`; flat listings carry no album info, so unknown is accepted (Stage 6 groups) |
+| Library | Rule                 | Reason                 | Rejects                                                                                      |
+| ------- | -------------------- | ---------------------- | -------------------------------------------------------------------------------------------- |
+| both    | (always)             | `upcoming` (transient) | `liveStatus` `is_upcoming`                                                                   |
+| both    | (always)             | `live` (transient)     | `liveStatus` `is_live` or `post_live`: never download an ongoing stream                      |
+| video   | `skipShorts`         | `short`                | `isShort`                                                                                    |
+| video   | `publishedAfter`     | `published_before`     | upload date before the date; the same day is accepted                                        |
+| video   | `keepDays`           | `older_than_keep_days` | upload date before `now` minus `keepDays` days (UTC date; the boundary day is accepted)      |
+| video   | `titleFilter`        | `title_filter`         | title without the case-insensitive substring (no title never matches)                        |
+| music   | `skipLiveRecordings` | `live`                 | title with the word "live" (`\blive\b`, case-insensitive: "Live at…", "(Live)", not "Olive") |
 
 Entries without a date pass the date rules (flat listings omit dates now and then; yt-dlp's flat dates are approximate to the day). The sync stores non-transient rejections as `skipped` items with the reason and leaves transient ones for the next check.
 

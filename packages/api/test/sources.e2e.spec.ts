@@ -253,7 +253,7 @@ describe('Sources (e2e)', () => {
         library: 'music',
         kind: 'artist',
         url: `https://music.youtube.com/channel/${NASA}`,
-        rules: { library: 'music', skipLiveRecordings: false, downloadFullAlbums: true },
+        rules: { library: 'music', skipLiveRecordings: false, embedCoverArt: true },
       });
       expect(catalogRow('artists', NASA)).toMatchObject({ source_id: artist.id });
 

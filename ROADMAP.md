@@ -65,7 +65,7 @@ Skills: backend, database, frontend. Handoff: Screen 5 Activity, Sidebar badge.
 
 - [x] **Items tables.** Migration for `videos`, `tracks`, `albums`, `playlist_items` with the shared item fields and status enum. Done when the database skill documents the status lifecycle.
 - [x] **Jobs table and worker.** Migration for `jobs`, a worker loop honouring downloads-at-once, retries with backoff, cancellation, progress and speed updates, history rows on completion and failure. Done when unit tests cover ordering, concurrency and failure without a real download.
-- [x] **Rule evaluation.** A pure function deciding which fetched items a source's rules accept (shorts, title match, live recordings, full albums only). Done when every rule has a unit test.
+- [x] **Rule evaluation.** A pure function deciding which fetched items a source's rules accept (shorts, title match, live recordings). Done when every rule has a unit test.
 - [ ] **Sync scheduler.** `check_source` jobs on the settings interval, fetching metadata through the runner, diffing against known items, inserting new ones and enqueueing downloads. Updates `last_checked_at`. Done when adding a subscribed source results in queued downloads within one interval.
 - [ ] **Download job.** Runs the runner with format, container, subtitles and thumbnail options from settings, writes to the templated path, marks the item on disk with size, and stores the sidecar thumbnail. Done when a real small video lands in the video mount with the right name.
 - [ ] **Activity screen and badge.** Queue rows with progress bars, history table with day grouping and the narrow collapse, polling while open, and the sidebar badge count on a slower poll. Done when a running download visibly progresses without reloading.

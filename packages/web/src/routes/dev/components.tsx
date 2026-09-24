@@ -85,7 +85,7 @@ const rulesByLibrary: Record<Library, { id: string; label: string; hint: string 
   ],
   music: [
     { id: 'live', label: 'Skip live recordings', hint: 'title contains "live"' },
-    { id: 'albums', label: 'Download full albums', hint: 'not singles' },
+    { id: 'cover', label: 'Embed cover art', hint: 'from YouTube Music' },
     { id: 'cover', label: 'Embed cover art', hint: 'from YouTube Music' },
   ],
 };

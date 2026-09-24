@@ -25,7 +25,6 @@ export const SKIP_REASONS = [
   'older_than_keep_days',
   'live',
   'upcoming',
-  'not_album',
 ] as const;
 export const SkipReason = z.enum(SKIP_REASONS);
 export type SkipReason = z.infer<typeof SkipReason>;
