@@ -5,7 +5,7 @@ description: How the MyTube API (NestJS, packages/api) is structured, how config
 
 # Backend
 
-The API is NestJS 12 (ESM) in `packages/api`. Everything is served under the `/api` global prefix. In production it also serves the built web app from `packages/web/dist` with an SPA fallback, so there is one process and one port. See the tooling skill for commands.
+The API is NestJS 12 (ESM) in `packages/api`. Everything is served under the `/api` global prefix. In production it also serves the built web app from `packages/web/dist` with an SPA fallback (`WebModule`, plain Express handlers registered on the adapter, dot-directory safe), so there is one process and one port. See the tooling skill for commands.
 
 ## Layout
 
@@ -17,6 +17,7 @@ packages/api/src
   database/             SQLite via Drizzle, SQL migrations (see database skill)
   common/               cross-cutting helpers such as ZodValidationPipe
   health/               example feature module (controller only)
+  web/                  serves packages/web/dist next to the API with an SPA fallback
   ytdlp/                the yt-dlp runner (the only code that spawns yt-dlp)
   settings/             SettingsService over the settings table, GET/PATCH /api/settings
 packages/api/test       end-to-end tests booting the real AppModule
