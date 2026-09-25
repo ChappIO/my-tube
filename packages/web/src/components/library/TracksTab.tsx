@@ -8,7 +8,8 @@ import { useDebounced } from '../../use-debounced';
 import { useNow } from '../../use-now';
 import { StatusLine } from '../sources/SourceBits';
 import { Button } from '../ui/Button';
-import { Body } from '../ui/typography';
+import { EmptyState } from '../ui/EmptyState';
+import { ErrorState, fromQuery, loadFailed } from '../ui/ErrorState';
 import { TrackTable } from './TrackTable';
 import { TrackSortPills, TracksToolbar } from './TracksToolbar';
 import {
@@ -61,14 +62,14 @@ export function TracksTab() {
         count={first ? trackCountText(first.total, first.libraryTotal) : undefined}
       />
       <TrackSortPills sort={state.sort} dir={state.dir} onSort={onSort} />
-      {tracks.isPending ? (
+      {loadFailed(tracks) ? (
+        <ErrorState what="the tracks" {...fromQuery(tracks)} />
+      ) : tracks.isPending ? (
         <StatusLine>Loading tracks.</StatusLine>
-      ) : tracks.isError ? (
-        <StatusLine>Could not load the tracks.</StatusLine>
       ) : first?.libraryTotal === 0 ? (
-        <Body muted>No tracks yet.</Body>
+        <EmptyState>No tracks yet. Add an artist with + Add to library.</EmptyState>
       ) : items.length === 0 ? (
-        <Body muted>No tracks match.</Body>
+        <EmptyState>No tracks match.</EmptyState>
       ) : (
         <TrackTable
           tracks={items}
@@ -90,7 +91,14 @@ export function TracksTab() {
           </Button>
         </div>
       )}
-      {tracks.isFetchNextPageError && <StatusLine>Could not load more tracks.</StatusLine>}
+      {tracks.isFetchNextPageError && (
+        <ErrorState
+          what="more tracks"
+          error={tracks.error}
+          onRetry={() => void tracks.fetchNextPage()}
+          retrying={tracks.isFetchingNextPage}
+        />
+      )}
     </>
   );
 }

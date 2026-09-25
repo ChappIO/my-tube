@@ -12,7 +12,7 @@ export type LogsDownload =
 
 /**
  * Facts about the running instance for Settings (mount paths, version) and the log download.
- * Backups and rescans are Stage 7 (maintenance) and not implemented here yet.
+ * Backups and rescans are in `src/maintenance`.
  */
 @Injectable()
 export class SystemService {

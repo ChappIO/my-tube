@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ApiError, apiErrorMessage } from './client';
+import { z } from 'zod';
+import { ApiError, apiErrorMessage, loadErrorDetail } from './client';
 import { conflictSourceId } from './sources';
 
 describe('apiErrorMessage', () => {
@@ -25,6 +26,25 @@ describe('apiErrorMessage', () => {
     expect(apiErrorMessage(new Error('offline'), 'fallback')).toBe('fallback');
     expect(apiErrorMessage(new ApiError(500, '<html>'), 'fallback')).toBe('fallback');
     expect(apiErrorMessage(new ApiError(500, '{}'), 'fallback')).toBe('fallback');
+  });
+});
+
+describe('loadErrorDetail', () => {
+  it('uses the API message, else the status', () => {
+    const nest = JSON.stringify({ statusCode: 500, message: 'Internal server error' });
+    expect(loadErrorDetail(new ApiError(500, nest))).toBe('Internal server error.');
+    expect(loadErrorDetail(new ApiError(502, ''))).toBe('The server answered 502.');
+  });
+
+  it('says when the server did not answer', () => {
+    expect(loadErrorDetail(new TypeError('Failed to fetch'))).toBe('The server did not answer.');
+  });
+
+  it('names a response of the wrong shape and other errors', () => {
+    const parsed = z.object({ id: z.number() }).safeParse({});
+    expect(loadErrorDetail(parsed.error)).toBe('The answer was not in the expected shape.');
+    expect(loadErrorDetail(new Error('Boom'))).toBe('Boom.');
+    expect(loadErrorDetail('what')).toBe('Unknown error.');
   });
 });
 

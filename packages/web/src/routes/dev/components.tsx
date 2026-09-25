@@ -5,6 +5,8 @@ import { BackLink } from '../../components/ui/BackLink';
 import { MUSIC_TABS, TAB_ICONS, TAB_LABELS } from '../../navigation';
 import { Button } from '../../components/ui/Button';
 import { CheckboxRow } from '../../components/ui/CheckboxRow';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { IconButton } from '../../components/ui/IconButton';
 import { Input } from '../../components/ui/Input';
 import { KeyValueGrid, KeyValueRow, KeyValueText } from '../../components/ui/KeyValueGrid';
@@ -368,6 +370,29 @@ function ComponentsDemo() {
             <Meta tone="red">missing</Meta>
           </Row>
           <FieldLabel>FieldLabel</FieldLabel>
+        </div>
+      </Story>
+
+      <Story
+        name="EmptyState · ErrorState"
+        note="plain muted Archivo 14 · the Add to library button only on Home · Retry refetches the query"
+      >
+        <div className="grid gap-5">
+          <EmptyState>No tracks match.</EmptyState>
+          <EmptyState
+            action={
+              <Button variant="outlined" icon={<PlusIcon />}>
+                Add to library
+              </Button>
+            }
+          >
+            Nothing downloaded yet. Add a channel or an artist to get started.
+          </EmptyState>
+          <ErrorState
+            what="the videos"
+            error={new TypeError('Failed to fetch')}
+            onRetry={() => {}}
+          />
         </div>
       </Story>
 

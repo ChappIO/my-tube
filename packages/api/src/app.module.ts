@@ -10,6 +10,8 @@ import { HealthModule } from './health/health.module.js';
 import { JobsModule } from './jobs/jobs.module.js';
 import { LibraryModule } from './library/library.module.js';
 import { LoggingModule } from './logging/logging.module.js';
+import { BackupRunner, RescanRunner } from './maintenance/maintenance.runners.js';
+import { MaintenanceModule } from './maintenance/maintenance.module.js';
 import { MetadataModule } from './metadata/metadata.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { SourcesModule } from './sources/sources.module.js';
@@ -30,14 +32,22 @@ import { YtdlpModule } from './ytdlp/ytdlp.module.js';
     ActivityModule,
     ArtworkModule,
     HealthModule,
-    // Queue and worker with the sync, revalidation and download runners. `download` jobs go to
-    // the dispatcher, which hands videos to DownloadRunner and tracks to TrackDownloadRunner.
+    // Queue and worker with the sync, revalidation, download and maintenance runners. `download`
+    // jobs go to the dispatcher, which hands videos to DownloadRunner and tracks to
+    // TrackDownloadRunner.
     JobsModule.forRoot({
-      imports: [YtdlpModule, SyncModule, MetadataModule],
-      runners: [CheckSourceRunner, RevalidateRunner, DownloadDispatchRunner],
+      imports: [YtdlpModule, SyncModule, MetadataModule, MaintenanceModule],
+      runners: [
+        CheckSourceRunner,
+        RevalidateRunner,
+        DownloadDispatchRunner,
+        RescanRunner,
+        BackupRunner,
+      ],
       providers: [DownloadRunner, TrackDownloadRunner],
     }),
     LibraryModule,
+    MaintenanceModule,
     SettingsModule,
     SourcesModule,
     SyncModule,

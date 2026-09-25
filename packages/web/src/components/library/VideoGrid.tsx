@@ -3,7 +3,8 @@ import { useNow } from '../../use-now';
 import { TileGrid } from '../media';
 import { StatusLine } from '../sources/SourceBits';
 import { Button } from '../ui/Button';
-import { Body } from '../ui/typography';
+import { EmptyState } from '../ui/EmptyState';
+import { ErrorState, fromQuery, loadFailed } from '../ui/ErrorState';
 import { VideoTile, type VideoTileMeta } from './VideoTile';
 
 export interface VideoGridProps {
@@ -21,10 +22,10 @@ export function VideoGrid({ filter = {}, meta }: VideoGridProps) {
   const videos = useVideos(filter);
   const now = useNow();
 
-  if (videos.isPending) return <StatusLine>Loading videos.</StatusLine>;
-  if (videos.isError) return <StatusLine>Could not load the videos.</StatusLine>;
+  if (loadFailed(videos)) return <ErrorState what="the videos" {...fromQuery(videos)} />;
+  if (videos.data === undefined) return <StatusLine>Loading videos.</StatusLine>;
   const items = videos.data.pages.flatMap((page) => page.items);
-  if (items.length === 0) return <Body muted>Nothing downloaded yet.</Body>;
+  if (items.length === 0) return <EmptyState>Nothing downloaded yet.</EmptyState>;
 
   return (
     <>
@@ -44,7 +45,14 @@ export function VideoGrid({ filter = {}, meta }: VideoGridProps) {
           </Button>
         </div>
       )}
-      {videos.isFetchNextPageError && <StatusLine>Could not load more videos.</StatusLine>}
+      {videos.isFetchNextPageError && (
+        <ErrorState
+          what="more videos"
+          error={videos.error}
+          onRetry={() => void videos.fetchNextPage()}
+          retrying={videos.isFetchingNextPage}
+        />
+      )}
     </>
   );
 }

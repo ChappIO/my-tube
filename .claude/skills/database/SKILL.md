@@ -82,10 +82,17 @@ Migration `20260925090000_items.sql`. Item tables have `id` (INTEGER PK), `creat
 - `on_disk` → `missing` when a rescan finds no file. `file_path` is kept so the library can show where it was.
 - `on_disk` → `skipped` / `no_longer_matches` when revalidation removes the file because the source's current tree no longer matches it: `file_path` and `file_size_bytes` are cleared and a `removed` history row names the failing conditions.
 - `on_disk` → `skipped` / `deleted_by_user` when the user deletes the file in Preview (`DELETE /api/library/videos/:id/file`): file and sidecars removed, `file_path` and `file_size_bytes` cleared, a `removed` history row "deleted by user". Neither the sync nor revalidation moves it again (no SQL CHECK on `skip_reason`, so no migration was needed).
-- `missing` → `wanted` only through an explicit re-download. Nothing moves an item out of `missing` or `skipped` / `unavailable` on its own.
+- `missing` → `on_disk` when a rescan finds the file at its `file_path` again (size updated). `missing` → `wanted` only through an explicit re-download. Nothing else moves an item out of `missing`, and nothing moves one out of `skipped` / `unavailable` on its own.
+- A rescan never creates or deletes rows: files in the mounts that no item points at are only counted.
 - Rows are never deleted by sync, unsubscribing or removing a source (`source_id` becomes null).
 
 In Drizzle, `status` and `skip_reason` are `text().$type<ItemStatus>()` / `$type<SkipReason>()`, `is_short` is `integer({ mode: 'boolean' })`, and `jobs.payload` is `text({ mode: 'json' }).$type<JobPayload>()` (`title`, optional `subtitle` and `historyKind`, plus runner fields). A `videos` row parses as the shared `Video` DTO and a `tracks` row as `Track`. Write jobs only through `JobsService` (see the backend skill "Jobs"); finished job rows are kept, history is the durable record.
+
+## Backups
+
+`CONFIG_DIR/backups/mytube-<UTC time>.sqlite` (`mytube-2026-09-26T04:00:00Z.sqlite`), written with SQLite's online backup API (`sqliteClient(db).backup()`, consistent while the app writes) nightly at 04:00 server time and on Back up now; the newest 7 are kept (`BACKUP_KEEP`). The settings are rows here, so one file is the whole state; the yt-dlp binary, the artwork cache and the logs are not backed up (they are rebuilt or disposable). See the backend skill "Maintenance".
+
+**Restore** (manual, documented for users in `README.md`): stop the app, copy the backup over `CONFIG_DIR/mytube.db`, delete `mytube.db-wal` and `mytube.db-shm`, start. Migrations run on boot, so an older backup is brought up to date. A rescan afterwards matches the on-disk flags to the mounts.
 
 ## Querying
 

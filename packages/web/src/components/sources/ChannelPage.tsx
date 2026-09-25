@@ -11,6 +11,8 @@ import { BellToggle } from '../media';
 import { BackLink } from '../ui/BackLink';
 import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
+import { EmptyState } from '../ui/EmptyState';
+import { ErrorState, fromQuery, loadFailed } from '../ui/ErrorState';
 import { Modal, ModalActions } from '../ui/Modal';
 import { Body, PageTitle } from '../ui/typography';
 import { SUBSCRIBE_FAILED } from './ChannelsTab';
@@ -31,11 +33,13 @@ export function ChannelPage({ id }: { id: string }) {
 
   let body;
   if (sourceId === 0 || (source.error instanceof ApiError && source.error.status === 404)) {
-    body = <StatusLine>This channel is not in your library.</StatusLine>;
-  } else if (source.isPending) {
-    body = <StatusLine>Loading channel.</StatusLine>;
-  } else if (source.isError) {
-    body = <StatusLine>Could not load this channel.</StatusLine>;
+    body = <EmptyState>This channel is not in your library.</EmptyState>;
+  } else if (source.data === undefined) {
+    body = loadFailed(source) ? (
+      <ErrorState what="this channel" {...fromQuery(source)} />
+    ) : (
+      <StatusLine>Loading channel.</StatusLine>
+    );
   } else {
     body = (
       <>

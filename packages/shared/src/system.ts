@@ -25,7 +25,53 @@ export type SystemAction = (typeof SYSTEM_ACTIONS)[number];
 
 /**
  * Body of a `POST /api/system/<action>` answer, success or failure: one line for the user.
- * Until Stage 7 both actions answer `501` with `Not implemented until Stage 7`.
+ * `202` when the job was queued (`Rescan queued.`), `409` when one is already queued or running
+ * (`A rescan is already running.`); `jobId` is that job in both cases.
  */
-export const SystemActionResult = z.object({ message: z.string() });
+export const SystemActionResult = z.object({
+  message: z.string(),
+  jobId: z.number().int().positive().optional(),
+});
 export type SystemActionResult = z.infer<typeof SystemActionResult>;
+
+/** How many database backups `CONFIG_DIR/backups` keeps; older ones are removed after a backup. */
+export const BACKUP_KEEP = 7;
+
+/** One library's totals: what is on disk now. */
+export const LibraryStats = z.object({
+  /** Bytes of the items on disk (`file_size_bytes` as the download or the last rescan saw it). */
+  sizeBytes: z.number().int().nonnegative(),
+  /** Tracks (Music) or videos (Video) on disk. */
+  itemCount: z.number().int().nonnegative(),
+});
+export type LibraryStats = z.infer<typeof LibraryStats>;
+
+/**
+ * `GET /api/system/maintenance`: the library totals, the last rescan and the last backup, for
+ * Settings → Music / Video (Library → Size) and Settings → Advanced (Data → Last backup).
+ * `active` is true while such a job is queued or running (the web polls until it is false).
+ */
+export const MaintenanceStatus = z.object({
+  libraries: z.object({ music: LibraryStats, video: LibraryStats }),
+  rescan: z.object({
+    active: z.boolean(),
+    /** When the last rescan finished (ISO UTC); null before the first one. */
+    lastAt: z.iso.datetime().nullable(),
+  }),
+  backup: z.object({
+    active: z.boolean(),
+    /** The newest file in `CONFIG_DIR/backups`, null before the first backup. */
+    last: z
+      .object({
+        /** `mytube-2026-09-26T04:00:00Z.sqlite`. */
+        file: z.string(),
+        /** When it was taken (ISO UTC, from the file name). */
+        at: z.iso.datetime(),
+        sizeBytes: z.number().int().nonnegative(),
+      })
+      .nullable(),
+    /** How many backups are kept (`BACKUP_KEEP`). */
+    keep: z.number().int().positive(),
+  }),
+});
+export type MaintenanceStatus = z.infer<typeof MaintenanceStatus>;

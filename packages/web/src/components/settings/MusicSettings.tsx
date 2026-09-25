@@ -6,7 +6,8 @@ import {
   type MusicSettings as MusicSettingsValue,
 } from '@mytube/shared';
 import { useUpdateSettings } from '../../api/settings';
-import { useSystemInfo } from '../../api/system';
+import { useMaintenanceStatus, useSystemInfo } from '../../api/system';
+import { librarySizeText } from '../../format';
 import { KeyValueGrid, KeyValueRow } from '../ui/KeyValueGrid';
 import { Select } from '../ui/Select';
 import { SettingsCard } from '../ui/SettingsCard';
@@ -33,6 +34,7 @@ export function validateMusicTemplate(template: string): string | undefined {
 export function MusicSettings() {
   const update = useUpdateSettings();
   const { data: info } = useSystemInfo();
+  const { data: maintenance } = useMaintenanceStatus();
   const save = (patch: Partial<MusicSettingsValue>) => update.mutate({ music: patch });
   return (
     <SettingsTab saveFailed={update.isError}>
@@ -45,6 +47,10 @@ export function MusicSettings() {
             validatePathTemplate={validateMusicTemplate}
             tags={MUSIC_PATH_TAGS}
             tagNote="Use {tag}; {track:02} pads numbers."
+            size={
+              maintenance &&
+              librarySizeText(maintenance.libraries.music, maintenance.rescan.lastAt, 'track')
+            }
           />
           <SettingsCard title="Format">
             <KeyValueGrid>

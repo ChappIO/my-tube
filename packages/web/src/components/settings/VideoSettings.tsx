@@ -6,7 +6,8 @@ import {
   type VideoSettings as VideoSettingsValue,
 } from '@mytube/shared';
 import { useUpdateSettings } from '../../api/settings';
-import { useSystemInfo } from '../../api/system';
+import { useMaintenanceStatus, useSystemInfo } from '../../api/system';
+import { librarySizeText } from '../../format';
 import { KeyValueGrid, KeyValueRow } from '../ui/KeyValueGrid';
 import { Select } from '../ui/Select';
 import { SettingsCard } from '../ui/SettingsCard';
@@ -33,6 +34,7 @@ export function validateVideoTemplate(template: string): string | undefined {
 export function VideoSettings() {
   const update = useUpdateSettings();
   const { data: info } = useSystemInfo();
+  const { data: maintenance } = useMaintenanceStatus();
   const save = (patch: Partial<VideoSettingsValue>) => update.mutate({ video: patch });
   return (
     <SettingsTab saveFailed={update.isError}>
@@ -45,6 +47,10 @@ export function VideoSettings() {
             validatePathTemplate={validateVideoTemplate}
             tags={VIDEO_PATH_TAGS}
             tagNote="Use {tag}."
+            size={
+              maintenance &&
+              librarySizeText(maintenance.libraries.video, maintenance.rescan.lastAt, 'video')
+            }
           />
           <SettingsCard title="Format">
             <KeyValueGrid>

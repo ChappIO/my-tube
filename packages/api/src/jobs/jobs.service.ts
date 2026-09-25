@@ -313,6 +313,25 @@ export class JobsService {
       .get();
   }
 
+  /** Whether a job of this type and key is queued or running (a rescan, a backup). */
+  isActive(type: JobType, key: string): boolean {
+    const job = this.latestForKey(type, key);
+    return job?.status === 'queued' || job?.status === 'running';
+  }
+
+  /** When the last job of a type finished successfully (ISO UTC), or null. */
+  lastDoneAt(type: JobType): string | null {
+    return (
+      this.db
+        .select({ finishedAt: jobs.finishedAt })
+        .from(jobs)
+        .where(and(eq(jobs.type, type), eq(jobs.status, 'done')))
+        .orderBy(desc(jobs.finishedAt))
+        .limit(1)
+        .get()?.finishedAt ?? null
+    );
+  }
+
   /**
    * The Activity queue: running jobs, then queued ones in pick order, then jobs that failed
    * for good within `failedWithinMs` (default a day) and were not retried or superseded by a
