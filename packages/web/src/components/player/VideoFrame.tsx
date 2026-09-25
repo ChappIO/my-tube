@@ -1,3 +1,4 @@
+import type { Ref } from 'react';
 import type { SubtitleSize } from '../../video-prefs';
 import { PlayIcon } from '../icons';
 import { cx, focusRingNone } from '../ui/cx';
@@ -18,6 +19,10 @@ export interface VideoFrameProps {
   /** The file seeks natively (direct): the scrubber seeks live while dragging. */
   seekable: boolean;
   onSeek: (pos: number) => void;
+  /** The frame's wrapper: the element `useFullscreen` makes fullscreen. */
+  ref?: Ref<HTMLDivElement>;
+  /** The wrapper is fullscreen: it fills the screen, square-cornered, the video contained on black. */
+  fullscreen?: boolean;
 }
 
 /**
@@ -25,7 +30,8 @@ export interface VideoFrameProps {
  * as its surface. A click anywhere plays or pauses; paused, an 84px translucent circle with a
  * blurred backdrop and the 36px play glyph sits in the middle. Captions are a DOM layer 28px
  * above the bottom (`SubtitleLayer`); the 4px progress line along the bottom edge is a scrubber
- * (`FrameScrubber`).
+ * (`FrameScrubber`). Fullscreen is this wrapper, not the `<video>`, so all of that stays on
+ * screen.
  */
 export function VideoFrame({
   title,
@@ -38,9 +44,17 @@ export function VideoFrame({
   onToggle,
   seekable,
   onSeek,
+  ref,
+  fullscreen = false,
 }: VideoFrameProps) {
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-modal bg-player">
+    <div
+      ref={ref}
+      className={cx(
+        'relative w-full overflow-hidden bg-player',
+        fullscreen ? 'h-full rounded-none' : 'aspect-video rounded-modal',
+      )}
+    >
       <VideoSurface kind="frame" />
       <SubtitleLayer text={caption} variant="frame" size={subSize} background={subBg} />
       <button

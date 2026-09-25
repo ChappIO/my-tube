@@ -3,12 +3,14 @@ import {
   SEEK_STEP_SECONDS,
   VOLUME_STEP,
   changeVolume,
+  type PlayerState,
   playerState,
   seekBy,
   toggleMute,
   togglePlay,
 } from '../../player-state';
 import { hasOpenModal } from '../ui/Modal';
+import { browserDocument, fullscreenElement, toggleRegisteredFullscreen } from './fullscreen';
 
 export type Shortcut =
   | 'toggle'
@@ -17,11 +19,12 @@ export type Shortcut =
   | 'leave'
   | 'captions'
   | 'theater'
+  | 'fullscreen'
   | 'mute'
   | 'volumeUp'
   | 'volumeDown';
 
-/** The global keys: Space, ← → and J L (10 s), ↑ ↓ (volume), M (mute), Esc, C and T (video). */
+/** The global keys: Space, ← → and J L (10 s), ↑ ↓ (volume), M (mute), F, Esc, C and T (video). */
 export function shortcutFor(key: string): Shortcut | null {
   switch (key) {
     case ' ':
@@ -42,6 +45,9 @@ export function shortcutFor(key: string): Shortcut | null {
     case 't':
     case 'T':
       return 'theater';
+    case 'f':
+    case 'F':
+      return 'fullscreen';
     case 'm':
     case 'M':
       return 'mute';
@@ -106,11 +112,55 @@ export interface VideoShortcuts {
   onTheater: () => void;
 }
 
+/** What a shortcut acts on besides the store's own actions. */
+export interface ShortcutContext {
+  state: Pick<PlayerState, 'player' | 'nowOpen' | 'fullscreen'>;
+  /** A frame or panel is fullscreen (the store's flag, or the document's element). */
+  inFullscreen: boolean;
+  /** Esc: leave Now Playing. */
+  leave: () => void;
+  /** C and T, while a video plays. */
+  video?: VideoShortcuts;
+  /** F: toggles the registered Now Playing surface; false when there is none. */
+  toggleFullscreen: () => boolean;
+}
+
+/**
+ * Runs a shortcut; true when it acted (the key's default is then prevented). Esc leaves Now
+ * Playing only while it is open and nothing is fullscreen (the browser's own Esc leaves
+ * fullscreen first). F toggles fullscreen on Now Playing. The rest need a player; C and T a
+ * video.
+ */
+export function runShortcut(shortcut: Shortcut, context: ShortcutContext): boolean {
+  const { state } = context;
+  if (shortcut === 'leave') {
+    if (!state.nowOpen || context.inFullscreen) return false;
+    context.leave();
+    return true;
+  }
+  if (!state.player) return false;
+  if (shortcut === 'fullscreen') return context.toggleFullscreen();
+  if (shortcut === 'captions' || shortcut === 'theater') {
+    const keys = context.video;
+    if (state.player.kind !== 'video' || !keys) return false;
+    if (shortcut === 'captions') keys.onCaptions();
+    else keys.onTheater();
+    return true;
+  }
+  if (shortcut === 'mute') toggleMute();
+  else if (shortcut === 'volumeUp') changeVolume(VOLUME_STEP);
+  else if (shortcut === 'volumeDown') changeVolume(-VOLUME_STEP);
+  else if (shortcut === 'toggle') togglePlay();
+  else seekBy(shortcut === 'forward' ? SEEK_STEP_SECONDS : -SEEK_STEP_SECONDS);
+  return true;
+}
+
 /**
  * The player's keyboard (global while a player exists): Space plays or pauses, → / L forward and
- * ← / J back 10 s, ↑ ↓ change the volume by 5 %, M mutes or unmutes, Esc leaves Now Playing (`onLeave`, only while it is open), and while a video
- * plays C cycles the captions and T toggles theater (`video`). Ignored in text fields and while
- * a modal is open. Mount once (the shell's `PlayerLayer`).
+ * ← / J back 10 s, ↑ ↓ change the volume by 5 %, M mutes or unmutes, F toggles fullscreen on Now
+ * Playing, Esc leaves Now Playing (`onLeave`, only while it is open and not fullscreen), and
+ * while a video plays C cycles the captions and T toggles theater (`video`). Ignored in text
+ * fields and while a modal is open. Mount once (the shell's `PlayerLayer`).
  */
 export function useKeyboardShortcuts(onLeave: () => void, video?: VideoShortcuts): void {
   const leave = useRef(onLeave);
@@ -126,27 +176,14 @@ export function useKeyboardShortcuts(onLeave: () => void, video?: VideoShortcuts
       const target = event.target instanceof Element ? event.target : null;
       if (shortcut === null || !shouldHandleKey({ ...pickKeys(event), target })) return;
       const state = playerState();
-      if (shortcut === 'leave') {
-        if (!state.nowOpen) return;
-        event.preventDefault();
-        leave.current();
-        return;
-      }
-      if (!state.player) return;
-      if (shortcut === 'captions' || shortcut === 'theater') {
-        const keys = videoKeys.current;
-        if (state.player.kind !== 'video' || !keys) return;
-        event.preventDefault();
-        if (shortcut === 'captions') keys.onCaptions();
-        else keys.onTheater();
-        return;
-      }
-      event.preventDefault();
-      if (shortcut === 'mute') toggleMute();
-      else if (shortcut === 'volumeUp') changeVolume(VOLUME_STEP);
-      else if (shortcut === 'volumeDown') changeVolume(-VOLUME_STEP);
-      else if (shortcut === 'toggle') togglePlay();
-      else seekBy(shortcut === 'forward' ? SEEK_STEP_SECONDS : -SEEK_STEP_SECONDS);
+      const acted = runShortcut(shortcut, {
+        state,
+        inFullscreen: state.fullscreen || fullscreenElement(browserDocument()) !== null,
+        leave: () => leave.current(),
+        video: videoKeys.current,
+        toggleFullscreen: toggleRegisteredFullscreen,
+      });
+      if (acted) event.preventDefault();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);

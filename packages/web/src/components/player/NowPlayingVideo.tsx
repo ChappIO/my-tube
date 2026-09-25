@@ -1,6 +1,7 @@
 import type { VideoPlayback } from '@mytube/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import { useRef } from 'react';
 import { videoPlaybackQuery, videoSubtitlesQuery } from '../../api/library';
 import { formatLength } from '../../format';
 import { type Player, type PlayerItem, jumpTo, seek, togglePlay } from '../../player-state';
@@ -10,20 +11,25 @@ import { ControlStrip } from './ControlStrip';
 import { UpNextPanel } from './UpNextPanel';
 import { VideoFrame } from './VideoFrame';
 import { useCaption } from './subtitles';
+import { useFullscreen } from './useFullscreen';
 
 export interface NowPlayingVideoProps {
   player: Player;
   item: PlayerItem;
   /** The load error line (an unplayable file), shown under the frame. */
   error: string | null;
-  /** Pop out: back to the library screen with the card open, the video playing on in it. */
+  /**
+   * Pop out: back to the library screen with the card open, the video playing on in it (after
+   * leaving fullscreen).
+   */
   onPopOut: () => void;
 }
 
 /**
  * Now Playing for a video (frontend skill "Player", "Video"): the player frame, the error line,
  * the control strip, the title block and the shortcut legend, beside Up next at 1180px and up in
- * Fit mode; one column in Theater mode and below 1180px.
+ * Fit mode; one column in Theater mode and below 1180px. Fullscreen (the pill, F) is the frame's
+ * wrapper: captions, the paused circle and the scrubber stay; the strip does not (it is outside).
  */
 export function NowPlayingVideo({ player, item, error, onPopOut }: NowPlayingVideoProps) {
   const prefs = useVideoPrefs();
@@ -32,6 +38,8 @@ export function NowPlayingVideo({ player, item, error, onPopOut }: NowPlayingVid
   const caption = useCaption(item, player.pos);
   const list = tracks.data ?? [];
   const active = activeTrackIndex(list, item.id, prefs);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const fullscreen = useFullscreen(frameRef);
   return (
     <div
       className={cx(
@@ -42,6 +50,8 @@ export function NowPlayingVideo({ player, item, error, onPopOut }: NowPlayingVid
       <div className="grid min-w-0 gap-4">
         <div className="grid gap-2">
           <VideoFrame
+            ref={frameRef}
+            fullscreen={fullscreen.active}
             title={item.title}
             playing={player.playing}
             pos={player.pos}
@@ -68,6 +78,7 @@ export function NowPlayingVideo({ player, item, error, onPopOut }: NowPlayingVid
           speed={prefs.speed}
           theater={prefs.theater}
           onPopOut={onPopOut}
+          fullscreen={fullscreen}
         />
         <VideoTitle item={item} playback={playback.data} />
         <ShortcutLegend />
@@ -132,6 +143,7 @@ export const VIDEO_SHORTCUTS: ReadonlyArray<readonly [key: string, action: strin
   ['M', 'mute'],
   ['C', 'captions'],
   ['T', 'theater'],
+  ['F', 'fullscreen'],
   ['Esc', 'back'],
 ];
 

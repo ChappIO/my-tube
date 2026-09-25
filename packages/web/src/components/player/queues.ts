@@ -124,63 +124,29 @@ export function videoItem(video: VideoListItem, now: number): PlayerItem {
 }
 
 /**
- * The channel of the clicked video in the order shown, from that video: the videos of `shown`
- * on disk and of the same channel. `from` = the channel name.
+ * A click on a video plays that video alone (Thomas's request: videos have no playlists, so a
+ * video never forms a queue): a one-item queue, which opens Now Playing at once. `from` = the
+ * channel name. Null when the video is not in the list or not on disk. The Videos tab and the
+ * channel page start it; Home through `homeVideoQueue`.
  */
-function channelQueue(
-  shown: readonly VideoListItem[],
+export function singleVideo(
+  videos: readonly VideoListItem[],
   videoId: number,
   now: number,
 ): QueueStart | null {
-  const clicked = shown.find((video) => video.id === videoId);
-  if (!clicked || clicked.status !== 'on_disk') return null;
-  const videos = shown.filter(
-    (video) => video.status === 'on_disk' && video.channel.id === clicked.channel.id,
-  );
-  return {
-    items: videos.map((video) => videoItem(video, now)),
-    index: videos.indexOf(clicked),
-    from: clicked.channel.name,
-  };
+  const video = videos.find((entry) => entry.id === videoId);
+  if (!video || video.status !== 'on_disk') return null;
+  return { items: [videoItem(video, now)], index: 0, from: video.channel.name };
 }
 
-/** A Home video tile: the videos of its day group by the same channel, in the order shown. */
+/** A Home video tile: that video alone. */
 export function homeVideoQueue(
   items: readonly HomeItem[],
   videoId: number,
   now: number,
 ): QueueStart | null {
   const videos = items.filter((item) => item.kind === 'video');
-  return channelQueue(videos, videoId, now);
-}
-
-/** A card on the Videos tab: the loaded list (every page so far) filtered to its channel. */
-export function videosTabQueue(
-  videos: readonly VideoListItem[],
-  videoId: number,
-  now: number,
-): QueueStart | null {
-  return channelQueue(videos, videoId, now);
-}
-
-/**
- * A card on the channel page: the page's loaded list (the source's videos, in the order shown).
- * `from` = the page's name (the channel, or the playlist of a playlist source).
- */
-export function channelPageQueue(
-  videos: readonly VideoListItem[],
-  videoId: number,
-  now: number,
-  name?: string,
-): QueueStart | null {
-  const clicked = videos.find((video) => video.id === videoId);
-  if (!clicked || clicked.status !== 'on_disk') return null;
-  const onDisk = videos.filter((video) => video.status === 'on_disk');
-  return {
-    items: onDisk.map((video) => videoItem(video, now)),
-    index: onDisk.indexOf(clicked),
-    from: name ?? clicked.channel.name,
-  };
+  return singleVideo(videos, videoId, now);
 }
 
 let openNowPlaying: (() => void) | null = null;
@@ -194,8 +160,8 @@ export function setNowPlayingOpener(open: (() => void) | null): void {
 }
 
 /**
- * Starts what a builder returned (nothing when it returned null). A queue of one item (an album
- * or playlist with one track on disk, a one-row Tracks table, a channel with one video, …)
+ * Starts what a builder returned (nothing when it returned null). A queue of one item (a clicked
+ * track or video, an album or playlist with one track on disk, …)
  * opens Now Playing at once (Thomas's request); longer queues play in the bar and card.
  */
 export function startQueue(start: QueueStart | null): void {
