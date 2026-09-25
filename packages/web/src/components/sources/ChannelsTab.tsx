@@ -18,7 +18,7 @@ import { sourceMeta } from './source-text';
 export const SUBSCRIBE_FAILED = 'Could not change the subscription. The previous state is back.';
 
 /**
- * Video → Channels (handoff Screen 3): every source in the Video library, channels and
+ * Video → Channels: every source in the Video library, channels and
  * playlists, newest first, as rows with rule chips, the last check, the bell and Edit.
  */
 export function ChannelsTab() {

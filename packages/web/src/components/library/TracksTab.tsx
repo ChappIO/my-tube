@@ -24,7 +24,7 @@ import {
 const FILTER_DEBOUNCE_MS = 300;
 
 /**
- * Music → Tracks (handoff Screen 2): the toolbar, the narrow sort pills, the table and **Load
+ * Music → Tracks: the toolbar, the narrow sort pills, the table and **Load
  * more** (60 per page). Filtering and sorting are server-side (`GET /api/library/tracks`); the
  * filter text, the filter and the sort are the URL search params of `/music/tracks`.
  */

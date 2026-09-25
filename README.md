@@ -117,4 +117,4 @@ The database is migrated on start. yt-dlp updates itself inside `/config` and do
 
 ## Contributing
 
-Start with [`CLAUDE.md`](CLAUDE.md) and [`ROADMAP.md`](ROADMAP.md); the conventions live in `.claude/skills`.
+Start with [`CLAUDE.md`](CLAUDE.md); the conventions and the design reference live in the skills under `.claude/skills`.

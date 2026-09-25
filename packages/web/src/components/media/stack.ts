@@ -10,7 +10,7 @@ export interface StackCover {
 /** Number of covers the stack shows. */
 export const STACK_SIZE = 4;
 
-/** Palette offsets for the four placeholder covers, as in the prototype. */
+/** Palette offsets for the four placeholder covers. */
 export const STACK_PLACEHOLDER_OFFSETS = [0, 3, 7, 11] as const;
 
 /**
@@ -39,7 +39,7 @@ export function stackCovers(covers: readonly string[] = [], seed?: string): Stac
 }
 
 /**
- * Geometry of cover `i` (0 = front) from the handoff's playlist stack spec: 62% wide, inset 12%
+ * Geometry of cover `i` (0 = front): 62% wide, inset 12%
  * top and bottom, 20% further right and 90px further back per step, the front cover turned
  * −10° and the rest −38° about their left edge.
  */

@@ -12,9 +12,9 @@ export interface PreviewFooterProps {
 }
 
 /**
- * The Preview footer (handoff Screen 7): 22px 26px, the title (Archivo 700 18) over the file
+ * The Preview footer: 22px 26px, the title (Archivo 700 18) over the file
  * path (Space Mono 12 muted) on the left and the outlined **Delete file** pill on the right.
- * The handoff's "Open in Plex" is not built (architecture skill, settled decisions).
+ * There is no "Open in Plex" (architecture skill, settled decisions).
  */
 export function PreviewFooter({ title, path, note, onDelete }: PreviewFooterProps) {
   return (

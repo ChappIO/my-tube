@@ -10,9 +10,9 @@ import { HistoryTable } from './HistoryTable';
 import { QueueRow } from './QueueRow';
 
 /**
- * Screen 5, Activity: what is downloading now (the queue, polled every 2 s) and what landed
- * recently (the history, polled every 5 s). The outlined Check now button (addition to the
- * handoff) checks every subscribed source without waiting for the interval.
+ * Activity: what is downloading now (the queue, polled every 2 s) and what landed recently
+ * (the history, polled every 5 s). The outlined Check now button checks every subscribed
+ * source without waiting for the interval.
  */
 export function ActivityScreen() {
   const queue = useQueue();

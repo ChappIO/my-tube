@@ -8,7 +8,7 @@ export interface DayGroupProps {
   children: ReactNode;
 }
 
-/** A Home day group: the Space Mono section label over its tiles, gap 14 (handoff Screen 1). */
+/** A Home day group: the Space Mono section label over its tiles, gap 14. */
 export function DayGroup({ label, children }: DayGroupProps) {
   const id = useId();
   return (

@@ -118,8 +118,8 @@ export const ICON_REGISTRY = {
     usedIn: 'rule builder "+ group"',
   },
   SearchIcon: { base: Search, meaning: 'Search', usedIn: 'search inputs (demo only so far)' },
-  PlayIcon: { base: Play, meaning: 'Play (preview)', usedIn: 'preview player (Stage 3+)' },
-  PauseIcon: { base: Pause, meaning: 'Pause (preview)', usedIn: 'preview player (Stage 3+)' },
+  PlayIcon: { base: Play, meaning: 'Play (preview)', usedIn: 'preview player' },
+  PauseIcon: { base: Pause, meaning: 'Pause (preview)', usedIn: 'preview player' },
   TrashIcon: { base: Trash2, meaning: 'Delete files', usedIn: 'explicit delete actions' },
   UnlinkIcon: {
     base: Unlink,
@@ -130,20 +130,20 @@ export const ICON_REGISTRY = {
   ExternalLinkIcon: {
     base: ExternalLink,
     meaning: 'Open on YouTube / external',
-    usedIn: 'external links (Stage 3+)',
+    usedIn: 'external links',
   },
   RefreshIcon: {
     base: RefreshCw,
     meaning: 'Check now / re-sync',
     usedIn: 'Check now buttons (yt-dlp, Activity subscriptions check)',
   },
-  MoreIcon: { base: Ellipsis, meaning: 'More actions menu', usedIn: 'row menus (Stage 3+)' },
+  MoreIcon: { base: Ellipsis, meaning: 'More actions menu', usedIn: 'row menus' },
 
   // Direction.
   BackIcon: { base: ArrowLeft, meaning: 'Back to parent page', usedIn: 'BackLink ("← Video")' },
   ChevronLeftIcon: { base: ChevronLeft, meaning: 'Previous', usedIn: 'pagers (not used yet)' },
   ChevronRightIcon: { base: ChevronRight, meaning: 'Next', usedIn: 'pagers (not used yet)' },
-  // The Tracks sort direction is the handoff's text arrows (↑/↓), not an icon.
+  // The Tracks sort direction is text arrows (↑/↓), not an icon.
   ChevronUpIcon: { base: ChevronUp, meaning: 'Collapse', usedIn: 'not used yet' },
   ChevronDownIcon: {
     base: ChevronDown,
@@ -256,7 +256,7 @@ export const ChevronUpIcon = icon('ChevronUpIcon');
 /** Expand / sort descending: Tracks table sort, selects. */
 export const ChevronDownIcon = icon('ChevronDownIcon');
 
-/** The handoff's bell path (24×24 viewBox), filled with the current color. */
+/** The bell path (24×24 viewBox), filled with the current color. Not Lucide. */
 export const BELL_PATH =
   'M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5.5-6.84V3.5a1.5 1.5 0 0 0-3 0v.66A7 7 0 0 0 5 11v5l-2 2v1h18v-1l-2-2Z';
 

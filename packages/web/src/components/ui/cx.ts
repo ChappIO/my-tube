@@ -4,8 +4,7 @@ export function cx(...parts: Array<string | false | null | undefined | 0>): stri
 }
 
 /**
- * Keyboard focus style shared by every control: 2px red outline, offset 2px (the handoff has no
- * designed focus ring). Only shown for keyboard focus. The values live once in `styles.css`
+ * Keyboard focus style shared by every control: 2px red outline, offset 2px. Only shown for keyboard focus. The values live once in `styles.css`
  * (the global `:focus-visible` rule and the `focus-ring` utilities); these constants name the
  * utilities so components can list them next to their other shared classes.
  */
@@ -21,7 +20,7 @@ export const focusRingInset = 'focus-ring-inset';
 export const focusRingOverlay = 'focus-ring-overlay';
 
 /**
- * Minimum hit target: 44px tall on narrow screens, 36px on wide (handoff "Buttons").
+ * Minimum hit target: 44px tall on narrow screens, 36px on wide.
  * For controls that are visually smaller, use `hitArea` instead.
  */
 export const minHit = 'min-h-11 wide:min-h-9';
@@ -34,7 +33,7 @@ export const hitArea =
   "relative before:absolute before:top-1/2 before:left-1/2 before:size-11 before:-translate-1/2 before:content-[''] wide:before:size-9";
 
 /**
- * The Settings value box (handoff Screen 6 key/value grid): `surface` fill, Space Mono 13,
+ * The Settings value box (key/value grid): `surface` fill, Space Mono 13,
  * 9px 12px, radius 8. Full width on narrow screens; on wide ones at least 160px and as wide as
  * its content. Shared by `KeyValueText`, `Select` and `Input shape="value"`.
  */

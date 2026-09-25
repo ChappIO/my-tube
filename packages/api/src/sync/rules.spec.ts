@@ -94,7 +94,7 @@ describe('evaluateItem', () => {
     ).toBe(false);
   });
 
-  it('builds the nested rule from the roadmap', () => {
+  it('builds a nested rule', () => {
     const tree = and(
       not({ type: 'is_short' }),
       or({ type: 'title_contains', text: 'Artemis' }, { type: 'title_contains', text: 'Orion' }),

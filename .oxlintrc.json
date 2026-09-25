@@ -23,13 +23,7 @@
   "env": {
     "es2024": true
   },
-  "ignorePatterns": [
-    "**/dist/**",
-    "**/routeTree.gen.ts",
-    ".local/**",
-    "design_handoff_mytube/**",
-    ".claude/worktrees/**"
-  ],
+  "ignorePatterns": ["**/dist/**", "**/routeTree.gen.ts", ".local/**", ".claude/worktrees/**"],
   "overrides": [
     {
       "files": ["packages/api/**", "packages/shared/**"],

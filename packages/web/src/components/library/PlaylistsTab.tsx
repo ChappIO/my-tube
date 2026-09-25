@@ -8,7 +8,7 @@ import { MusicGrid } from './MusicGrid';
 export const SYNCED_PLAYLIST = 'Synced from YouTube';
 
 /**
- * Music → Playlists (handoff Screen 2): the playlist stack of the first four covers on disk,
+ * Music → Playlists: the playlist stack of the first four covers on disk,
  * "Synced from YouTube" and `42 tracks · 2h51` (`65/68 tracks · 4h12` in red when tracks are
  * missing). A tile opens Preview on the first track on disk ("Nothing on disk yet." without one).
  */

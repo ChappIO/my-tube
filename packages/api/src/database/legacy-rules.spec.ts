@@ -16,11 +16,12 @@ import { MIGRATIONS_DIR, openDatabase } from './database.module.js';
 import { listMigrationFiles, runMigrations } from './migrate.js';
 import { sources } from './schema.js';
 
-/** The first migration of Stage 3b; everything before it is the Stage 4 schema. */
+/** The first matcher-tree migration; everything before it is the flat-rules schema. */
 const MATCHER_MIGRATION = '20260926090000_matcher_rules.sql';
 
 /**
- * Upgrades a database that holds Stage 3 flat rules: migrates to the last pre-3b file, writes
+ * Upgrades a database that holds the flat rules format used before matcher trees: migrates to
+ * the last file before the matcher migration, writes
  * old-shaped rows, then runs the rest (the SQL files and the code migration between them).
  */
 describe('matcher rules migration', () => {

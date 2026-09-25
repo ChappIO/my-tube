@@ -17,7 +17,7 @@ import { TrackTile } from './TrackTile';
 import { VideoTile } from './VideoTile';
 
 /**
- * Home, "What's new" (handoff Screen 1): the three stat cards and what landed in the last two
+ * Home, "What's new": the three stat cards and what landed in the last two
  * weeks, grouped by local day, newest first. The queue card follows the badge summary (polled
  * faster while downloads run); the rest comes from `GET /api/library/home`. A library with
  * nothing downloaded ever gets the one empty state with the Add to library button.

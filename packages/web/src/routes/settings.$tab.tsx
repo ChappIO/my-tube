@@ -53,7 +53,7 @@ function SettingsPage() {
   const Content = TAB_CONTENT[tab];
   return (
     <>
-      {/* No sub: the handoff shows "Settings" and the tab pills only. */}
+      {/* No sub by design: "Settings" and the tab pills only. */}
       <PageHeader
         title="Settings"
         actions={<TabPillLinks label="Settings section" items={settingsTabItems} value={tab} />}

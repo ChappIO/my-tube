@@ -18,7 +18,7 @@ export interface SourceAvatarProps {
   className?: string;
 }
 
-/** Round source avatar at one of the handoff's three sizes. Decorative: the name is next to it. */
+/** Round source avatar at one of three sizes (44, 56, 88). Decorative: the name is next to it. */
 export function SourceAvatar({ src, name, size, className }: SourceAvatarProps) {
   return (
     <div className={cx('shrink-0', avatarSizes[size], className)}>
@@ -56,8 +56,8 @@ export function RuleChips({ chips, size = 'row', className }: RuleChipsProps) {
 }
 
 /**
- * A plain status line (loading, empty, error): muted Archivo 14, announced politely. The
- * handoff leaves these undesigned and asks for plain text.
+ * A plain status line (loading, empty, error): muted Archivo 14, announced politely. Plain
+ * text by design.
  */
 export function StatusLine({ children, className }: { children: ReactNode; className?: string }) {
   return (

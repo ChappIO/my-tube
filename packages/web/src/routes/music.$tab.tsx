@@ -50,7 +50,7 @@ const TAB_CONTENT = {
   tracks: TracksTab,
 } satisfies Record<MusicTab, ComponentType>;
 
-/** Music (handoff Screen 2): the header with the library summary and the four tabs. */
+/** Music: the header with the library summary and the four tabs. */
 function MusicPage() {
   const { tab } = Route.useParams();
   const summary = useLibrarySummary();

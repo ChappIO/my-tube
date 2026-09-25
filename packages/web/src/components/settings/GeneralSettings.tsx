@@ -13,7 +13,7 @@ import { SettingsCard, SettingsRow } from '../ui/SettingsCard';
 import { TabPills } from '../ui/TabPills';
 import { SettingsTab } from './SettingsTab';
 
-// The handoff shows Light / Dark; System is added so the user can return to following the device.
+// System lets the user return to following the device.
 const themeItems: { id: ThemeChoice; label: string }[] = [
   { id: 'light', label: 'Light' },
   { id: 'dark', label: 'Dark' },

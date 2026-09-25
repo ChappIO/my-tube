@@ -42,7 +42,7 @@ describe('draftFromMatcher / matcherFromDraft', () => {
     ['the video default', DEFAULT_VIDEO_MATCHER],
     ['the music default (empty and)', DEFAULT_MUSIC_MATCHER],
     [
-      'the roadmap rule',
+      'a nested rule',
       and(
         not({ type: 'is_short' }),
         or(artemis, orion),

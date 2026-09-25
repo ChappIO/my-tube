@@ -9,7 +9,7 @@ import {
 } from './settings.js';
 
 describe('Settings', () => {
-  it('fills every field from the handoff defaults', () => {
+  it('fills every field with its default', () => {
     expect(DEFAULT_SETTINGS).toEqual({
       general: { theme: 'system', checkIntervalHours: 2, downloadsAtOnce: 2 },
       music: {

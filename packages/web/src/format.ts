@@ -25,7 +25,7 @@ function plural(count: number, one: string, many = `${one}s`): string {
 }
 
 /**
- * How long ago an ISO timestamp was, in the handoff's style: `just now`, `12 min ago`,
+ * How long ago an ISO timestamp was, in short form: `just now`, `12 min ago`,
  * `1 h ago`, `2 days ago`, `3 weeks ago`, `4 months ago`, `2 years ago`. Times in the future
  * (clock skew) and unparsable ones read `just now`.
  */
@@ -67,7 +67,7 @@ export function formatSpeed(bytesPerSec: number): string {
 }
 
 /**
- * The queue row's meta line, as in the handoff (`Deep Dive Podcast · 1080p · 1.2 GB · 4.1 MB/s`):
+ * The queue row's meta line (`Deep Dive Podcast · 1080p · 1.2 GB · 4.1 MB/s`):
  * channel, quality, size and speed, each only when known. The speed shows while running.
  */
 export function queueMeta(job: Job): string {
@@ -141,7 +141,7 @@ function pad(value: number): string {
 }
 
 /**
- * The history "when" column, grouped by local day like the handoff: `Today 08:12`,
+ * The history "when" column, grouped by local day: `Today 08:12`,
  * `Yesterday 21:40`, `3 days ago` within a week, then the date (`2026-09-10`).
  */
 export function whenLabel(at: string, now: Date = new Date()): string {
@@ -244,7 +244,7 @@ export function publishedAgo(publishedAt: string | null, now: number = Date.now(
   return relativeTime(new Date(now - days * DAY).toISOString(), now);
 }
 
-// Music tabs (handoff Screen 2).
+// Music tabs.
 
 /** A playlist's total length on its meta line: `2h51`, `4h12`, `42 min`. */
 export function formatTotalLength(seconds: number): string {

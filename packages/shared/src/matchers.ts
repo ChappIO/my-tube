@@ -471,7 +471,7 @@ export function describeLeaf(leaf: MatcherLeaf, negated = false): string {
 }
 
 /**
- * The rule chips for a tree (handoff Screen 3 rule chips): one chip per item of the root `and`
+ * The rule chips for a tree (Channels rows, channel page): one chip per item of the root `and`
  * (nested `and`s are flattened into it), otherwise one chip for the whole tree. An `or` is one
  * chip with its items joined (`only "Artemis" or "Orion"`); deeper groups are parenthesised. An
  * empty root `and` (match everything) has no chips.

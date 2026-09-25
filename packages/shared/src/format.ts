@@ -6,7 +6,7 @@
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'] as const;
 
 /**
- * Size in decimal units, as disks and the handoff write them: `0 B`, `512 KB`, `1.2 GB`,
+ * Size in decimal units, as disks write them: `0 B`, `512 KB`, `1.2 GB`,
  * `38 GB`. One decimal below 10 of a unit, whole numbers above.
  */
 export function formatBytes(bytes: number): string {

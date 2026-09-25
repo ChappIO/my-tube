@@ -18,9 +18,9 @@ export interface QueueRowProps {
 }
 
 /**
- * One queue row (handoff Screen 5): title Archivo 600 15, meta Space Mono 12 muted, state Space
+ * One queue row: title Archivo 600 15, meta Space Mono 12 muted, state Space
  * Mono 700 13 (`downloading 64%` red, `queued` muted), and a full-width 4px bar (`surface`
- * track, red fill). Additions to the handoff: a small × to cancel (or dismiss a failed row), on
+ * track, red fill). Also: a small × to cancel (or dismiss a failed row), on
  * failed rows the error's last line in red with Retry, after the download the post-processing
  * step as the state (`processing · merging`) while the bar runs from 90 to 99, and on running
  * and failed rows **View log**, which opens the job's log inline (`JobLogPanel`, live while the

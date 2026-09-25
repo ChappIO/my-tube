@@ -10,7 +10,7 @@ export interface TabPillItem<T extends string> {
   label: ReactNode;
   /**
    * Optional icon from `components/icons` (for example `TAB_ICONS[id]`), 16px before the label.
-   * Wide screens only: below 760px the pills are text only, as in the handoff, so four of
+   * Wide screens only: below 760px the pills are text only, so four of
    * them fit a 375px screen.
    */
   icon?: ComponentType<IconProps>;

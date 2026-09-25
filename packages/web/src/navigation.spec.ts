@@ -31,7 +31,7 @@ describe('parseTab', () => {
 });
 
 describe('tab metadata', () => {
-  it('uses the handoff defaults', () => {
+  it('opens Albums, Videos and General by default', () => {
     expect(DEFAULT_MUSIC_TAB).toBe('albums');
     expect(DEFAULT_VIDEO_TAB).toBe('videos');
     expect(DEFAULT_SETTINGS_TAB).toBe('general');

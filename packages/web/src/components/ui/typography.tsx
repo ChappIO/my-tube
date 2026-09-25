@@ -1,6 +1,6 @@
 /**
- * Type roles from the handoff's Typography table as components, so screens never repeat the
- * type utilities. Each sets the role and, where the handoff says so, the muted color.
+ * Type roles as components, so screens never repeat the type utilities. Each sets the role
+ * and, for labels, meta lines and secondary text, the muted color.
  */
 import type { ElementType, ReactNode } from 'react';
 import { cx } from './cx';

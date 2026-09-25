@@ -138,10 +138,11 @@ export const Source = z
 export type Source = z.infer<typeof Source>;
 
 // ---------------------------------------------------------------------------------------
-// Legacy flat rules (Stage 3), kept only to convert stored rows once.
+// Legacy rules: the flat rules format used before matcher trees, kept only to convert stored
+// rows once.
 // ---------------------------------------------------------------------------------------
 
-/** The Stage 3 video rules as stored in `sources.rules`. Missing fields take their defaults. */
+/** The flat video rules as stored in `sources.rules`. Missing fields take their defaults. */
 export const LegacyVideoRules = z.object({
   library: z.literal('video'),
   skipShorts: z.boolean().default(true),
@@ -150,7 +151,7 @@ export const LegacyVideoRules = z.object({
   titleFilter: z.string().trim().min(1).max(200).nullable().default(null),
   syncOrder: z.boolean().default(false),
 });
-/** The Stage 3 music rules. */
+/** The flat music rules. */
 export const LegacyMusicRules = z.object({
   library: z.literal('music'),
   skipLiveRecordings: z.boolean().default(false),
@@ -163,7 +164,7 @@ export type LegacyRules = z.input<typeof LegacyRules>;
 export const LIVE_WORD_PATTERN = '\\blive\\b';
 
 /**
- * The matcher and options equivalent to Stage 3 flat rules. Each rule that was on becomes one
+ * The matcher and options equivalent to legacy flat rules. Each rule that was on becomes one
  * item of a root `and`, in this order: `skipShorts` → `not(is_short)`, `keepDays` →
  * `not(older_than_days)`, `publishedAfter` → `published_after`, `titleFilter` →
  * `title_contains`, `skipLiveRecordings` → `not(title_matches \blive\b)`. `syncOrder` and
