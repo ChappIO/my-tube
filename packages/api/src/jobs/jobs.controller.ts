@@ -8,6 +8,7 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Query,
   StreamableFile,
 } from '@nestjs/common';
 import type { Job } from '@mytube/shared';
@@ -21,9 +22,20 @@ export class JobsController {
     private readonly logs: JobLogsService,
   ) {}
 
-  /** The job's yt-dlp log as `text/plain` (shown inline). 404 when the job wrote none. */
+  /** Any job, queued, running or long finished (the log viewer's header). 404 when unknown. */
+  @Get(':id')
+  get(@Param('id', ParseIntPipe) id: number): Job {
+    const job = this.jobs.get(id);
+    if (!job) throw new NotFoundException(`Job ${id} not found`);
+    return toJobDto(job);
+  }
+
+  /**
+   * The job's log as `text/plain`, shown inline; `?download=1` answers it as an attachment
+   * (`job-<id>.log`). 404 when the job wrote none.
+   */
   @Get(':id/log')
-  log(@Param('id', ParseIntPipe) id: number): StreamableFile {
+  log(@Param('id', ParseIntPipe) id: number, @Query('download') download?: string): StreamableFile {
     const path = this.logs.path(id);
     let size: number;
     try {
@@ -33,7 +45,7 @@ export class JobsController {
     }
     return new StreamableFile(createReadStream(path), {
       type: 'text/plain; charset=utf-8',
-      disposition: `inline; filename="job-${id}.log"`,
+      disposition: `${isFlagSet(download) ? 'attachment' : 'inline'}; filename="job-${id}.log"`,
       length: size,
     });
   }
@@ -63,4 +75,9 @@ export class JobsController {
     if (!job) throw new NotFoundException(`Job ${id} not found`);
     return toJobDto(job);
   }
+}
+
+/** `?download=1` (or `true`, or a bare `?download`) sets the flag; `0`, `false` or absent do not. */
+function isFlagSet(value: string | undefined): boolean {
+  return value !== undefined && value !== '0' && value !== 'false';
 }

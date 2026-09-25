@@ -1,5 +1,6 @@
 import { ActivitySummary, HistoryEntry, Job } from '@mytube/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { z } from 'zod';
 import { ApiError, apiGet, apiGetText, apiPost, apiPostEmpty } from './client';
 
@@ -92,9 +93,46 @@ export function useCheckAll() {
   });
 }
 
-/** The job's yt-dlp log (`text/plain`), opened in a new tab. */
+/** The job's log (`text/plain`, inline). */
 export function jobLogUrl(id: number): string {
   return `/api/jobs/${id}/log`;
+}
+
+/** The job's log as an attachment (`job-<id>.log`): the log viewer's Download. */
+export function jobLogDownloadUrl(id: number): string {
+  return `${jobLogUrl(id)}?download=1`;
+}
+
+const notFound = (error: Error) => error instanceof ApiError && error.status === 404;
+
+/** `GET /api/jobs/:id`: any job, for the log viewer's header when it is not in the queue. */
+export function jobQuery(id: number) {
+  return {
+    queryKey: ['activity', 'job', id] as const,
+    queryFn: () => apiGet(`/api/jobs/${id}`, Job),
+    retry: (count: number, error: Error) => !notFound(error) && count < 2,
+  };
+}
+
+/**
+ * The job the log viewer describes: its queue row while it is in the queue (polled with the
+ * queue, so the header follows the download), otherwise `GET /api/jobs/:id` once (a finished
+ * job no longer changes). A job that leaves the queue is fetched then, with its final state.
+ */
+export function useJobDetails(id: number): {
+  job: Job | undefined;
+  isPending: boolean;
+  error: Error | null;
+} {
+  const queue = useQueue();
+  const queued = queue.data?.find((job) => job.id === id);
+  const fetched = useQuery({ ...jobQuery(id), enabled: queued === undefined && queue.isFetched });
+  if (queued) return { job: queued, isPending: false, error: null };
+  return {
+    job: fetched.data,
+    isPending: fetched.data === undefined && !fetched.isError,
+    error: fetched.error,
+  };
 }
 
 /** A live job log is fetched again this often (the queue's own pace). */
@@ -109,12 +147,21 @@ export function jobLogQuery(id: number, { live }: { live: boolean }) {
     queryKey: ['activity', 'job-log', id] as const,
     queryFn: () => apiGetText(jobLogUrl(id)),
     refetchInterval: live ? JOB_LOG_POLL_MS : (false as const),
-    retry: (count: number, error: Error) =>
-      !(error instanceof ApiError && error.status === 404) && count < 2,
+    retry: (count: number, error: Error) => !notFound(error) && count < 2,
   };
 }
 
-/** `GET /api/jobs/:id/log` for the inline log panel; see `jobLogQuery`. */
+/**
+ * `GET /api/jobs/:id/log` for the log viewer; see `jobLogQuery`. When `live` turns off (the job
+ * finished or failed) the log is fetched once more, so its last lines are not missed.
+ */
 export function useJobLog(id: number, options: { live: boolean }) {
-  return useQuery(jobLogQuery(id, options));
+  const query = useQuery(jobLogQuery(id, options));
+  const wasLive = useRef(options.live);
+  const { refetch } = query;
+  useEffect(() => {
+    if (wasLive.current && !options.live) void refetch();
+    wasLive.current = options.live;
+  }, [options.live, refetch]);
+  return query;
 }

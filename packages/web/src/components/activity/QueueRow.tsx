@@ -1,11 +1,10 @@
 import type { Job } from '@mytube/shared';
-import { useState } from 'react';
 import { errorTail, queueMeta, queuePercent, queueState } from '../../format';
+import { openJobLog } from '../../ui-state';
 import { CloseIcon } from '../icons';
 import { IconButton } from '../ui/IconButton';
 import { Meta } from '../ui/typography';
 import { ActivityLink } from './ActivityLink';
-import { JobLogPanel } from './JobLogPanel';
 import { QueueState } from './QueueState';
 
 export interface QueueRowProps {
@@ -23,11 +22,10 @@ export interface QueueRowProps {
  * track, red fill). Also: a small × to cancel (or dismiss a failed row), on
  * failed rows the error's last line in red with Retry, after the download the post-processing
  * step as the state (`processing · merging`) while the bar runs from 90 to 99, and on running
- * and failed rows **View log**, which opens the job's log inline (`JobLogPanel`, live while the
- * job runs). Queued rows have no log yet.
+ * and failed rows **View log**, which opens the log viewer (`openJobLog`, `LogViewerModal`,
+ * live while the job runs). Queued rows have no log yet.
  */
 export function QueueRow({ job, onCancel, onRetry, busy }: QueueRowProps) {
-  const [logOpen, setLogOpen] = useState(false);
   const state = queueState(job);
   const percent = queuePercent(job);
   const meta = queueMeta(job);
@@ -56,12 +54,8 @@ export function QueueRow({ job, onCancel, onRetry, busy }: QueueRowProps) {
                 Retry
               </ActivityLink>
             )}
-            <ActivityLink
-              onClick={() => setLogOpen((open) => !open)}
-              expanded={logOpen}
-              label={`${logOpen ? 'Hide' : 'View'} the log of ${job.title}`}
-            >
-              {logOpen ? 'Hide log' : 'View log'}
+            <ActivityLink onClick={() => openJobLog(job.id)} label={`View log of ${job.title}`}>
+              View log
             </ActivityLink>
           </div>
         )}
@@ -87,7 +81,6 @@ export function QueueRow({ job, onCancel, onRetry, busy }: QueueRowProps) {
       >
         <div className="h-full rounded-[2px] bg-red" style={{ width: `${percent}%` }} />
       </div>
-      {hasLog && logOpen && <JobLogPanel jobId={job.id} live={running} title={job.title} />}
     </li>
   );
 }

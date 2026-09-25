@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   closeAdd,
+  closeJobLog,
   closePreview,
   isAddOpen,
+  jobLogTarget,
   openAdd,
+  openJobLog,
   openEmptyPreview,
   openPreview,
   openTrackPreview,
@@ -68,5 +71,28 @@ describe('Preview state', () => {
     expect(previewKey({ kind: 'video', id: 4 })).toBe('video:4');
     expect(previewKey({ kind: 'track', id: 4 })).toBe('track:4');
     expect(previewKey({ kind: 'empty', title: 'X' })).toBe('empty:X');
+  });
+});
+
+describe('Log viewer state', () => {
+  afterEach(() => {
+    closeJobLog();
+  });
+
+  it('shows one job at a time and notifies on changes only', () => {
+    const listener = vi.fn<() => void>();
+    const unsubscribe = subscribeUiState(listener);
+    expect(jobLogTarget()).toBeNull();
+    openJobLog(7);
+    openJobLog(7);
+    expect(jobLogTarget()).toBe(7);
+    expect(listener).toHaveBeenCalledTimes(1);
+    openJobLog(8);
+    expect(jobLogTarget()).toBe(8);
+    closeJobLog();
+    closeJobLog();
+    expect(jobLogTarget()).toBeNull();
+    expect(listener).toHaveBeenCalledTimes(3);
+    unsubscribe();
   });
 });

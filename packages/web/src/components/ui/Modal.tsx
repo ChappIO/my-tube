@@ -15,6 +15,12 @@ interface ModalBaseProps {
   width?: string;
   /** CSS max height of the dialog (Preview: `calc(100vh - 48px)`). None by default. */
   maxHeight?: string;
+  /**
+   * `large` (the log viewer): `min(1100px, 100vw - 32px)` by `min(85vh, 900px)` on wide screens,
+   * the whole screen below 760px, a flex column the children fill. Ignores `width` and
+   * `maxHeight`. Default `default`.
+   */
+  size?: 'default' | 'large';
   children: ReactNode;
 }
 
@@ -58,9 +64,11 @@ export function Modal({
   dim = 'default',
   width = 'min(560px, 100%)',
   maxHeight,
+  size = 'default',
   children,
   'aria-label': ariaLabel,
 }: ModalProps) {
+  const large = size === 'large';
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const headed = title !== undefined;
@@ -101,7 +109,11 @@ export function Modal({
 
   return createPortal(
     <div
-      className={cx('fixed inset-0 z-10 grid place-items-center overflow-y-auto p-6', scrims[dim])}
+      className={cx(
+        'fixed inset-0 z-10 grid place-items-center overflow-y-auto',
+        large ? 'p-0 wide:p-4' : 'p-6',
+        scrims[dim],
+      )}
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -114,11 +126,14 @@ export function Modal({
         aria-label={headed ? undefined : ariaLabel}
         tabIndex={-1}
         className={cx(
-          'rounded-modal bg-bg text-ink outline-none',
+          'bg-bg text-ink outline-none',
+          large
+            ? 'flex h-dvh w-full flex-col wide:h-[min(85vh,900px)] wide:w-[min(1100px,100%)] wide:rounded-modal'
+            : 'rounded-modal',
           dim === 'strong' ? 'shadow-preview' : 'shadow-modal',
           headed ? 'grid gap-[22px] p-7' : 'overflow-hidden',
         )}
-        style={{ width, maxHeight }}
+        style={large ? undefined : { width, maxHeight }}
       >
         {headed && (
           <div className="flex items-center justify-between gap-4">

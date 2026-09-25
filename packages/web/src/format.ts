@@ -125,6 +125,56 @@ export function queuePercent(job: Job): number {
   return job.status === 'running' && job.progress !== null ? Math.floor(job.progress * 100) : 0;
 }
 
+export type JobTone = QueueTone | 'ok';
+
+/**
+ * The log viewer's status pill: the queue state (`downloading 64%`, `queued`, `failed`, …) while
+ * the job is in the queue, then `done` (green) or `cancelled` (muted).
+ */
+export function jobState(job: Job): { text: string; tone: JobTone } {
+  if (job.status === 'done') return { text: 'done', tone: 'ok' };
+  if (job.status === 'cancelled') return { text: 'cancelled', tone: 'muted' };
+  return queueState(job);
+}
+
+/**
+ * `1 of 3`: the attempt that runs, ran or waits. `attempts` counts failed attempts, so a job that
+ * failed for good shows its last one.
+ */
+export function jobAttempt(job: Job): string {
+  const attempt = job.status === 'failed' ? Math.max(job.attempts, 1) : job.attempts + 1;
+  return `${Math.min(attempt, job.maxAttempts)} of ${job.maxAttempts}`;
+}
+
+/** A timestamp in local time to the second: `2026-09-25 14:03:07`. */
+export function jobTime(at: string): string {
+  const date = new Date(at);
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+    `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  );
+}
+
+/** How long a job ran: `12s`, `3m 07s`, `1h 04m`. */
+export function formatElapsed(ms: number): string {
+  const seconds = Math.max(0, Math.round(ms / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ${pad(seconds % 60)}s`;
+  return `${Math.floor(minutes / 60)}h ${pad(minutes % 60)}m`;
+}
+
+/**
+ * The duration of the job's current or last run: started to finished, or to `now` while it
+ * runs. Null before it started.
+ */
+export function jobDuration(job: Job, now: number = Date.now()): string | null {
+  if (!job.startedAt) return null;
+  const end = job.finishedAt ? Date.parse(job.finishedAt) : job.status === 'running' ? now : null;
+  if (end === null) return null;
+  return formatElapsed(end - Date.parse(job.startedAt));
+}
+
 /** The last line of an error, which is the useful one for yt-dlp (`ERROR: … unavailable`). */
 export function errorTail(error: string | null): string | null {
   if (!error) return null;
