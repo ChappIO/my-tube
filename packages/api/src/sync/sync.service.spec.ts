@@ -228,6 +228,8 @@ describe('SyncService', () => {
         channelId: null,
         channel: null,
         thumbnails: [],
+        expectedStreams: [],
+        expectedBytes: null,
       })),
     };
     const result = sync.applyListing(source, channel, NOW);

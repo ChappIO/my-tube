@@ -26,6 +26,8 @@ function entry(overrides: Partial<SourceEntry> = {}): SourceEntry {
     channelId: null,
     channel: null,
     thumbnails: [],
+    expectedStreams: [],
+    expectedBytes: null,
     ...overrides,
   };
 }

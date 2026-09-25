@@ -16,6 +16,8 @@
 //   FAKE_YTDLP_DELAY_MS=<ms>    delay before each progress line (and before the JSON)
 //   FAKE_YTDLP_STDOUT=<text>    print this instead of a fixture for --dump-single-json
 //   FAKE_YTDLP_ARGS_FILE=<path> write the received argv as JSON to this file
+//   FAKE_YTDLP_STREAMS=split    a download as a merged video: subtitles, thumbnail conversion,
+//                               a video and an audio stream, then four post-processors
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
@@ -66,23 +68,52 @@ const output = (option('-o') ?? '%(id)s.%(ext)s')
   .replaceAll('%(id)s', id)
   .replaceAll('%(title)s', 'Fake video')
   .replaceAll('%(ext)s', 'mp4');
-const total = 3000000;
-const progress = (fields) => process.stdout.write(`[mytube-progress] ${JSON.stringify(fields)}\n`);
-
-for (const downloaded of [1024, 750000, 1500000, 3000000]) {
-  await sleep(delay);
-  const remaining = total - downloaded;
-  progress({
-    status: 'downloading',
-    downloaded_bytes: downloaded,
+const progress = (formatId, fields) =>
+  process.stdout.write(
+    `[mytube-progress] ${JSON.stringify({ format_id: formatId, progress: fields })}\n`,
+  );
+const postprocess = (name) => {
+  for (const status of ['started', 'finished']) {
+    process.stderr.write(`[mytube-progress] {"status": "${status}", "postprocessor": "${name}"}\n`);
+  }
+};
+// One stream: its total is known from the first line. yt-dlp learns a stream's size only when
+// that stream starts, so a second stream's total is not in the first stream's lines.
+const stream = async (formatId, total, steps) => {
+  for (const downloaded of steps) {
+    await sleep(delay);
+    progress(formatId, {
+      status: 'downloading',
+      downloaded_bytes: downloaded,
+      total_bytes: total,
+      speed: 1048576.5,
+      eta: Math.ceil((total - downloaded) / 1048576),
+    });
+  }
+  progress(formatId, {
+    status: 'finished',
+    downloaded_bytes: total,
     total_bytes: total,
     speed: 1048576.5,
-    eta: Math.ceil(remaining / 1048576),
   });
+};
+
+if (env.FAKE_YTDLP_STREAMS === 'split') {
+  // What a merged download with subtitles and a thumbnail prints (yt-dlp 2026.08.19): the
+  // subtitle track (no format id), the thumbnail conversion, the video stream, the audio
+  // stream, then the post-processors. Sizes match requested_formats in video.json.
+  progress('', { status: 'finished', downloaded_bytes: 1642, total_bytes: 1642 });
+  postprocess('ThumbnailsConvertor');
+  await stream('248', 2400000, [1024, 600000, 1200000, 1800000, 2400000]);
+  await stream('251', 600000, [1024, 150000, 300000, 450000, 600000]);
+  for (const name of ['Merger', 'VideoRemuxer', 'EmbedSubtitle', 'MoveFiles']) {
+    await sleep(delay);
+    postprocess(name);
+  }
+} else {
+  await stream('18', 3000000, [1024, 750000, 1500000, 3000000]);
+  postprocess('MoveFiles');
 }
-progress({ status: 'finished', downloaded_bytes: total, total_bytes: total, speed: 1048576.5 });
-process.stderr.write('[mytube-progress] {"status": "started", "postprocessor": "MoveFiles"}\n');
-process.stderr.write('[mytube-progress] {"status": "finished", "postprocessor": "MoveFiles"}\n');
 mkdirSync(dirname(output), { recursive: true });
 writeFileSync(output, 'fake media');
 process.stdout.write(`[mytube-file] ${output}\n`);

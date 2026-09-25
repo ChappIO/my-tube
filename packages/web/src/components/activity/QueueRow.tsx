@@ -2,10 +2,10 @@ import type { Job } from '@mytube/shared';
 import { jobLogUrl } from '../../api/activity';
 import { errorTail, queueMeta, queuePercent, queueState } from '../../format';
 import { CloseIcon } from '../icons';
-import { cx } from '../ui/cx';
 import { IconButton } from '../ui/IconButton';
 import { Meta } from '../ui/typography';
 import { ActivityLink } from './ActivityLink';
+import { QueueState } from './QueueState';
 
 export interface QueueRowProps {
   job: Job;
@@ -19,8 +19,9 @@ export interface QueueRowProps {
 /**
  * One queue row (handoff Screen 5): title Archivo 600 15, meta Space Mono 12 muted, state Space
  * Mono 700 13 (`downloading 64%` red, `queued` muted), and a full-width 4px bar (`surface`
- * track, red fill). Additions to the handoff: a small × to cancel (or dismiss a failed row), and
- * on failed rows the error's last line in red with Retry and View log.
+ * track, red fill). Additions to the handoff: a small × to cancel (or dismiss a failed row), on
+ * failed rows the error's last line in red with Retry and View log, and after the download the
+ * post-processing step as the state (`processing · merging`) while the bar runs from 90 to 99.
  */
 export function QueueRow({ job, onCancel, onRetry, busy }: QueueRowProps) {
   const state = queueState(job);
@@ -54,14 +55,7 @@ export function QueueRow({ job, onCancel, onRetry, busy }: QueueRowProps) {
         )}
       </div>
       <div className="flex items-center gap-3">
-        <span
-          className={cx(
-            'font-mono text-[13px] font-bold whitespace-nowrap',
-            state.tone === 'red' ? 'text-red' : 'text-muted',
-          )}
-        >
-          {state.text}
-        </span>
+        <QueueState text={state.text} tone={state.tone} />
         <IconButton
           size="sm"
           label={failed ? `Dismiss ${job.title}` : `Cancel ${job.title}`}

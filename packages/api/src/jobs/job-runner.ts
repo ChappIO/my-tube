@@ -15,6 +15,8 @@ export interface JobProgress {
   etaSeconds?: number | null;
   /** Expected size of the whole download, for the queue meta line. */
   totalBytes?: number | null;
+  /** What the job is doing when it is not fetching bytes (a yt-dlp post-processor name). */
+  stage?: string | null;
 }
 
 export interface JobContext {

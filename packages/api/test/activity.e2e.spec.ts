@@ -91,6 +91,16 @@ describe('Activity (e2e)', () => {
 
     const queue = z.array(Job).parse((await request(server()).get('/api/activity/queue')).body);
     expect(queue.map((row) => row.id)).toEqual([job.id]);
+    expect(queue[0]).toMatchObject({ status: 'queued', progress: null, stage: null });
+
+    // A running job's post-processing stage reaches the queue, and a cancel clears it.
+    jobs.claimNext(['rescan']);
+    jobs.updateProgress(job.id, { progress: 0.911, stage: 'Merger', speedBytesPerSec: null });
+    const running = z.array(Job).parse((await request(server()).get('/api/activity/queue')).body);
+    expect(running[0]).toMatchObject({ status: 'running', progress: 0.911, stage: 'Merger' });
+    jobs.cancel(job.id);
+    expect(jobs.get(job.id)).toMatchObject({ status: 'cancelled', stage: null });
+    await request(server()).post(`/api/jobs/${job.id}/retry`).expect(200);
     const summary = ActivitySummary.parse(
       (await request(server()).get('/api/activity/summary').expect(200)).body,
     );

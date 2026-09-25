@@ -131,6 +131,7 @@ describe('YtdlpRunner (fake binary)', () => {
       totalBytes: 3000000,
       speedBytesPerSec: 1048577,
       etaSeconds: 3,
+      formatId: '18',
     });
     expect(progress.at(-1)?.postprocessor).toBe('MoveFiles');
     expect(receivedArgs()).toContain('bv*+ba/b');

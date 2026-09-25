@@ -260,6 +260,8 @@ export const jobs = sqliteTable(
     etaSeconds: integer('eta_seconds'),
     /** Expected download size (migration 20260925120100_jobs_total_bytes). */
     totalBytes: integer('total_bytes'),
+    /** yt-dlp post-processor while post-processing (migration 20260927100000_jobs_stage). */
+    stage: text('stage'),
     error: text('error'),
     createdAt: text('created_at').notNull().default(now),
     startedAt: text('started_at'),

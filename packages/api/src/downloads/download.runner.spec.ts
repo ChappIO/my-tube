@@ -35,7 +35,12 @@ describe('DownloadRunner (fake binary)', () => {
   });
 
   afterEach(() => {
-    for (const name of ['FAKE_YTDLP_FAIL', 'FAKE_YTDLP_DELAY_MS', 'FAKE_YTDLP_STDOUT']) {
+    for (const name of [
+      'FAKE_YTDLP_FAIL',
+      'FAKE_YTDLP_DELAY_MS',
+      'FAKE_YTDLP_STDOUT',
+      'FAKE_YTDLP_STREAMS',
+    ]) {
       delete process.env[name];
     }
     delete process.env.FAKE_YTDLP_ARGS_FILE;
@@ -99,6 +104,7 @@ describe('DownloadRunner (fake binary)', () => {
     const { runner, job, row, db, source, logs, config } = setup();
     const argsFile = join(root, 'args.json');
     process.env.FAKE_YTDLP_ARGS_FILE = argsFile;
+    process.env.FAKE_YTDLP_STREAMS = 'split';
     const { ctx, reports } = context();
 
     const outcome = await runner.run(job, ctx);
@@ -121,12 +127,32 @@ describe('DownloadRunner (fake binary)', () => {
     expect(row().downloadedAt).not.toBeNull();
     expect(db.select().from(sources).where(eq(sources.id, source.id)).get()?.sizeBytes).toBe(10);
 
-    // Progress is one monotonic bar with the total size.
+    // The size the metadata call resolved (video + audio in video.json) is known up front.
+    expect(reports[0]).toEqual({ totalBytes: 3_000_000 });
+    // Progress is one monotonic bar: up to 0.9 over both streams (the subtitle track does not
+    // count), then a step per post-processor, which is also the stage.
     const fractions = reports.flatMap((r) => (r.progress == null ? [] : [r.progress]));
-    expect(fractions.length).toBeGreaterThan(2);
     expect(fractions.toSorted((a, b) => a - b)).toEqual(fractions);
-    expect(Math.max(...fractions)).toBeLessThan(1);
-    expect(reports.some((r) => r.totalBytes === 3_000_000)).toBe(true);
+    const downloading = reports.filter((r) => r.progress != null && r.stage === null);
+    expect(downloading.length).toBeGreaterThan(8);
+    expect(downloading.every((r) => r.progress! <= 0.9 && r.totalBytes === 3_000_000)).toBe(true);
+    // The video stream (2.4 of 3 MB) ends at 0.72, not at the cap.
+    expect(downloading.some((r) => Math.abs(r.progress! - 0.72) < 1e-9)).toBe(true);
+    expect(Math.max(...fractions)).toBeCloseTo(0.944, 9);
+    const stages = reports.flatMap((r) => (r.stage ? [[r.stage, r.progress ?? null]] : []));
+    expect(stages).toEqual([
+      ['ThumbnailsConvertor', null],
+      ['ThumbnailsConvertor', null],
+      ['Merger', 0.911],
+      ['Merger', 0.911],
+      ['VideoRemuxer', 0.922],
+      ['VideoRemuxer', 0.922],
+      ['EmbedSubtitle', expect.closeTo(0.933, 9)],
+      ['EmbedSubtitle', expect.closeTo(0.933, 9)],
+      ['MoveFiles', expect.closeTo(0.944, 9)],
+      ['MoveFiles', expect.closeTo(0.944, 9)],
+    ]);
+    expect(reports.filter((r) => r.stage).every((r) => r.speedBytesPerSec === null)).toBe(true);
 
     // Format, container, subtitles and thumbnails come from Settings → Video.
     const args = z.array(z.string()).parse(JSON.parse(readFileSync(argsFile, 'utf8')));
@@ -144,6 +170,10 @@ describe('DownloadRunner (fake binary)', () => {
     const log = readFileSync(logs.path(job.id), 'utf8');
     expect(log).toMatch(/^=== download job 1 · attempt 1 of 3 /);
     expect(log.match(/^\$ /gm)).toHaveLength(2);
+    // The metadata call resolves the same format selector as the download.
+    expect(log).toMatch(
+      /^\$ .* --dump-single-json .* -f bestvideo\[height<=1080\]\+bestaudio\/best\[height<=1080\] -- /m,
+    );
     expect(log).toContain('[mytube-progress]');
     expect(log).toContain(`saved ${path} (10 bytes)`);
   });

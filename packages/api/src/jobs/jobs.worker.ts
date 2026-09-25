@@ -144,10 +144,15 @@ export class JobsWorker implements OnApplicationBootstrap, OnModuleDestroy {
     const runner = this.runners.get(job.type)!;
     const controller = new AbortController();
     let lastWrite = 0;
+    let lastStage: string | null = null;
     const progress = (update: JobProgress) => {
       const now = Date.now();
-      if (now - lastWrite < PROGRESS_WRITE_MS && update.progress !== 1) return;
+      // A new stage (merging, moving the file, …) is written at once: post-processing steps are
+      // few and short, and the queue should not keep showing the previous one.
+      const stageChanged = update.stage !== undefined && (update.stage || null) !== lastStage;
+      if (now - lastWrite < PROGRESS_WRITE_MS && update.progress !== 1 && !stageChanged) return;
       lastWrite = now;
+      if (update.stage !== undefined) lastStage = update.stage || null;
       this.jobs.updateProgress(job.id, update);
     };
 

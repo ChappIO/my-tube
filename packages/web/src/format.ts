@@ -102,11 +102,36 @@ export function queueMeta(job: Job): string {
 
 export type QueueTone = 'red' | 'muted';
 
-/** The state column: `downloading 64%` (red), `checking`, `queued` (muted), `failed` (red). */
+// yt-dlp post-processors by the name its progress hook reports (the class name without the
+// `FFmpeg` prefix and `PP` suffix; the prefixed spelling is accepted too).
+const STAGE_LABELS: Record<string, string> = {
+  Merger: 'merging',
+  VideoRemuxer: 'remuxing',
+  VideoConvertor: 'converting video',
+  EmbedSubtitle: 'embedding subtitles',
+  SubtitlesConvertor: 'converting subtitles',
+  ThumbnailsConvertor: 'converting thumbnail',
+  EmbedThumbnail: 'embedding thumbnail',
+  MoveFiles: 'moving file',
+  MoveFilesAfterDownload: 'moving file',
+  Metadata: 'writing tags',
+};
+
+/** A post-processor stage as the queue says it: `Merger` → `merging`; unknown ones lowercased. */
+export function stageLabel(stage: string): string {
+  const key = stage.replace(/^FFmpeg/, '').replace(/PP$/, '');
+  return STAGE_LABELS[key] ?? stage.toLowerCase();
+}
+
+/**
+ * The state column: `downloading 64%` (red), `processing · merging` once the bytes are in,
+ * `checking`, `queued` (muted), `failed` (red).
+ */
 export function queueState(job: Job): { text: string; tone: QueueTone } {
   if (job.status === 'failed') return { text: 'failed', tone: 'red' };
   if (job.status !== 'running') return { text: 'queued', tone: 'muted' };
   if (job.type === 'check_source') return { text: 'checking', tone: 'red' };
+  if (job.stage) return { text: `processing · ${stageLabel(job.stage)}`, tone: 'red' };
   if (job.type !== 'download') return { text: 'running', tone: 'red' };
   if (job.progress === null) return { text: 'starting', tone: 'red' };
   return { text: `downloading ${Math.floor(job.progress * 100)}%`, tone: 'red' };

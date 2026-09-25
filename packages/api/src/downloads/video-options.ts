@@ -1,4 +1,5 @@
 import type { VideoSettings } from '@mytube/shared';
+import type { ExpectedStream } from '../ytdlp/metadata.js';
 import type { DownloadProgress } from '../ytdlp/progress.js';
 import type { JobProgress } from '../jobs/job-runner.js';
 
@@ -56,38 +57,120 @@ export function isUnavailableReason(reason: string | null | undefined): boolean 
   return typeof reason === 'string' && UNAVAILABLE.test(reason);
 }
 
+/** Share of the bar for fetching bytes; the rest up to 1 is post-processing and completion. */
+export const DOWNLOAD_SHARE = 0.9;
+/** How far each distinct post-processor moves the bar into the 0.9 to 0.99 band. */
+export const POSTPROCESS_STEP = 0.011;
+/** Steps counted at most, so the bar stays below 0.99 however many post-processors run. */
+export const POSTPROCESS_MAX_STEPS = 8;
+
 /**
- * Turns yt-dlp's per-stream progress into one job progress. yt-dlp downloads the video stream
- * and then the audio stream, each from 0 to 100 %; this adds the finished streams' bytes so the
- * bar runs once from 0 to 1 and never moves backwards (the audio's size is unknown until it
- * starts, so the total grows a little then). It stays below 1 until the job completes.
+ * Turns yt-dlp's per-stream progress into one job progress:
+ *
+ * - **0 to 0.9: downloading.** yt-dlp fetches the video stream and then the audio stream, each
+ *   from 0 to 100 %. The bar is (finished streams' bytes + the current stream's share of its
+ *   size) / (finished + current + the streams still to come). The streams and their expected
+ *   sizes come from the metadata call made with the download's format selector
+ *   (`SourceEntry.expectedStreams`), so the whole size is known up front and the bar runs once
+ *   through all streams without moving backwards. A stream reports its own exact size once it
+ *   starts, which replaces the expected one. When a size is unknown, yt-dlp's per-stream totals
+ *   and estimates stand in: the bar may then step back when the audio stream reveals its size,
+ *   but it never stands still while bytes arrive. Subtitle tracks (side files without a
+ *   format) do not count.
+ * - **0.9 to 0.99: post-processing.** Each distinct post-processor that runs after the
+ *   download (Merger, VideoRemuxer, EmbedSubtitle, MoveFiles, …) moves the bar one step and
+ *   becomes the job's `stage`. Post-processors that run before any stream (thumbnail
+ *   conversion) only set the stage.
+ * - **1: done**, written by the jobs service when the job completes.
  */
 export class DownloadProgressTracker {
+  /** Bytes of the media streams that finished. */
   private finishedBytes = 0;
+  /** Index of the stream being fetched in `streams` (media streams finished so far). */
+  private index = 0;
   private fraction = 0;
+  private mediaSeen = false;
+  private readonly steps = new Set<string>();
+  /** Every expected stream has a size: the bar never moves backwards. */
+  private readonly known: boolean;
+
+  constructor(private readonly streams: readonly ExpectedStream[] = []) {
+    this.known = streams.length > 0 && streams.every((stream) => stream.bytes !== null);
+  }
+
+  /** The report to make before the download starts: the expected size, when known. */
+  start(): JobProgress {
+    return this.known ? { totalBytes: this.later(0) } : {};
+  }
 
   update(progress: DownloadProgress): JobProgress | null {
-    if (progress.status === 'postprocessing') {
-      return { speedBytesPerSec: null, etaSeconds: null };
-    }
+    if (progress.status === 'postprocessing') return this.postprocess(progress.postprocessor);
+    // A side file (subtitles) is not part of the expected size.
+    if (progress.formatId === null) return null;
+    this.mediaSeen = true;
+
+    // The current stream's size (its weight in the bar) and how far it is, 0 to 1.
+    let size = 0;
+    let shown = 0;
+    let ratio: number | null = 0;
     if (progress.status === 'finished') {
       this.finishedBytes += progress.totalBytes ?? progress.downloadedBytes ?? 0;
-      return { totalBytes: this.finishedBytes || null, etaSeconds: null };
+      this.index += 1;
+    } else {
+      const planned = this.planned(progress.formatId);
+      const exact = progress.estimated ? null : progress.totalBytes;
+      const downloaded = progress.downloadedBytes ?? 0;
+      size = exact ?? planned ?? progress.totalBytes ?? 0;
+      if (exact) ratio = downloaded / exact;
+      else if (progress.percent !== null) ratio = progress.percent / 100;
+      else ratio = size > 0 ? downloaded / size : null;
+      ratio = ratio === null ? null : Math.min(1, Math.max(0, ratio));
+      // yt-dlp's estimate settles once some of the stream is in; before that, the plan.
+      const estimate = progress.estimated && (ratio ?? 0) >= 0.1 ? progress.totalBytes : null;
+      shown = exact ?? estimate ?? planned ?? progress.totalBytes ?? 0;
     }
-    const total = this.finishedBytes + (progress.totalBytes ?? 0);
-    const done = this.finishedBytes + (progress.downloadedBytes ?? 0);
-    const raw =
-      progress.totalBytes && total > 0
-        ? done / total
-        : progress.percent === null
-          ? 0
-          : progress.percent / 100;
-    this.fraction = Math.max(this.fraction, Math.min(raw, 0.99));
+    const later = this.later(progress.status === 'finished' ? this.index : this.index + 1);
+    const total = this.finishedBytes + size + later;
+    if (ratio !== null) {
+      // No sizes at all (a single stream reporting only a percentage): the ratio is the bar.
+      const share = this.share(total > 0 ? (this.finishedBytes + ratio * size) / total : ratio);
+      this.fraction = this.known ? Math.max(this.fraction, share) : share;
+    }
+    const finished = progress.status === 'finished';
+    const totalBytes = this.finishedBytes + shown + later;
     return {
       progress: this.fraction,
-      speedBytesPerSec: progress.speedBytesPerSec,
-      etaSeconds: progress.etaSeconds,
-      totalBytes: total > 0 ? total : null,
+      speedBytesPerSec: finished ? null : progress.speedBytesPerSec,
+      etaSeconds: finished ? null : progress.etaSeconds,
+      totalBytes: totalBytes > 0 ? totalBytes : null,
+      stage: null,
     };
+  }
+
+  /** The expected size of the stream being fetched, unless yt-dlp fetches another format. */
+  private planned(formatId: string | undefined): number | null {
+    const stream = this.streams[this.index];
+    if (!stream) return null;
+    if (formatId && stream.formatId && formatId !== stream.formatId) return null;
+    return stream.bytes;
+  }
+
+  /** Expected bytes of the streams from `index` on. */
+  private later(index: number): number {
+    return this.streams.slice(index).reduce((sum, stream) => sum + (stream.bytes ?? 0), 0);
+  }
+
+  private postprocess(name: string | undefined): JobProgress {
+    const stage = name ?? null;
+    const idle = { speedBytesPerSec: null, etaSeconds: null, stage };
+    if (!this.mediaSeen) return idle;
+    if (stage) this.steps.add(stage);
+    const steps = Math.min(this.steps.size, POSTPROCESS_MAX_STEPS);
+    this.fraction = Math.max(this.fraction, DOWNLOAD_SHARE + steps * POSTPROCESS_STEP);
+    return { ...idle, progress: this.fraction };
+  }
+
+  private share(ratio: number): number {
+    return Math.min(DOWNLOAD_SHARE, Math.max(0, ratio) * DOWNLOAD_SHARE);
   }
 }

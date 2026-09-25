@@ -102,6 +102,55 @@ describe('parseSourceMetadata', () => {
     ]);
   });
 
+  it('sums the selected streams into expectedBytes', () => {
+    // The fixture was fetched with a format selector: video (exact) plus audio (estimated).
+    const source = parseSourceMetadata(fixture('video.json'));
+    expect(source.entries[0]?.expectedStreams).toEqual([
+      { formatId: '248', bytes: 2_400_000 },
+      { formatId: '251', bytes: 600_000 },
+    ]);
+    expect(source.entries[0]?.expectedBytes).toBe(2_400_000 + 600_000);
+
+    const video = { _type: 'video', id: 'v1', title: 'One', duration: 1180 };
+    const bytes = (info: object) => parseSourceMetadata({ ...video, ...info }).entries[0];
+    // A single file: exact size first, then the estimate.
+    expect(bytes({ filesize: 5000, filesize_approx: 6000 })?.expectedBytes).toBe(5000);
+    expect(bytes({ filesize: null, filesize_approx: 6000.4 })?.expectedBytes).toBe(6000);
+    // A merged download: the requested streams win over the top-level size.
+    expect(
+      bytes({
+        filesize_approx: 1,
+        requested_formats: [{ filesize: 900 }, { filesize: null, filesize_approx: 100 }],
+      })?.expectedBytes,
+    ).toBe(1000);
+    // An HLS stream has no size, only a bitrate (kbit/s): bitrate × duration stands in.
+    expect(
+      bytes({
+        requested_formats: [
+          { format_id: '616', filesize: null, filesize_approx: null, tbr: 3508.025 },
+          { format_id: '140', filesize: 19_105_583, tbr: 129.476 },
+        ],
+      })?.expectedStreams,
+    ).toEqual([
+      { formatId: '616', bytes: 517_433_688 },
+      { formatId: '140', bytes: 19_105_583 },
+    ]);
+    // One stream of unknown size makes the whole unknown.
+    const partly = bytes({ requested_formats: [{ filesize: 900 }, { format_id: '140' }] });
+    expect(partly?.expectedStreams).toEqual([
+      { formatId: null, bytes: 900 },
+      { formatId: '140', bytes: null },
+    ]);
+    expect(partly?.expectedBytes).toBeNull();
+    expect(bytes({})).toMatchObject({ expectedStreams: [], expectedBytes: null });
+    expect(bytes({ format_id: '18', filesize: 5000 })?.expectedStreams).toEqual([
+      { formatId: '18', bytes: 5000 },
+    ]);
+    // Flat listing entries carry no sizes.
+    const channel = parseSourceMetadata(fixture('channel.json'));
+    expect(channel.entries.every((entry) => entry.expectedBytes === null)).toBe(true);
+  });
+
   it('drops invalid entries, ignores unknown fields and tolerates odd values', () => {
     const source = parseSourceMetadata({
       _type: 'playlist',

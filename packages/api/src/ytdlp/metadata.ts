@@ -13,7 +13,11 @@ import { z } from 'zod';
  *   channel's tabs (Videos, Live, Shorts), each a nested playlist with its own entries.
  * - Channel tab (`/@handle/videos`) and playlist (`/playlist?list=`): `_type: playlist` with
  *   flat `_type: url` entries.
- * - Single video: `_type: video` with full metadata and no entries.
+ * - Single video: `_type: video` with full metadata and no entries. It also names the streams
+ *   yt-dlp's format selection picked (`-f`, see `MetadataArgs.format`, else its default):
+ *   `requested_formats` (video and audio, each with `format_id` and `filesize`,
+ *   `filesize_approx` or at least `tbr`) for a merged download, or the same fields at the top
+ *   level for a single file. HLS formats often have no size at all, only a bitrate.
  */
 
 const str = z.string().nullish().catch(null);
@@ -65,6 +69,14 @@ export const RawInfo = z.object({
   live_status: LiveStatus.nullish().catch(null),
   playlist_count: num,
   thumbnails,
+  // Sizes of what a download would fetch: the selected streams of a merged download, or the
+  // single file. Present for a single video only (flat entries carry no formats).
+  format_id: str,
+  filesize: num,
+  filesize_approx: num,
+  /** Total bitrate in kbit/s. */
+  tbr: num,
+  requested_formats: z.array(z.unknown()).nullish().catch(null),
   // Entries are validated one by one in `toSourceMetadata`, so one odd entry does not
   // reject the whole listing.
   entries: z.array(z.unknown()).nullish().catch(null),
@@ -99,6 +111,23 @@ export interface SourceEntry {
   channelId: string | null;
   channel: string | null;
   thumbnails: Thumbnail[];
+  /**
+   * The streams a download of this entry fetches, in download order (video, then audio), with
+   * their expected sizes. Empty for flat listing entries, which carry no formats.
+   */
+  expectedStreams: ExpectedStream[];
+  /**
+   * Bytes a download of this entry fetches: the sum of `expectedStreams`. Null when any
+   * stream's size is unknown, and for flat listing entries.
+   */
+  expectedBytes: number | null;
+}
+
+/** One stream yt-dlp selected for download. */
+export interface ExpectedStream {
+  formatId: string | null;
+  /** Exact size, else yt-dlp's estimate, else bitrate × duration; null when none is known. */
+  bytes: number | null;
 }
 
 export interface SourceMetadata {
@@ -225,7 +254,47 @@ function toEntry(node: RawInfo, tab: ChannelTab | null): SourceEntry {
     channelId: node.channel_id ?? null,
     channel: node.channel ?? node.uploader ?? null,
     thumbnails: node.thumbnails,
+    ...expected(node),
   };
+}
+
+const FormatSize = z.object({ format_id: str, filesize: num, filesize_approx: num, tbr: num });
+type FormatSize = z.infer<typeof FormatSize>;
+
+/**
+ * What a download of `node` fetches: each of `requested_formats` (separate video and audio
+ * streams), else the single file when yt-dlp selected one. `expectedBytes` sums them; one
+ * stream of unknown size makes the sum unknown.
+ */
+export function expected(node: RawInfo): Pick<SourceEntry, 'expectedStreams' | 'expectedBytes'> {
+  const formats = node.requested_formats?.length
+    ? node.requested_formats.map((item) => {
+        const parsed = FormatSize.safeParse(item);
+        return parsed.success ? parsed.data : { format_id: null };
+      })
+    : node.format_id || node.filesize || node.filesize_approx
+      ? [node]
+      : [];
+  const expectedStreams = formats.map((format) => ({
+    formatId: format.format_id ?? null,
+    bytes: sizeOf(format, node.duration),
+  }));
+  const sizes = expectedStreams.map((stream) => stream.bytes);
+  const expectedBytes =
+    sizes.length > 0 && sizes.every((bytes) => bytes !== null)
+      ? sizes.reduce((sum, bytes) => sum + bytes, 0)
+      : null;
+  return { expectedStreams, expectedBytes };
+}
+
+/**
+ * Exact size, else yt-dlp's estimate, else bitrate × duration (yt-dlp's own estimate, which
+ * it leaves out for HLS formats; there the bitrate is the playlist's, so it runs high).
+ */
+function sizeOf(format: Partial<FormatSize>, duration: number | null | undefined) {
+  const bitrateBytes = format.tbr && duration ? (format.tbr * 1000 * duration) / 8 : null;
+  const bytes = format.filesize ?? format.filesize_approx ?? bitrateBytes;
+  return bytes != null && Number.isFinite(bytes) && bytes > 0 ? Math.round(bytes) : null;
 }
 
 function formatDate(uploadDate: string | null | undefined, timestamp: number | null | undefined) {
