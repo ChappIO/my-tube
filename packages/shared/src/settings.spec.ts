@@ -26,7 +26,7 @@ describe('Settings', () => {
       },
       video: {
         pathTemplate: '{channel}/{title} ({date})',
-        quality: '1080p',
+        quality: 'best',
         container: 'mkv',
         subtitleLanguages: ['en', 'nl'],
         subtitlesEmbedded: true,

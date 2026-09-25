@@ -69,6 +69,7 @@ export const LEAF_OPTIONS: readonly { value: LeafType; label: string }[] = [
   { value: 'title_contains', label: 'Title contains' },
   { value: 'title_matches', label: 'Title matches regex' },
   { value: 'is_short', label: 'Is a short' },
+  { value: 'is_members_only', label: 'Is members-only' },
   { value: 'older_than_days', label: 'Older than' },
   { value: 'published_after', label: 'Published on or after' },
   { value: 'published_before', label: 'Published before' },
@@ -185,6 +186,7 @@ export function leafFromDraft(leaf: DraftLeaf): MatcherLeaf {
     case 'title_matches':
       return { type: leaf.type, pattern: leaf.pattern.trim() };
     case 'is_short':
+    case 'is_members_only':
       return { type: leaf.type };
     case 'published_before':
     case 'published_after':

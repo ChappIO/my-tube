@@ -151,6 +151,48 @@ describe('parseSourceMetadata', () => {
     expect(channel.entries.every((entry) => entry.expectedBytes === null)).toBe(true);
   });
 
+  it("reads the members-only badge from a flat entry's availability", () => {
+    // Trimmed from yt-dlp 2026.08.19 on https://www.youtube.com/@MengusWorkshop/videos: flat
+    // entries carry `availability: subscriber_only` for members-only videos and null otherwise.
+    const source = parseSourceMetadata({
+      _type: 'playlist',
+      id: 'UCGZdKNOxKdSNL1Qht9aC8tQ',
+      channel_id: 'UCGZdKNOxKdSNL1Qht9aC8tQ',
+      channel: "Mengu's Workshop",
+      webpage_url: 'https://www.youtube.com/@MengusWorkshop/videos',
+      entries: [
+        {
+          _type: 'url',
+          ie_key: 'Youtube',
+          id: 'Qa2iPP35WK8',
+          url: 'https://www.youtube.com/watch?v=Qa2iPP35WK8',
+          title: "What's the BEST Enchantment Deck in Premodern?",
+          duration: 2527,
+          timestamp: 1790121600,
+          live_status: null,
+          availability: null,
+        },
+        {
+          _type: 'url',
+          ie_key: 'Youtube',
+          id: 'Ar6PspVnJxc',
+          url: 'https://www.youtube.com/watch?v=Ar6PspVnJxc',
+          title: 'Enchantress vs Replenish! | Premodern Warm Up Match!',
+          duration: 1616,
+          timestamp: 1790035200,
+          live_status: null,
+          availability: 'subscriber_only',
+        },
+        { _type: 'url', id: 'odd', url: 'https://www.youtube.com/watch?v=odd', availability: 7 },
+      ],
+    });
+    expect(source.entries.map((entry) => [entry.id, entry.availability])).toEqual([
+      ['Qa2iPP35WK8', null],
+      ['Ar6PspVnJxc', 'subscriber_only'],
+      ['odd', null],
+    ]);
+  });
+
   it('drops invalid entries, ignores unknown fields and tolerates odd values', () => {
     const source = parseSourceMetadata({
       _type: 'playlist',

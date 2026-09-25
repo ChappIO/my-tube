@@ -67,6 +67,11 @@ export const RawInfo = z.object({
   timestamp: num,
   release_timestamp: num,
   live_status: LiveStatus.nullish().catch(null),
+  /**
+   * `public`, `unlisted`, `subscriber_only` (members only), `premium_only`, `needs_auth`,
+   * `private`. Flat listings set it from the entry's badge only (members only), else null.
+   */
+  availability: str,
   playlist_count: num,
   // YouTube Music fields (a track's full metadata; flat listings leave them out).
   track: str,
@@ -110,6 +115,12 @@ export interface SourceEntry {
   /** Unix seconds. In flat channel listings this is yt-dlp's approximate date (a day). */
   timestamp: number | null;
   liveStatus: LiveStatus | null;
+  /**
+   * yt-dlp's `availability`. Flat listings only fill it for badged entries (`subscriber_only`
+   * for members-only videos) and leave it null otherwise; a single video's metadata always
+   * has it (`public`, `unlisted`, ...).
+   */
+  availability: string | null;
   /** True when the URL is a `/shorts/` URL or the entry came from the Shorts tab. */
   isShort: boolean;
   /** The channel tab the entry was listed under, when the source was a channel root. */
@@ -277,6 +288,7 @@ function toEntry(node: RawInfo, tab: ChannelTab | null): SourceEntry {
     uploadDate: formatDate(node.upload_date, node.timestamp ?? node.release_timestamp),
     timestamp: node.timestamp ?? node.release_timestamp ?? null,
     liveStatus: node.live_status ?? null,
+    availability: node.availability ?? null,
     isShort: !isPlaylist && (url.includes('/shorts/') || tab === 'shorts'),
     tab,
     channelId: node.channel_id ?? null,

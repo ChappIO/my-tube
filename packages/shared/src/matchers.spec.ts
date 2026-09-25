@@ -29,6 +29,7 @@ function ctx(overrides: Partial<MatcherContext> = {}): MatcherContext {
     publishedAt: '2026-09-20',
     durationSeconds: 600,
     liveStatus: null,
+    availability: null,
     channelName: 'NASA',
     channelId: 'UCLA_DiR1FfKNvjuUpBHmylQ',
     playlistPosition: null,
@@ -61,6 +62,21 @@ describe('evaluateMatcher leaves', () => {
   it('is_short', () => {
     expect(matches({ type: 'is_short' }, { isShort: true })).toBe(true);
     expect(matches({ type: 'is_short' }, { isShort: false })).toBe(false);
+  });
+
+  it('is_members_only reads yt-dlp availability; none is unknown', () => {
+    const m = leaf({ type: 'is_members_only' });
+    const artemis = leaf({ type: 'title_contains', text: 'Artemis' });
+    expect(matches(m, { availability: 'subscriber_only' })).toBe(true);
+    expect(matches(m, { availability: 'public' })).toBe(false);
+    expect(matches(m, { availability: 'premium_only' })).toBe(false);
+    expect(matches(not(m), { availability: 'subscriber_only' })).toBe(false);
+    expect(matches(not(m), { availability: 'unlisted' })).toBe(true);
+    // Flat listings only name the availability of badged entries: unknown counts as a match.
+    expect(matches(m, { availability: null })).toBe(true);
+    expect(matches(not(m), { availability: null })).toBe(true);
+    expect(matches(or(m, artemis), { availability: null, title: 'Mars' })).toBe(true);
+    expect(matches(and(m, artemis), { availability: null, title: 'Mars' })).toBe(false);
   });
 
   it('published_before is strict, published_after includes the day', () => {
@@ -158,6 +174,12 @@ describe('evaluateMatcher gates', () => {
     expect(
       evaluateMatcher(DEFAULT_VIDEO_MATCHER, ctx({ isShort: true, publishedAt: '2020-01-01' })),
     ).toEqual({ matches: false, failing: ['no shorts', 'not older than 90 days'] });
+    expect(
+      evaluateMatcher(DEFAULT_VIDEO_MATCHER, ctx({ availability: 'subscriber_only' })),
+    ).toEqual({ matches: false, failing: ['not members only'] });
+    expect(evaluateMatcher(DEFAULT_VIDEO_MATCHER, ctx({ availability: 'public' }))).toEqual({
+      matches: true,
+    });
     expect(evaluateMatcher(and(or(artemis, orion)), ctx({ title: 'Mars' }))).toEqual({
       matches: false,
       failing: ['only "Artemis"', 'only "Orion"'],
@@ -173,6 +195,7 @@ describe('Matcher schema', () => {
       { type: 'title_contains', text: '  Artemis ' },
       { type: 'title_matches', pattern: '^Orion' },
       { type: 'is_short' },
+      { type: 'is_members_only' },
       { type: 'published_before', date: '2026-01-01' },
       { type: 'published_after', date: '2025-01-01' },
       { type: 'older_than_days', days: 90 },
@@ -195,6 +218,7 @@ describe('Matcher schema', () => {
     { type: 'nope' },
     { type: 'and' },
     { type: 'and', items: [{ type: 'is_short', extra: 1 }] },
+    { type: 'is_members_only', availability: 'subscriber_only' },
     { type: 'not', items: [] },
     { type: 'title_contains', text: '   ' },
     { type: 'title_contains', text: 'x'.repeat(201) },
@@ -257,7 +281,18 @@ describe('describeMatcher', () => {
   });
 
   it('describes the defaults', () => {
-    expect(describeMatcher(DEFAULT_VIDEO_MATCHER)).toEqual(['no shorts', 'not older than 90 days']);
+    expect(describeMatcher(DEFAULT_VIDEO_MATCHER)).toEqual([
+      'no shorts',
+      'not older than 90 days',
+      'not members only',
+    ]);
+    expect(DEFAULT_VIDEO_MATCHER).toEqual(
+      and(
+        not({ type: 'is_short' }),
+        not({ type: 'older_than_days', days: 90 }),
+        not({ type: 'is_members_only' }),
+      ),
+    );
     expect(describeMatcher(DEFAULT_MUSIC_MATCHER)).toEqual([]);
     expect(describeMatcher(or())).toEqual(['nothing']);
   });
@@ -302,6 +337,7 @@ describe('describeMatcher', () => {
       [{ type: 'title_contains', text: 'A' }, 'only "A"', 'not "A"'],
       [{ type: 'title_matches', pattern: 'x+' }, 'regex /x+/', 'not /x+/'],
       [{ type: 'is_short' }, 'only shorts', 'no shorts'],
+      [{ type: 'is_members_only' }, 'members only', 'not members only'],
       [{ type: 'published_before', date: '2026-01-01' }, 'before 2026-01-01', 'since 2026-01-01'],
       [{ type: 'published_after', date: '2026-01-01' }, 'since 2026-01-01', 'before 2026-01-01'],
       [{ type: 'older_than_days', days: 1 }, 'older than 1 day', 'not older than 1 day'],

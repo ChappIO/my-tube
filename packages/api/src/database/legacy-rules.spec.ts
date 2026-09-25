@@ -117,7 +117,11 @@ describe('matcher rules migration', () => {
         { embedCoverArt: false, syncOrder: false },
       ],
       [DEFAULT_MUSIC_MATCHER, { embedCoverArt: true, syncOrder: false }],
-      [DEFAULT_VIDEO_MATCHER, { embedCoverArt: true, syncOrder: false }],
+      // The old defaults (the members-only condition came later).
+      [
+        and(not({ type: 'is_short' }), not({ type: 'older_than_days', days: 90 })),
+        { embedCoverArt: true, syncOrder: false },
+      ],
     ]);
     // Every converted row is a valid source; the rules column is gone.
     for (const row of rows) expect(Source.safeParse(row).success).toBe(true);

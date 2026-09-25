@@ -50,7 +50,7 @@ export function videoExtraArgs(video: VideoSettings): string[] {
 // checks ("Sign in to confirm you're not a bot"), network errors and throttling are not here:
 // those may pass on a retry.
 const UNAVAILABLE =
-  /video unavailable|private video|has been removed|no longer available|account associated with this video has been terminated|members[- ]only|join this channel|copyright claim/i;
+  /video unavailable|private video|has been removed|no longer available|account associated with this video has been terminated|members[- ]only|members on level|join this channel|copyright claim/i;
 
 /** Whether a yt-dlp error reason means the video will never download (removed, private, …). */
 export function isUnavailableReason(reason: string | null | undefined): boolean {

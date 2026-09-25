@@ -71,6 +71,19 @@ describe('isUnavailableReason', () => {
     }
   });
 
+  it("recognises yt-dlp's members-only message", () => {
+    const reason =
+      "ERROR: [youtube] Ar6PspVnJxc: This video is available to this channel's members on level: " +
+      'So Good (or any higher level). Join this channel to get access to members-only content ' +
+      'and other exclusive perks.';
+    expect(isUnavailableReason(reason)).toBe(true);
+    // Each phrase on its own is enough, should YouTube reword the rest.
+    expect(
+      isUnavailableReason("[youtube] abc: available to this channel's members on level: 1"),
+    ).toBe(true);
+    expect(isUnavailableReason('[youtube] abc: members-only content')).toBe(true);
+  });
+
   it('leaves bot checks, network errors and missing reasons retryable', () => {
     expect(isUnavailableReason("[youtube] abc: Sign in to confirm you're not a bot")).toBe(false);
     expect(isUnavailableReason('Unable to download webpage: HTTP Error 503')).toBe(false);

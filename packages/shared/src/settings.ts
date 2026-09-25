@@ -138,7 +138,8 @@ export type MusicSettings = z.infer<typeof MusicSettings>;
 export const VideoSettings = z.object({
   /** Reads "Channel / Title (Date)". */
   pathTemplate: pathTemplate(VIDEO_PATH_TAGS).default('{channel}/{title} ({date})'),
-  quality: z.enum(VIDEO_QUALITIES).default('1080p'),
+  /** Highest resolution to download; `best` ("best available") has no cap. */
+  quality: z.enum(VIDEO_QUALITIES).default('best'),
   container: z.enum(VIDEO_CONTAINERS).default('mkv'),
   /** Subtitle language codes; empty means no subtitles. */
   subtitleLanguages: z

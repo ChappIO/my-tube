@@ -157,7 +157,8 @@ describe('DownloadRunner (fake binary)', () => {
     // Format, container, subtitles and thumbnails come from Settings → Video.
     const args = z.array(z.string()).parse(JSON.parse(readFileSync(argsFile, 'utf8')));
     const after = (flag: string) => args[args.indexOf(flag) + 1];
-    expect(after('-f')).toBe('bestvideo[height<=1080]+bestaudio/best[height<=1080]');
+    // The default quality is "best available": no height cap.
+    expect(after('-f')).toBe('bestvideo+bestaudio/best');
     expect(after('--merge-output-format')).toBe('mkv');
     expect(after('--remux-video')).toBe('mkv');
     expect(after('--sub-langs')).toBe('en,nl');
@@ -171,9 +172,7 @@ describe('DownloadRunner (fake binary)', () => {
     expect(log).toMatch(/^=== download job 1 · attempt 1 of 3 /);
     expect(log.match(/^\$ /gm)).toHaveLength(2);
     // The metadata call resolves the same format selector as the download.
-    expect(log).toMatch(
-      /^\$ .* --dump-single-json .* -f bestvideo\[height<=1080\]\+bestaudio\/best\[height<=1080\] -- /m,
-    );
+    expect(log).toMatch(/^\$ .* --dump-single-json .* -f bestvideo\+bestaudio\/best -- /m);
     expect(log).toContain('[mytube-progress]');
     expect(log).toContain(`saved ${path} (10 bytes)`);
   });
