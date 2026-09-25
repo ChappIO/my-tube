@@ -3,7 +3,9 @@ import { type ReactNode, useState } from 'react';
 import {
   Artwork,
   BellToggle,
+  CardGrid,
   DurationBadge,
+  MediaCard,
   MediaTile,
   MusicTile,
   PlaylistStack,
@@ -166,22 +168,38 @@ function MediaDemo() {
         </Section>
       ))}
 
-      <Section label="Videos tab · fixed chin with duration">
-        <TileGrid>
+      <Section label="Videos tab · wide cards with avatar and duration">
+        <CardGrid>
           {videos.map(([title, channel, when, duration]) => (
-            <MediaTile
+            <MediaCard
               key={title}
-              chin="fixed"
               title={title}
               channel={channel}
+              channelHref="#"
               when={when}
               duration={duration}
               art={<Artwork fill seed={title} />}
+              avatar={<Artwork fill shape="circle" seed={channel} />}
               onOpen={() => log(`onOpen: ${title}`)}
               onOpenChannel={() => log(`onOpenChannel: ${channel}`)}
             />
           ))}
-        </TileGrid>
+        </CardGrid>
+      </Section>
+
+      <Section label="Channel page · wide cards without the channel">
+        <CardGrid>
+          {videos.slice(0, 3).map(([title, , when, duration]) => (
+            <MediaCard
+              key={title}
+              title={title}
+              when={when}
+              duration={duration}
+              art={<Artwork fill seed={title} />}
+              onOpen={() => log(`onOpen: ${title}`)}
+            />
+          ))}
+        </CardGrid>
       </Section>
 
       <Section label="Music · Albums">
