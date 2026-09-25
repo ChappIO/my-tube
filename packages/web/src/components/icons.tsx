@@ -143,15 +143,12 @@ export const ICON_REGISTRY = {
   BackIcon: { base: ArrowLeft, meaning: 'Back to parent page', usedIn: 'BackLink ("← Video")' },
   ChevronLeftIcon: { base: ChevronLeft, meaning: 'Previous', usedIn: 'pagers (not used yet)' },
   ChevronRightIcon: { base: ChevronRight, meaning: 'Next', usedIn: 'pagers (not used yet)' },
-  ChevronUpIcon: {
-    base: ChevronUp,
-    meaning: 'Collapse / sort ascending',
-    usedIn: 'Tracks table sort (Stage 3+)',
-  },
+  // The Tracks sort direction is the handoff's text arrows (↑/↓), not an icon.
+  ChevronUpIcon: { base: ChevronUp, meaning: 'Collapse', usedIn: 'not used yet' },
   ChevronDownIcon: {
     base: ChevronDown,
-    meaning: 'Expand / sort descending',
-    usedIn: 'Tracks table sort, selects, rules preview list',
+    meaning: 'Expand / open a list',
+    usedIn: 'selects, rules preview list',
   },
 } as const satisfies Record<string, IconEntry>;
 

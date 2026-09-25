@@ -2,6 +2,8 @@ import { Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Query, Res } fr
 import {
   AlbumListQuery,
   PlaylistListQuery,
+  TrackListQuery,
+  type TrackPage,
   type AlbumListItem,
   type ArtistListItem,
   type PlaylistListItem,
@@ -35,6 +37,12 @@ export class MusicLibraryController {
     @Query(new ZodValidationPipe(PlaylistListQuery)) _query: PlaylistListQuery,
   ): PlaylistListItem[] {
     return this.music.listPlaylists();
+  }
+
+  /** The Tracks tab: filter, text match, sort and cursor pages with the two totals. */
+  @Get('tracks')
+  tracks(@Query(new ZodValidationPipe(TrackListQuery)) query: TrackListQuery): TrackPage {
+    return this.music.listTracks(query);
   }
 
   /** One track with its artist and album (Preview). */

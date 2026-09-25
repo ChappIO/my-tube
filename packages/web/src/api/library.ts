@@ -6,6 +6,8 @@ import {
   LibrarySummary,
   PlaylistListItem,
   TrackListItem,
+  type TrackListQuery,
+  TrackPage,
   type VideoListQuery,
   VideoListItem,
   VideoPage,
@@ -13,6 +15,7 @@ import {
 } from '@mytube/shared';
 import {
   type QueryClient,
+  keepPreviousData,
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -43,6 +46,7 @@ export const libraryKeys = {
   albums: (artistId: number | undefined) => ['library', 'albums', artistId ?? 'all'] as const,
   playlists: ['library', 'playlists'] as const,
   track: (id: number) => ['library', 'track', id] as const,
+  tracks: (filter: TrackFilterState) => ['library', 'tracks', filter] as const,
 };
 
 function videosUrl(filter: VideoFilter, cursor: string | null): string {
@@ -183,6 +187,31 @@ export function useTrack(id: number) {
     enabled: id > 0,
     queryFn: () => apiGet(`/api/library/tracks/${id}`, TrackListItem),
     retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 2,
+  });
+}
+
+/** What the Tracks tab lists: the filter text, the filter and the sort. */
+export type TrackFilterState = Pick<TrackListQuery, 'filter' | 'sort' | 'dir'> & { q: string };
+
+export function tracksUrl(filter: TrackFilterState, cursor: string | null): string {
+  const params = new URLSearchParams({ filter: filter.filter, sort: filter.sort, dir: filter.dir });
+  if (filter.q.trim() !== '') params.set('q', filter.q.trim());
+  if (cursor) params.set('cursor', cursor);
+  return `/api/library/tracks?${params.toString()}`;
+}
+
+/**
+ * The Tracks tab (`GET /api/library/tracks`), 60 per page; `fetchNextPage` loads the next one
+ * while `hasNextPage`. The previous result stays on screen while a new filter or sort loads, so
+ * the table does not flash empty on every keystroke.
+ */
+export function useTracks(filter: TrackFilterState) {
+  return useInfiniteQuery({
+    queryKey: libraryKeys.tracks(filter),
+    queryFn: ({ pageParam }) => apiGet(tracksUrl(filter, pageParam), TrackPage),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.nextCursor,
+    placeholderData: keepPreviousData,
   });
 }
 

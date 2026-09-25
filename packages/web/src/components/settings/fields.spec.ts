@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { valueInputChars } from '../ui/TextValueInput';
 import { formatLanguageList, parseLanguageList, qualityLabel, textOrNull } from './fields';
+import { discogsNote, validateDiscogsToken } from './MetadataProvidersCard';
 import { validateMusicTemplate } from './MusicSettings';
 import { validateNetworkField } from './NetworkCard';
 import { validateLanguageList } from './VideoControls';
@@ -38,6 +39,18 @@ describe('settings field helpers', () => {
     expect(validateMusicTemplate('../{title:02}')).toBe(
       ':02 only pads numbers, not {title:02}. Folders named .. are not allowed.',
     );
+  });
+
+  it('validates the Discogs token and notes a Discogs toggle without one', () => {
+    expect(validateDiscogsToken('')).toBeUndefined();
+    expect(validateDiscogsToken('abcDEF123')).toBeUndefined();
+    expect(validateDiscogsToken('abc def')).toBe('A token has no spaces.');
+    const off = { musicbrainz: { enabled: false }, discogs: { enabled: false, token: null } };
+    expect(discogsNote(off)).toBeUndefined();
+    expect(discogsNote({ ...off, discogs: { enabled: true, token: null } })).toBe(
+      'Discogs is skipped until a token is set.',
+    );
+    expect(discogsNote({ ...off, discogs: { enabled: true, token: 'abc' } })).toBeUndefined();
   });
 
   it('sizes a text value box to its text within bounds', () => {

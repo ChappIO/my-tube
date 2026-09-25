@@ -14,6 +14,7 @@ import { ToggleRow } from '../ui/Toggle';
 import { LibraryCard } from './LibraryCard';
 import { ON_OFF_OPTIONS, optionsOf, qualityLabel, schemaError } from './fields';
 import { DefaultRulesEditor } from './DefaultRulesEditor';
+import { MetadataProvidersCard } from './MetadataProvidersCard';
 import { SettingsTab } from './SettingsTab';
 
 const audioOptions = optionsOf(AUDIO_QUALITIES, qualityLabel);
@@ -25,8 +26,9 @@ export function validateMusicTemplate(template: string): string | undefined {
 }
 
 /**
- * Settings → Music: Library, Format, Behaviour and Defaults for new artists. Every change saves
- * immediately, except the default rules, which have their own Save.
+ * Settings → Music: Library, Format, Behaviour, Metadata providers and Defaults for new
+ * artists. Every change saves immediately, except the default rules, which have their own
+ * Save.
  */
 export function MusicSettings() {
   const update = useUpdateSettings();
@@ -77,6 +79,10 @@ export function MusicSettings() {
               onChange={(embedCoverArt) => save({ embedCoverArt })}
             />
           </SettingsCard>
+          <MetadataProvidersCard
+            value={music.metadataProviders}
+            onChange={(metadataProviders) => save({ metadataProviders })}
+          />
           <SettingsCard title="Defaults for new artists">
             <DefaultRulesEditor
               value={music.defaultRules}

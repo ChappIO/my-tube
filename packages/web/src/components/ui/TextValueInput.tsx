@@ -17,6 +17,8 @@ export interface TextValueInputProps {
   /** Accessible name when there is no visible label. */
   label?: string;
   disabled?: boolean;
+  /** A password-style box for tokens: the text is masked and never autofilled. */
+  secret?: boolean;
   className?: string;
 }
 
@@ -45,6 +47,7 @@ export function TextValueInput({
   id,
   label,
   disabled,
+  secret,
   className,
 }: TextValueInputProps) {
   const fieldId = useFieldId(id);
@@ -87,8 +90,10 @@ export function TextValueInput({
         aria-label={label}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
+        type={secret ? 'password' : 'text'}
         spellCheck={false}
-        autoComplete="off"
+        // `new-password` keeps password managers from filling in a saved login.
+        autoComplete={secret ? 'new-password' : 'off'}
         chars={valueInputChars(text, placeholder)}
         placeholder={placeholder}
         value={text}

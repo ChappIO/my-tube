@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_MUSIC_MATCHER, DEFAULT_VIDEO_MATCHER } from './matchers.js';
-import { DEFAULT_SETTINGS, Settings, SettingsPatch, settingsKey } from './settings.js';
+import {
+  DEFAULT_METADATA_PROVIDERS,
+  DEFAULT_SETTINGS,
+  Settings,
+  SettingsPatch,
+  settingsKey,
+} from './settings.js';
 
 describe('Settings', () => {
   it('fills every field from the handoff defaults', () => {
@@ -13,6 +19,10 @@ describe('Settings', () => {
         loudnessNormalization: false,
         embedCoverArt: true,
         defaultRules: DEFAULT_MUSIC_MATCHER,
+        metadataProviders: {
+          musicbrainz: { enabled: false },
+          discogs: { enabled: false, token: null },
+        },
       },
       video: {
         pathTemplate: '{channel}/{title} ({date})',
@@ -63,6 +73,39 @@ describe('SettingsPatch', () => {
         video: { defaultRules: { type: 'channel_is', channel: 'NASA' } },
       }).success,
     ).toBe(false);
+  });
+});
+
+/** Whether a patch of only `music.metadataProviders` is accepted. */
+const patch = (metadataProviders: unknown) =>
+  SettingsPatch.safeParse({ music: { metadataProviders } }).success;
+
+describe('music.metadataProviders', () => {
+  const providers = {
+    musicbrainz: { enabled: true },
+    discogs: { enabled: true, token: ' abcDEF123 ' },
+  };
+
+  it('is both providers off and no token by default', () => {
+    expect(DEFAULT_SETTINGS.music.metadataProviders).toEqual(DEFAULT_METADATA_PROVIDERS);
+  });
+
+  it('patches as one value with both providers, trimming the token', () => {
+    expect(SettingsPatch.parse({ music: { metadataProviders: providers } })).toEqual({
+      music: {
+        metadataProviders: {
+          musicbrainz: { enabled: true },
+          discogs: { enabled: true, token: 'abcDEF123' },
+        },
+      },
+    });
+  });
+
+  it('rejects a partial value and empty tokens or tokens with spaces', () => {
+    expect(patch({ musicbrainz: { enabled: true } })).toBe(false);
+    expect(patch({ ...providers, discogs: { enabled: true, token: 'a b' } })).toBe(false);
+    expect(patch({ ...providers, discogs: { enabled: true, token: '' } })).toBe(false);
+    expect(patch({ ...providers, discogs: { enabled: true, token: null } })).toBe(true);
   });
 });
 

@@ -18,7 +18,23 @@ export function openDatabase(file: string): { db: Database; client: BetterSqlite
   const client = new BetterSqlite3(file);
   client.pragma('journal_mode = WAL');
   client.pragma('foreign_keys = ON');
+  registerFunctions(client);
   return { db: drizzle({ client, schema }), client };
+}
+
+/**
+ * Text folded for searching and sorting: decomposed, accents dropped, lower case. SQLite's own
+ * `lower()` and `LIKE` only fold ASCII, so `beyonce` would not find `Beyoncé`.
+ */
+export function foldText(text: string): string {
+  return text.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase();
+}
+
+/** SQL functions of the app, on every connection: `mytube_fold(text)` is `foldText`. */
+function registerFunctions(client: BetterSqlite3.Database): void {
+  client.function('mytube_fold', { deterministic: true }, (value: unknown) =>
+    typeof value === 'string' ? foldText(value) : value,
+  );
 }
 
 @Global()

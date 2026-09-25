@@ -10,6 +10,9 @@ import { AppConfig } from '../config/app-config.js';
 import { albums, artists, sources, tracks } from '../database/schema.js';
 import { JobLogsService } from '../jobs/job-logs.service.js';
 import { PermanentJobError, type JobProgress } from '../jobs/job-runner.js';
+import { MetadataChain } from '../metadata/metadata-chain.js';
+import type { MetadataProvider, TrackLookup } from '../metadata/provider.js';
+import type { TrackTags } from '../metadata/ytdlp-tags.js';
 import { YtdlpRunner } from '../ytdlp/ytdlp-runner.js';
 import { DownloadDispatchRunner } from './download-dispatch.runner.js';
 import { DownloadRunner } from './download.runner.js';
@@ -52,7 +55,39 @@ describe('TrackDownloadRunner (fake binary)', () => {
     });
     const logs = new JobLogsService(config);
     const ytdlp = new YtdlpRunner({ path: () => FAKE });
-    const runner = new TrackDownloadRunner(harness.db, ytdlp, harness.settings, config, logs);
+    // A fake provider behind the MusicBrainz toggle and a writer that records instead of ffmpeg.
+    const lookups: TrackLookup[] = [];
+    const writes: { file: string; tags: Partial<TrackTags> }[] = [];
+    const provider: MetadataProvider = {
+      name: 'musicbrainz',
+      label: 'FakeBrainz',
+      enabled: (music) => music.metadataProviders.musicbrainz.enabled,
+      lookup: (lookup) => {
+        lookups.push(lookup);
+        return Promise.resolve({
+          match: {
+            tags: { album: 'First Light (Deluxe)', year: 1999, discNumber: 1 },
+            confidence: 0.95,
+            summary: 'fixture',
+          },
+          tried: [lookup.tags.title ?? ''],
+        });
+      },
+    };
+    const chain = new MetadataChain([provider], {
+      write: (file, tags) => {
+        writes.push({ file, tags });
+        return Promise.resolve();
+      },
+    });
+    const runner = new TrackDownloadRunner(
+      harness.db,
+      ytdlp,
+      harness.settings,
+      config,
+      logs,
+      chain,
+    );
     const source = harness.db
       .insert(sources)
       .values({
@@ -107,8 +142,80 @@ describe('TrackDownloadRunner (fake binary)', () => {
     const argsFile = join(root, 'args.json');
     process.env.FAKE_YTDLP_ARGS_FILE = argsFile;
     const args = () => z.array(z.string()).parse(JSON.parse(readFileSync(argsFile, 'utf8')));
-    return { ...harness, config, logs, runner, source, artist, album, track, enqueue, row, args };
+    return {
+      ...harness,
+      config,
+      logs,
+      runner,
+      source,
+      artist,
+      album,
+      track,
+      enqueue,
+      row,
+      args,
+      lookups,
+      writes,
+    };
   }
+
+  const PROVIDERS_ON = {
+    musicbrainz: { enabled: true },
+    discogs: { enabled: false, token: null },
+  };
+
+  it('runs no metadata provider by default', async () => {
+    const { runner, enqueue, lookups, writes } = setup();
+    await runner.run(enqueue(), context().ctx);
+    expect(lookups).toEqual([]);
+    expect(writes).toEqual([]);
+  });
+
+  it('runs the metadata chain on the file once a provider is enabled', async () => {
+    const { runner, enqueue, settings, lookups, writes, config, logs } = setup();
+    settings.patch({ music: { metadataProviders: PROVIDERS_ON } });
+    const job = enqueue();
+    const outcome = await runner.run(job, context().ctx);
+    expect(outcome?.result).toBe('done');
+    expect(lookups).toEqual([
+      {
+        youtubeId: TRACK_ID,
+        durationSeconds: 201,
+        // A YouTube Music track: its `track` field is the title, no upload title to fall back on.
+        uploadTitle: null,
+        featuredArtists: [],
+        tags: {
+          title: 'Heatwave',
+          artist: 'Test Artist',
+          album: 'First Light',
+          albumArtist: 'Test Artist',
+          trackNumber: 1,
+          discNumber: null,
+          year: 2024,
+        },
+      },
+    ]);
+    expect(writes).toEqual([
+      {
+        file: join(config.musicDir, 'Test Artist/First Light/01 Heatwave.m4a'),
+        tags: expect.objectContaining({ album: 'First Light (Deluxe)', year: 1999, discNumber: 1 }),
+      },
+    ]);
+    const log = readFileSync(logs.path(job.id), 'utf8');
+    expect(log).toContain(
+      'FakeBrainz: album "First Light (Deluxe)", disc 1, year 1999 for "Heatwave" by Test Artist',
+    );
+    expect(log).toContain('metadata: wrote album "First Light (Deluxe)", disc 1, year 1999');
+  });
+
+  it('skips the chain when the source does not tag its files', async () => {
+    const { runner, enqueue, settings, lookups } = setup({
+      sourceOptions: { ...DEFAULT_SOURCE_OPTIONS, embedCoverArt: false },
+    });
+    settings.patch({ music: { metadataProviders: PROVIDERS_ON } });
+    await runner.run(enqueue(), context().ctx);
+    expect(lookups).toEqual([]);
+  });
 
   it('downloads to the music template, tags the file and marks the track on disk', async () => {
     const { runner, enqueue, row, db, source, album, config, args, logs } = setup();

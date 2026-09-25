@@ -10,6 +10,7 @@ import { HealthModule } from './health/health.module.js';
 import { JobsModule } from './jobs/jobs.module.js';
 import { LibraryModule } from './library/library.module.js';
 import { LoggingModule } from './logging/logging.module.js';
+import { MetadataModule } from './metadata/metadata.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { SourcesModule } from './sources/sources.module.js';
 import { CheckSourceRunner } from './sync/check-source.runner.js';
@@ -32,7 +33,7 @@ import { YtdlpModule } from './ytdlp/ytdlp.module.js';
     // Queue and worker with the sync, revalidation and download runners. `download` jobs go to
     // the dispatcher, which hands videos to DownloadRunner and tracks to TrackDownloadRunner.
     JobsModule.forRoot({
-      imports: [YtdlpModule, SyncModule],
+      imports: [YtdlpModule, SyncModule, MetadataModule],
       runners: [CheckSourceRunner, RevalidateRunner, DownloadDispatchRunner],
       providers: [DownloadRunner, TrackDownloadRunner],
     }),
