@@ -24,8 +24,8 @@ const backToChannels = linkOptions({ to: '/video/$tab', params: { tab: 'channels
 
 /**
  * The channel page: back link, header with avatar, name, meta and rule
- * chips, Edit rules and the bell pill, then the source's videos on disk as square tiles (title and
- * relative date). `id` is the route param, a source id.
+ * chips, Edit rules and the bell pill, then the source's videos on disk as video cards without the
+ * channel (title and relative date). `id` is the route param, a source id.
  */
 export function ChannelPage({ id }: { id: string }) {
   const sourceId = /^\d+$/.test(id) ? Number(id) : 0;
@@ -44,7 +44,7 @@ export function ChannelPage({ id }: { id: string }) {
     body = (
       <>
         <ChannelHeader source={source.data} />
-        <VideoGrid filter={{ sourceId: source.data.id }} meta="when" />
+        <VideoGrid filter={{ sourceId: source.data.id }} showChannel={false} />
       </>
     );
   }
