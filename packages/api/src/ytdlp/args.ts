@@ -22,6 +22,12 @@ export interface MetadataArgs {
    * it channel entries carry no date at all. Defaults to true.
    */
   approximateDates?: boolean;
+  /**
+   * Format selector (`-f`) to resolve, as the download will use it. For a single video yt-dlp
+   * then reports the chosen streams (`requested_formats`) and their sizes, which become the
+   * entry's `expectedBytes`. Omitted: yt-dlp's default selection.
+   */
+  format?: string;
   network?: NetworkOptions;
 }
 
@@ -122,6 +128,7 @@ export function buildArgs(command: YtdlpCommand): string[] {
     if (command.approximateDates ?? true) {
       args.push('--extractor-args', 'youtubetab:approximate_date');
     }
+    if (command.format) args.push('-f', command.format);
     args.push(...networkArgs(command.network), '--', command.url);
     return args;
   }
@@ -138,8 +145,9 @@ export function buildArgs(command: YtdlpCommand): string[] {
     '--progress',
     '--progress-delta',
     '1',
+    // The format id tells media streams from side files (subtitles have none).
     '--progress-template',
-    `download:${PROGRESS_MARKER}%(progress.{${DOWNLOAD_PROGRESS_FIELDS}})j`,
+    `download:${PROGRESS_MARKER}{"format_id":"%(info.format_id|)s","progress":%(progress.{${DOWNLOAD_PROGRESS_FIELDS}})j}`,
     '--progress-template',
     `postprocess:${PROGRESS_MARKER}%(progress.{status,postprocessor})j`,
     '--print',

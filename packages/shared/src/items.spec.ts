@@ -11,6 +11,7 @@ const job = {
   speedBytesPerSec: 1_000_000,
   etaSeconds: 12,
   totalBytes: 3_000_000,
+  stage: null,
   detail: '1080p',
   error: null,
   attempts: 0,

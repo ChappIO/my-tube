@@ -131,6 +131,7 @@ export class JobsService {
         speedBytesPerSec: null,
         etaSeconds: null,
         totalBytes: null,
+        stage: null,
       })
       .where(and(inArray(jobs.id, next), eq(jobs.status, 'queued')))
       .returning()
@@ -148,6 +149,7 @@ export class JobsService {
     }
     if (update.etaSeconds !== undefined) set.etaSeconds = wholeOrNull(update.etaSeconds);
     if (update.totalBytes !== undefined) set.totalBytes = wholeOrNull(update.totalBytes);
+    if (update.stage !== undefined) set.stage = update.stage || null;
     this.db
       .update(jobs)
       .set(set)
@@ -171,6 +173,7 @@ export class JobsService {
           progress: 1,
           speedBytesPerSec: null,
           etaSeconds: null,
+          stage: null,
           error: null,
         })
         .where(and(eq(jobs.id, id), eq(jobs.status, 'running')))
@@ -203,6 +206,7 @@ export class JobsService {
         progress: null,
         speedBytesPerSec: null,
         etaSeconds: null,
+        stage: null,
       };
       if ((options.retryable ?? true) && attempts < job.maxAttempts) {
         const runAfter = new Date(now.getTime() + retryDelayMs(attempts)).toISOString();
@@ -239,7 +243,13 @@ export class JobsService {
     const now = this.now();
     const cancelled = this.db
       .update(jobs)
-      .set({ status: 'cancelled', finishedAt: now, updatedAt: now, speedBytesPerSec: null })
+      .set({
+        status: 'cancelled',
+        finishedAt: now,
+        updatedAt: now,
+        speedBytesPerSec: null,
+        stage: null,
+      })
       .where(and(eq(jobs.id, id), inArray(jobs.status, ['queued', 'running', 'failed'])))
       .returning()
       .get();
@@ -409,6 +419,7 @@ function requeued(now: string) {
     speedBytesPerSec: null,
     etaSeconds: null,
     totalBytes: null,
+    stage: null,
   };
 }
 
@@ -434,6 +445,7 @@ export function toJobDto(job: JobRow): Job {
     speedBytesPerSec: job.speedBytesPerSec,
     etaSeconds: job.etaSeconds,
     totalBytes: job.totalBytes,
+    stage: job.stage,
     detail: typeof detail === 'string' ? detail : null,
     error: job.error,
     attempts: job.attempts,

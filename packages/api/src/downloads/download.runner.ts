@@ -32,10 +32,12 @@ const MEDIA_EXTENSIONS = new Set(['mkv', 'mp4', 'webm', 'm4a', 'mp3', 'opus', 'f
  * `download` jobs for videos (payload `{ videoId, title, subtitle, historyKind, playlist? }`).
  *
  * 1. Loads the video and its channel; marks it `downloading`.
- * 2. Reads the video's full metadata (exact upload date and title: flat listings only carry an
- *    approximate date) and renders `video.pathTemplate` under `VIDEO_DIR`.
+ * 2. Reads the video's full metadata with the download's format selector (exact upload date
+ *    and title: flat listings only carry an approximate date; the size of the streams it will
+ *    fetch) and renders `video.pathTemplate` under `VIDEO_DIR`.
  * 3. Runs yt-dlp with the Settings → Video format, container, subtitles and thumbnail options
- *    and the network options, reporting progress.
+ *    and the network options, reporting progress (`DownloadProgressTracker`: 0 to 0.9 while
+ *    downloading, 0.9 to 0.99 with the post-processor as the job's stage).
  * 4. On success marks the video `on_disk` with its path (relative to `VIDEO_DIR`), size and
  *    time, and adds the size to its source.
  *
@@ -83,10 +85,13 @@ export class DownloadRunner implements JobRunner {
     const settings = this.settings.get();
     const network = networkOptions(settings.network);
     const url = `https://www.youtube.com/watch?v=${video.youtubeId}`;
+    const format = videoFormat(settings.video.quality, settings.video.container);
     this.setStatus(video.id, 'downloading');
     let target: string | null = null;
     try {
-      const info = await this.runner.metadata(url, { network, signal, log: log.line });
+      // The same format selector as the download, so yt-dlp reports the streams it will fetch
+      // and their sizes: the progress bar knows the whole download's size up front.
+      const info = await this.runner.metadata(url, { format, network, signal, log: log.line });
       const entry = info.entries.find((item) => item.id === video.youtubeId) ?? info.entries[0];
       const title = entry?.title ?? video.title;
       const date = entry?.uploadDate ?? video.publishedAt?.slice(0, 10) ?? null;
@@ -115,13 +120,14 @@ export class DownloadRunner implements JobRunner {
       mkdirSync(dirname(target), { recursive: true });
       log.line(`target ${target}.<ext>`);
 
-      const tracker = new DownloadProgressTracker();
+      const tracker = new DownloadProgressTracker(entry?.expectedStreams);
+      progress(tracker.start());
       const result = await this.runner.download(
         url,
         {
           // `%` starts a yt-dlp output template field; the rendered path is literal.
           output: `${target.replaceAll('%', '%%')}.%(ext)s`,
-          format: videoFormat(settings.video.quality, settings.video.container),
+          format,
           mergeOutputFormat: settings.video.container,
           extraArgs: videoExtraArgs(settings.video),
           network,

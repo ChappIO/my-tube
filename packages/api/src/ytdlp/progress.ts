@@ -11,15 +11,29 @@ export type DownloadStatus = 'downloading' | 'finished' | 'postprocessing';
 
 export interface DownloadProgress {
   status: DownloadStatus;
-  /** 0 to 100, or null when the total size is unknown. */
+  /**
+   * 0 to 100 through this stream: by bytes when the exact size is known, else by fragments
+   * (HLS and DASH fragment downloads), else by bytes against yt-dlp's estimate; null when
+   * nothing is known.
+   */
   percent: number | null;
   downloadedBytes: number | null;
   /** Exact total when known, otherwise yt-dlp's estimate, otherwise null. */
   totalBytes: number | null;
+  /**
+   * True when `totalBytes` is yt-dlp's estimate. For fragment downloads the estimate is the
+   * bytes so far extrapolated over the fragments, which is far off for the first fragments.
+   */
+  estimated?: boolean;
   speedBytesPerSec: number | null;
   etaSeconds: number | null;
   /** Post-processor name (e.g. `Merger`, `MoveFiles`) while post-processing. */
   postprocessor?: string;
+  /**
+   * The yt-dlp format being fetched (`398`, `140-20`): a media stream. Null for a side file
+   * without a format, such as a subtitle track; absent when the line did not say.
+   */
+  formatId?: string | null;
 }
 
 const num = z.number().nullish().catch(null);
@@ -35,6 +49,9 @@ const RawProgress = z.object({
   fragment_count: num,
   postprocessor: z.string().nullish().catch(null),
 });
+
+/** Download lines wrap the progress fields with the stream's format id (see `buildArgs`). */
+const Wrapped = z.object({ format_id: z.string().nullish().catch(null), progress: z.unknown() });
 
 export type OutputLine =
   | { type: 'progress'; progress: DownloadProgress }
@@ -60,6 +77,12 @@ function parseProgress(json: string): DownloadProgress | null {
   } catch {
     return null;
   }
+  let formatId: string | null | undefined;
+  const wrapped = Wrapped.safeParse(data);
+  if (wrapped.success && wrapped.data.progress !== undefined) {
+    formatId = wrapped.data.format_id || null;
+    data = wrapped.data.progress;
+  }
   const parsed = RawProgress.safeParse(data);
   if (!parsed.success) return null;
   const raw = parsed.data;
@@ -79,21 +102,24 @@ function parseProgress(json: string): DownloadProgress | null {
 
   const status: DownloadStatus = raw.status === 'finished' ? 'finished' : 'downloading';
   const downloaded = raw.downloaded_bytes ?? null;
-  const total = raw.total_bytes ?? raw.total_bytes_estimate ?? null;
+  const exact = raw.total_bytes ?? null;
+  const total = exact ?? raw.total_bytes_estimate ?? null;
   let percent: number | null = null;
   if (status === 'finished') percent = 100;
-  else if (downloaded !== null && total) percent = clamp((downloaded / total) * 100);
+  else if (downloaded !== null && exact) percent = clamp((downloaded / exact) * 100);
   else if (raw.fragment_index != null && raw.fragment_count) {
     percent = clamp((raw.fragment_index / raw.fragment_count) * 100);
-  }
+  } else if (downloaded !== null && total) percent = clamp((downloaded / total) * 100);
 
   return {
     status,
     percent: percent === null ? null : Math.round(percent * 10) / 10,
     downloadedBytes: downloaded,
     totalBytes: total === null ? null : Math.round(total),
+    ...(exact === null && total !== null ? { estimated: true } : {}),
     speedBytesPerSec: raw.speed == null ? null : Math.round(raw.speed),
     etaSeconds: raw.eta == null ? null : Math.round(raw.eta),
+    ...(formatId === undefined ? {} : { formatId }),
   };
 }
 

@@ -145,10 +145,17 @@ describe('JobsWorker', () => {
       speedBytesPerSec: 2_000_000,
       etaSeconds: 30,
     });
+    // A new post-processing stage is written at once, inside the window too; a repeat is not.
+    ctx.progress({ progress: 0.911, stage: 'Merger', speedBytesPerSec: null });
+    expect(jobs.listQueue()[0]).toMatchObject({ progress: 0.911, stage: 'Merger' });
+    ctx.progress({ progress: 0.93, stage: 'Merger' });
+    expect(jobs.listQueue()[0]).toMatchObject({ progress: 0.911, stage: 'Merger' });
+    ctx.progress({ progress: 0.922, stage: 'MoveFiles' });
+    expect(jobs.listQueue()[0]).toMatchObject({ progress: 0.922, stage: 'MoveFiles' });
 
     finish({ title: 'Clip', result: 'done', kind: 'video', details: '12 MB' });
     await flush();
-    expect(jobs.get(job.id)).toMatchObject({ status: 'done', progress: 1 });
+    expect(jobs.get(job.id)).toMatchObject({ status: 'done', progress: 1, stage: null });
     expect(history.recent()).toMatchObject([
       { kind: 'video', title: 'Clip', result: 'done', details: '12 MB' },
     ]);

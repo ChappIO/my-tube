@@ -35,6 +35,26 @@
   "duration_string": "2:32",
   "is_live": false,
   "was_live": false,
+  "requested_formats": [
+    {
+      "format_id": "248",
+      "ext": "webm",
+      "vcodec": "vp9",
+      "acodec": "none",
+      "height": 1080,
+      "filesize": 2400000,
+      "filesize_approx": 2400011
+    },
+    {
+      "format_id": "251",
+      "ext": "webm",
+      "vcodec": "none",
+      "acodec": "opus",
+      "filesize": null,
+      "filesize_approx": 600000
+    }
+  ],
+  "filesize_approx": 3000011,
   "ext": "webm",
   "_type": "video"
 }

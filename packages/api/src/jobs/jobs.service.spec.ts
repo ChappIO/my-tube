@@ -35,6 +35,7 @@ describe('JobsService', () => {
       speedBytesPerSec: null,
       etaSeconds: null,
       totalBytes: null,
+      stage: null,
       detail: null,
       error: null,
       attempts: 0,
@@ -253,6 +254,34 @@ describe('JobsService', () => {
       ['Bad', failing.id],
       ['Clip', loud.id],
     ]);
+  });
+
+  it('stores the post-processing stage while running and clears it when the job moves on', () => {
+    const { jobs } = createJobsHarness();
+    const a = jobs.enqueue({ type: 'download', key: 'video:a', payload: { title: 'A' } }).job;
+    const b = jobs.enqueue({ type: 'download', key: 'video:b', payload: { title: 'B' } }).job;
+    jobs.claimNext(['download']);
+    jobs.claimNext(['download']);
+    const stage = (id: number) => jobs.get(id)?.stage;
+
+    jobs.updateProgress(a.id, { progress: 0.911, stage: 'Merger' });
+    expect(jobs.listQueue().find((job) => job.id === a.id)).toMatchObject({
+      progress: 0.911,
+      stage: 'Merger',
+    });
+    // Omitted keeps it; null or empty clears it.
+    jobs.updateProgress(a.id, { progress: 0.92 });
+    expect(stage(a.id)).toBe('Merger');
+    jobs.updateProgress(a.id, { stage: '' });
+    expect(stage(a.id)).toBeNull();
+
+    jobs.updateProgress(a.id, { stage: 'MoveFiles' });
+    jobs.complete(a.id, null);
+    expect(jobs.get(a.id)).toMatchObject({ status: 'done', progress: 1, stage: null });
+
+    // A failed attempt requeues without it, and a new claim starts clean.
+    jobs.updateProgress(b.id, { stage: 'Merger' });
+    expect(jobs.fail(b.id, 'ffmpeg exited')).toMatchObject({ status: 'queued', stage: null });
   });
 
   it('shows recent failures in the queue view until retried, dismissed or superseded', () => {

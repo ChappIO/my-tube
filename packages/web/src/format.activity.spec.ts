@@ -7,6 +7,7 @@ import {
   queueMeta,
   queuePercent,
   queueState,
+  stageLabel,
   resultTone,
   whenLabel,
 } from './format';
@@ -21,6 +22,7 @@ const job: Job = {
   speedBytesPerSec: 4_100_000,
   etaSeconds: 30,
   totalBytes: 1_200_000_000,
+  stage: null,
   detail: '1080p',
   error: null,
   attempts: 0,
@@ -58,6 +60,46 @@ describe('queue rows', () => {
     expect(queueState({ ...job, progress: null }).text).toBe('starting');
     expect(queueState({ ...job, type: 'check_source', progress: null }).text).toBe('checking');
     expect(queueState({ ...job, status: 'failed' })).toEqual({ text: 'failed', tone: 'red' });
+  });
+
+  it('names the post-processing stage once the bytes are in', () => {
+    const merging = { ...job, progress: 0.911, stage: 'Merger', speedBytesPerSec: null };
+    expect(queueState(merging)).toEqual({ text: 'processing · merging', tone: 'red' });
+    expect(queuePercent(merging)).toBe(91);
+    expect(queueMeta(merging)).toBe('Deep Dive Podcast · 1080p · 1.2 GB');
+    // A stage left on a row that is no longer running does not show.
+    expect(queueState({ ...merging, status: 'queued' }).text).toBe('queued');
+    expect(
+      [
+        'Merger',
+        'VideoRemuxer',
+        'FFmpegVideoRemuxer',
+        'EmbedSubtitle',
+        'FFmpegEmbedSubtitle',
+        'ThumbnailsConvertor',
+        'FFmpegThumbnailsConvertor',
+        'EmbedThumbnail',
+        'MoveFiles',
+        'MoveFilesAfterDownload',
+        'FFmpegMetadata',
+        'Metadata',
+        'SponsorBlock',
+      ].map(stageLabel),
+    ).toEqual([
+      'merging',
+      'remuxing',
+      'remuxing',
+      'embedding subtitles',
+      'embedding subtitles',
+      'converting thumbnail',
+      'converting thumbnail',
+      'embedding thumbnail',
+      'moving file',
+      'moving file',
+      'writing tags',
+      'writing tags',
+      'sponsorblock',
+    ]);
   });
 
   it('keeps the last line of an error', () => {

@@ -71,6 +71,11 @@ export const Job = z.object({
   etaSeconds: z.number().int().nonnegative().nullable(),
   /** Expected size in bytes of what a download fetches (all streams), once yt-dlp knows it. */
   totalBytes: z.number().int().nonnegative().nullable(),
+  /**
+   * The yt-dlp post-processor a download is running (`Merger`, `MoveFiles`, …) once its bytes
+   * are in, else null.
+   */
+  stage: z.string().nullable(),
   /** Short fact for the queue meta line, such as the quality (`1080p`), or null. */
   detail: z.string().nullable(),
   /** Error of the last failed attempt (kept while a retry waits). */

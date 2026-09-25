@@ -35,6 +35,12 @@ describe('buildArgs', () => {
     expect(args).not.toContain('--extractor-args');
   });
 
+  it('passes a format selector to a metadata call so it reports the chosen streams', () => {
+    const args = buildArgs({ kind: 'metadata', url: 'u', format: 'bv+ba/b' });
+    expect(args.slice(-4)).toEqual(['-f', 'bv+ba/b', '--', 'u']);
+    expect(buildArgs({ kind: 'metadata', url: 'u' })).not.toContain('-f');
+  });
+
   it('rejects a non-positive limit', () => {
     expect(() => buildArgs({ kind: 'metadata', url: 'u', limit: 0 })).toThrow('Invalid limit');
   });
@@ -64,7 +70,7 @@ describe('buildArgs', () => {
       '--progress-delta',
       '1',
       '--progress-template',
-      'download:[mytube-progress] %(progress.{status,downloaded_bytes,total_bytes,total_bytes_estimate,speed,eta,fragment_index,fragment_count})j',
+      'download:[mytube-progress] {"format_id":"%(info.format_id|)s","progress":%(progress.{status,downloaded_bytes,total_bytes,total_bytes_estimate,speed,eta,fragment_index,fragment_count})j}',
       '--progress-template',
       'postprocess:[mytube-progress] %(progress.{status,postprocessor})j',
       '--print',
