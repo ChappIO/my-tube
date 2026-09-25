@@ -17,9 +17,12 @@ import {
   speedLabel,
   toggleTheater,
 } from '../../video-prefs';
+import { ExitFullscreenIcon, FullscreenIcon } from '../icons';
 import { TabPills } from '../ui/TabPills';
 import { Toggle } from '../ui/Toggle';
 import { cx, focusRingVisible, focusRingVisibleInset, minHit } from '../ui/cx';
+import { fullscreenLabel } from './fullscreen';
+import type { Fullscreen } from './useFullscreen';
 
 /** The strip's popovers; only one is open at a time. */
 export type StripPopover = 'captions' | 'style' | null;
@@ -47,13 +50,15 @@ export interface ControlStripProps {
   speed: number;
   theater: boolean;
   onPopOut: () => void;
+  /** The frame's fullscreen (`useFullscreen`): the pill hides where it is unsupported. */
+  fullscreen: Fullscreen;
 }
 
 /**
  * Now Playing's control strip under the video (frontend skill "Player", "Video"): outlined pills
- * that wrap. Left: captions (CC), subtitle style and speed; right: Pop out and Theater / Fit
- * (wide screens only). The captions menu and the style popover are exclusive and close with a
- * click outside, Escape, or when Now Playing goes (their state lives here).
+ * that wrap. Left: captions (CC), subtitle style and speed; right: Pop out, Fullscreen and
+ * Theater / Fit (wide screens only). The captions menu and the style popover are exclusive and
+ * close with a click outside, Escape, or when Now Playing goes (their state lives here).
  */
 export function ControlStrip({
   tracks,
@@ -64,6 +69,7 @@ export function ControlStrip({
   speed,
   theater,
   onPopOut,
+  fullscreen,
 }: ControlStripProps) {
   const [open, setOpen] = useState<StripPopover>(null);
   const close = () => setOpen(null);
@@ -94,11 +100,41 @@ export function ControlStrip({
         <ControlPill onClick={onPopOut} title="Keep playing in the floating card">
           Pop out
         </ControlPill>
+        <FullscreenButton
+          supported={fullscreen.supported}
+          active={fullscreen.active}
+          onToggle={fullscreen.toggle}
+        />
         <ControlPill onClick={toggleTheater} wideOnly>
           {theater ? 'Fit' : 'Theater'}
         </ControlPill>
       </div>
     </div>
+  );
+}
+
+export interface FullscreenButtonProps {
+  /** The browser can make an element fullscreen. */
+  supported: boolean;
+  /** The frame or panel is fullscreen now. */
+  active: boolean;
+  onToggle: () => void;
+}
+
+/**
+ * Now Playing's Fullscreen pill (the video strip's right group, beside the music panel's caption):
+ * `FullscreenIcon` and "Fullscreen", or `ExitFullscreenIcon` and "Exit fullscreen" while its
+ * frame or panel is fullscreen. Nothing where the browser cannot make an element fullscreen
+ * (iPhone Safari).
+ */
+export function FullscreenButton({ supported, active, onToggle }: FullscreenButtonProps) {
+  if (!supported) return null;
+  const Icon = active ? ExitFullscreenIcon : FullscreenIcon;
+  return (
+    <ControlPill onClick={onToggle}>
+      <Icon />
+      {fullscreenLabel(active)}
+    </ControlPill>
   );
 }
 

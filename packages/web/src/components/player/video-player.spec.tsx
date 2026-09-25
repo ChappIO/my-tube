@@ -173,7 +173,7 @@ describe('Now Playing video', () => {
     expect(videoMetaParts(video(1, { when: undefined, dur: 0 }), undefined)).toEqual(['mkv']);
   });
 
-  it('lists the shortcuts, volume, M, C and T included', () => {
+  it('lists the shortcuts, volume, M, C, T and F included', () => {
     const html = renderToStaticMarkup(<ShortcutLegend />);
     expect(VIDEO_SHORTCUTS.map(([key]) => key)).toEqual([
       'Space',
@@ -183,9 +183,11 @@ describe('Now Playing video', () => {
       'M',
       'C',
       'T',
+      'F',
       'Esc',
     ]);
     expect(html).toContain('<kbd class="font-mono font-bold text-ink">C</kbd> captions');
+    expect(html).toContain('<kbd class="font-mono font-bold text-ink">F</kbd> fullscreen');
   });
 
   it('shows Up next with the position, the current row in red', () => {

@@ -61,6 +61,8 @@ export interface PlayerState {
   cardOpen: boolean;
   /** The Now Playing page is on screen (it hides the card). */
   nowOpen: boolean;
+  /** Now Playing's frame or panel is fullscreen (it follows the browser's `fullscreenchange`). */
+  fullscreen: boolean;
   /** The media element is waiting for data: a spinner in the play circle. */
   buffering: boolean;
   /** The current item failed to load: a muted line in the bar; the engine skips on after 2 s. */
@@ -130,6 +132,7 @@ const INITIAL: PlayerState = {
   player: null,
   cardOpen: false,
   nowOpen: false,
+  fullscreen: false,
   buffering: false,
   error: null,
   load: 0,
@@ -360,6 +363,12 @@ export function dismissCard(): void {
 export function setNowOpen(open: boolean): void {
   if (state.nowOpen === open) return;
   set({ ...state, nowOpen: open, cardOpen: open ? false : state.cardOpen });
+}
+
+/** Now Playing's frame or panel entered (true) or left (false) fullscreen. */
+export function setFullscreen(fullscreen: boolean): void {
+  if (state.fullscreen === fullscreen) return;
+  set({ ...state, fullscreen });
 }
 
 /** The element's clock (`timeupdate`). */

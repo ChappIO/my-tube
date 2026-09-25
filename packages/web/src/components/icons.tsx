@@ -31,6 +31,8 @@ import {
   ListPlus,
   type LucideIcon,
   type LucideProps,
+  Maximize2,
+  Minimize2,
   Music,
   Plus,
   RefreshCw,
@@ -208,6 +210,18 @@ export const ICON_REGISTRY = {
     usedIn: 'player bar mute button, while muted or at volume 0',
   },
 
+  // Now Playing's fullscreen pill.
+  FullscreenIcon: {
+    base: Maximize2,
+    meaning: 'Enter fullscreen',
+    usedIn: 'Now Playing Fullscreen pill (video control strip, music panel)',
+  },
+  ExitFullscreenIcon: {
+    base: Minimize2,
+    meaning: 'Leave fullscreen',
+    usedIn: 'Now Playing Fullscreen pill, while fullscreen',
+  },
+
   // Direction.
   BackIcon: { base: ArrowLeft, meaning: 'Back to parent page', usedIn: 'BackLink ("← Video")' },
   ChevronLeftIcon: {
@@ -356,6 +370,11 @@ export const NextIcon = icon('NextIcon');
 export const VolumeIcon = icon('VolumeIcon');
 /** Muted (unmute): the player bar's mute button while muted or at volume 0. */
 export const MutedIcon = icon('MutedIcon');
+
+/** Enter fullscreen: Now Playing's Fullscreen pill (video control strip, music panel). */
+export const FullscreenIcon = icon('FullscreenIcon');
+/** Leave fullscreen: the same pill while its frame or panel is fullscreen. */
+export const ExitFullscreenIcon = icon('ExitFullscreenIcon');
 
 /** Back to parent page: BackLink ("← Video"). */
 export const BackIcon = icon('BackIcon');

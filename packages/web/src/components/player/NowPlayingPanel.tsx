@@ -1,10 +1,13 @@
 import { Link } from '@tanstack/react-router';
+import { useRef } from 'react';
 import type { PlayerItem } from '../../player-state';
 import { Artwork } from '../media';
 import { cx, focusRing } from '../ui/cx';
 import { Meta } from '../ui/typography';
+import { FullscreenButton } from './ControlStrip';
 import { barSubLine } from './PlayerBar';
 import { VisualizerCanvas } from './VisualizerCanvas';
+import { useFullscreen } from './useFullscreen';
 
 /** The caption under the panel. */
 export const VISUALIZER_CAPTION = 'Visualizer · colours picked from the cover';
@@ -14,12 +17,23 @@ export const VISUALIZER_CAPTION = 'Visualizer · colours picked from the cover';
  * top: the cover blurred and darkened as the background (inset −40px and scaled so the blur's
  * soft edges stay outside), the visualizer canvas, and the overlay along the bottom (the 72px
  * cover, a link to the album page, beside the title and `artist · album` in white over a dark
- * fade). The caption sits under the panel.
+ * fade). The caption sits under the panel, the Fullscreen pill right of it: fullscreen is the
+ * panel (cover, visualizer, overlay); the bar stays outside, and the keyboard still plays.
  */
 export function NowPlayingPanel({ item }: { item: PlayerItem }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const fullscreen = useFullscreen(panelRef);
   return (
     <div className="grid gap-3">
-      <div className="relative aspect-square overflow-hidden rounded-modal bg-player wide:aspect-[16/10]">
+      <div
+        ref={panelRef}
+        className={cx(
+          'relative overflow-hidden bg-player',
+          fullscreen.active
+            ? 'size-full rounded-none'
+            : 'aspect-square rounded-modal wide:aspect-[16/10]',
+        )}
+      >
         {item.artUrl && (
           <img
             src={item.artUrl}
@@ -40,7 +54,14 @@ export function NowPlayingPanel({ item }: { item: PlayerItem }) {
           </div>
         </div>
       </div>
-      <Meta as="p">{VISUALIZER_CAPTION}</Meta>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Meta as="p">{VISUALIZER_CAPTION}</Meta>
+        <FullscreenButton
+          supported={fullscreen.supported}
+          active={fullscreen.active}
+          onToggle={fullscreen.toggle}
+        />
+      </div>
     </div>
   );
 }

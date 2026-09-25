@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
-import { currentItem, jumpTo, openCard, setNowOpen, usePlayerState } from '../../player-state';
+import { currentItem, jumpTo, setNowOpen, usePlayerState } from '../../player-state';
 import { BackButton } from '../ui/BackLink';
 import { EmptyState } from '../ui/EmptyState';
 import { NowPlayingPanel } from './NowPlayingPanel';
 import { NowPlayingVideo } from './NowPlayingVideo';
 import { QueuePanel } from './QueuePanel';
-import { useNowPlayingNav } from './now-playing-nav';
+import { browserDocument } from './fullscreen';
+import { popOut, useNowPlayingNav } from './now-playing-nav';
 
 /**
  * Now Playing (`/now-playing`), the expanded card: an in-place route in the main column. The bar
@@ -32,10 +33,7 @@ export function NowPlayingPage() {
           player={player}
           item={item}
           error={error}
-          onPopOut={() => {
-            openCard();
-            leave();
-          }}
+          onPopOut={() => void popOut(browserDocument(), leave)}
         />
       ) : player && item ? (
         <div className="grid items-start gap-5 wide:gap-7 min-[1180px]:grid-cols-[minmax(0,1fr)_340px]">

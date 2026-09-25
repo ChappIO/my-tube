@@ -4,17 +4,16 @@ import { playerState, resetPlayer, setNowOpen } from '../../player-state';
 import {
   albumQueue,
   artistQueue,
-  channelPageQueue,
   homeQueue,
   homeVideoQueue,
   addToQueue,
   playlistQueue,
   setNowPlayingOpener,
+  singleVideo,
   startQueue,
   trackItem,
   tracksTableQueue,
   videoItem,
-  videosTabQueue,
 } from './queues';
 
 const NOW = '2026-09-25T10:00:00.000Z';
@@ -196,7 +195,7 @@ function videoRow(
   };
 }
 
-const videoIds = (start: ReturnType<typeof videosTabQueue>) => start?.items.map((item) => item.id);
+const videoIds = (start: ReturnType<typeof singleVideo>) => start?.items.map((item) => item.id);
 
 describe('videoItem', () => {
   it('maps a video: the channel as sub, the relative date, the play URL and the container', () => {
@@ -222,8 +221,8 @@ describe('videoItem', () => {
   });
 });
 
-describe('video queues', () => {
-  it('Home: the videos of the day group by the clicked channel, in the order shown', () => {
+describe('video clicks', () => {
+  it('Home: the clicked video alone, from its channel', () => {
     const group: HomeItem[] = [
       { ...videoRow(1), kind: 'video' },
       { ...track(9), kind: 'music' },
@@ -231,27 +230,26 @@ describe('video queues', () => {
       { ...videoRow(3), kind: 'video' },
     ];
     const start = homeVideoQueue(group, 3, CLOCK);
-    expect(videoIds(start)).toEqual([1, 3]);
-    expect(start).toMatchObject({ index: 1, from: 'NASA' });
-    expect(videoIds(homeVideoQueue(group, 2, CLOCK))).toEqual([2]);
+    expect(videoIds(start)).toEqual([3]);
+    expect(start).toMatchObject({ index: 0, from: 'NASA' });
+    expect(homeVideoQueue(group, 2, CLOCK)).toMatchObject({ from: 'ESA' });
+    expect(homeVideoQueue(group, 9, CLOCK)).toBeNull();
     expect(homeVideoQueue(group, 99, CLOCK)).toBeNull();
   });
 
-  it('Videos tab: the loaded list filtered to the channel, in the same order', () => {
-    const list = [videoRow(1), videoRow(2, ESA), videoRow(3), videoRow(4, ESA), videoRow(5)];
-    const start = videosTabQueue(list, 3, CLOCK);
-    expect(videoIds(start)).toEqual([1, 3, 5]);
-    expect(start).toMatchObject({ index: 1, from: 'NASA' });
-    expect(videosTabQueue(list, 4, CLOCK)).toMatchObject({ index: 1, from: 'ESA' });
-  });
-
-  it('channel page: the loaded list, from the page name; nothing not on disk', () => {
-    const list = [videoRow(1), videoRow(2), videoRow(3, NASA, { status: 'missing' }), videoRow(4)];
-    const start = channelPageQueue(list, 4, CLOCK, 'NASA playlist');
-    expect(videoIds(start)).toEqual([1, 2, 4]);
-    expect(start).toMatchObject({ index: 2, from: 'NASA playlist' });
-    expect(channelPageQueue(list, 1, CLOCK)).toMatchObject({ from: 'NASA' });
-    expect(channelPageQueue(list, 3, CLOCK)).toBeNull();
+  it('Videos tab and channel page: the clicked video alone, never its channel; nothing not on disk', () => {
+    const list = [
+      videoRow(1),
+      videoRow(2, ESA),
+      videoRow(3),
+      videoRow(4, NASA, { status: 'missing' }),
+    ];
+    const start = singleVideo(list, 3, CLOCK);
+    expect(videoIds(start)).toEqual([3]);
+    expect(start).toMatchObject({ index: 0, from: 'NASA' });
+    expect(singleVideo(list, 2, CLOCK)).toMatchObject({ from: 'ESA' });
+    expect(singleVideo(list, 4, CLOCK)).toBeNull();
+    expect(singleVideo(list, 99, CLOCK)).toBeNull();
   });
 });
 
@@ -281,15 +279,16 @@ describe('a one-item queue opens Now Playing', () => {
     expect(playerState().player).toMatchObject({ kind: 'music', from: 'Road Trip' });
   });
 
-  it('opens it for one video (a channel showing only that one)', () => {
-    startQueue(videosTabQueue([videoRow(1), videoRow(2, ESA)], 2, CLOCK));
+  it('opens it for every video click (a video never forms a queue)', () => {
+    startQueue(singleVideo([videoRow(1), videoRow(2), videoRow(3)], 2, CLOCK));
     expect(open).toHaveBeenCalledTimes(1);
-    expect(playerState().player).toMatchObject({ kind: 'video', from: 'ESA' });
+    expect(playerState()).toMatchObject({ nowOpen: true, cardOpen: false });
+    expect(playerState().player).toMatchObject({ kind: 'video', from: 'NASA', index: 0 });
+    expect(playerState().player?.queue.map((item) => item.id)).toEqual([2]);
   });
 
   it('keeps the bar and the card for two or more items, and does nothing without a queue', () => {
     startQueue(artistQueue([track(1), track(2)], 'Hiatus Kaiyote'));
-    startQueue(channelPageQueue([videoRow(1), videoRow(2)], 1, CLOCK));
     startQueue(null);
     expect(open).not.toHaveBeenCalled();
     expect(playerState()).toMatchObject({ nowOpen: false, cardOpen: true });
@@ -305,7 +304,8 @@ describe('a one-item queue opens Now Playing', () => {
   });
 
   it('"+" on music while a video plays starts a new queue and opens it; a missing track does not', () => {
-    startQueue(channelPageQueue([videoRow(1), videoRow(2)], 1, CLOCK));
+    startQueue(singleVideo([videoRow(1), videoRow(2)], 1, CLOCK));
+    open.mockClear();
     addToQueue(trackItem(track(3)));
     expect(open).toHaveBeenCalledTimes(1);
     resetPlayer();
