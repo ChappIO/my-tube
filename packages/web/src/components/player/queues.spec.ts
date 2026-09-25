@@ -1,12 +1,20 @@
-import type { AlbumDetail, HomeItem, TrackListItem } from '@mytube/shared';
-import { describe, expect, it } from 'vitest';
+import type { AlbumDetail, HomeItem, TrackListItem, VideoListItem } from '@mytube/shared';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { playerState, resetPlayer, setNowOpen } from '../../player-state';
 import {
   albumQueue,
   artistQueue,
+  channelPageQueue,
   homeQueue,
+  homeVideoQueue,
+  addToQueue,
   playlistQueue,
+  setNowPlayingOpener,
+  startQueue,
   trackItem,
   tracksTableQueue,
+  videoItem,
+  videosTabQueue,
 } from './queues';
 
 const NOW = '2026-09-25T10:00:00.000Z';
@@ -105,8 +113,10 @@ describe('albumQueue', () => {
     expect(ids(albumQueue(detail))).toEqual([1, 3, 4]);
   });
 
-  it('starts at the clicked row', () => {
-    expect(albumQueue(detail, 3)?.index).toBe(1);
+  it('a row click plays that track alone', () => {
+    const start = albumQueue(detail, 3);
+    expect(ids(start)).toEqual([3]);
+    expect(start).toMatchObject({ index: 0, from: 'Mood Valiant' });
   });
 
   it('is null for a row not on disk or an album with nothing on disk', () => {
@@ -116,11 +126,13 @@ describe('albumQueue', () => {
 });
 
 describe('tracksTableQueue', () => {
-  it('keeps the table order and continues down from the clicked row', () => {
-    const rows = [track(9), missing(4), track(2), track(7)];
-    const start = tracksTableQueue(rows, 2);
-    expect(ids(start)).toEqual([9, 2, 7]);
-    expect(start).toMatchObject({ index: 1, from: 'Tracks' });
+  it('plays the clicked row alone, labelled with its album or "Tracks"', () => {
+    const rows = [track(9), missing(4), track(2, { album: null }), track(7)];
+    const start = tracksTableQueue(rows, 7);
+    expect(ids(start)).toEqual([7]);
+    expect(start).toMatchObject({ index: 0, from: 'Mood Valiant' });
+    expect(tracksTableQueue(rows, 2)).toMatchObject({ from: 'Tracks' });
+    expect(tracksTableQueue(rows, 4)).toBeNull();
   });
 });
 
@@ -136,7 +148,7 @@ describe('artistQueue and playlistQueue', () => {
 });
 
 describe('homeQueue', () => {
-  it('queues the music of the day group in the order shown, videos left out', () => {
+  it('plays the clicked tile alone, labelled with its album or "Home"', () => {
     const video = { kind: 'video', id: 40 } as unknown as HomeItem;
     const group: HomeItem[] = [
       { ...track(1), kind: 'music' },
@@ -144,7 +156,161 @@ describe('homeQueue', () => {
       { ...track(2), kind: 'music' },
     ];
     const start = homeQueue(group, 2);
-    expect(ids(start)).toEqual([1, 2]);
-    expect(start).toMatchObject({ index: 1, from: 'Home' });
+    expect(ids(start)).toEqual([2]);
+    expect(start).toMatchObject({ index: 0, from: 'Mood Valiant' });
+    const single: HomeItem[] = [{ ...track(3, { album: null }), kind: 'music' }];
+    expect(homeQueue(single, 3)).toMatchObject({ from: 'Home' });
+  });
+});
+
+const CLOCK = Date.parse('2026-09-25T12:00:00Z');
+const NASA = { id: 2, name: 'NASA', avatarUrl: null, sourceId: 5 };
+const ESA = { id: 3, name: 'ESA', avatarUrl: null, sourceId: null };
+
+function videoRow(
+  id: number,
+  channel: VideoListItem['channel'] = NASA,
+  extra: Partial<VideoListItem> = {},
+): VideoListItem {
+  return {
+    id,
+    sourceId: channel.sourceId,
+    youtubeId: `yt-${id}`,
+    title: `Video ${id}`,
+    durationSeconds: 60 * id,
+    publishedAt: '2026-09-23',
+    thumbnailUrl: `/api/artwork/video/${id}`,
+    status: 'on_disk',
+    skipReason: null,
+    filePath: `${channel.name}/Video ${id}.mkv`,
+    fileSizeBytes: 10,
+    downloadedAt: NOW,
+    createdAt: NOW,
+    updatedAt: NOW,
+    channelId: channel.id,
+    isShort: false,
+    liveStatus: null,
+    mimeType: 'video/x-matroska',
+    channel,
+    ...extra,
+  };
+}
+
+const videoIds = (start: ReturnType<typeof videosTabQueue>) => start?.items.map((item) => item.id);
+
+describe('videoItem', () => {
+  it('maps a video: the channel as sub, the relative date, the play URL and the container', () => {
+    expect(videoItem(videoRow(4), CLOCK)).toEqual({
+      kind: 'video',
+      id: 4,
+      title: 'Video 4',
+      sub: 'NASA',
+      when: '2 days ago',
+      dur: 240,
+      artUrl: '/api/artwork/video/4',
+      fileUrl: '/api/library/videos/4/play',
+      channelPageId: 5,
+      container: 'mkv',
+    });
+    const plain = videoItem(
+      videoRow(5, ESA, { durationSeconds: null, publishedAt: null, filePath: 'ESA/x.MP4' }),
+      CLOCK,
+    );
+    expect(plain).toMatchObject({ dur: 0, container: 'mp4' });
+    expect(plain.when).toBeUndefined();
+    expect(plain.channelPageId).toBeUndefined();
+  });
+});
+
+describe('video queues', () => {
+  it('Home: the videos of the day group by the clicked channel, in the order shown', () => {
+    const group: HomeItem[] = [
+      { ...videoRow(1), kind: 'video' },
+      { ...track(9), kind: 'music' },
+      { ...videoRow(2, ESA), kind: 'video' },
+      { ...videoRow(3), kind: 'video' },
+    ];
+    const start = homeVideoQueue(group, 3, CLOCK);
+    expect(videoIds(start)).toEqual([1, 3]);
+    expect(start).toMatchObject({ index: 1, from: 'NASA' });
+    expect(videoIds(homeVideoQueue(group, 2, CLOCK))).toEqual([2]);
+    expect(homeVideoQueue(group, 99, CLOCK)).toBeNull();
+  });
+
+  it('Videos tab: the loaded list filtered to the channel, in the same order', () => {
+    const list = [videoRow(1), videoRow(2, ESA), videoRow(3), videoRow(4, ESA), videoRow(5)];
+    const start = videosTabQueue(list, 3, CLOCK);
+    expect(videoIds(start)).toEqual([1, 3, 5]);
+    expect(start).toMatchObject({ index: 1, from: 'NASA' });
+    expect(videosTabQueue(list, 4, CLOCK)).toMatchObject({ index: 1, from: 'ESA' });
+  });
+
+  it('channel page: the loaded list, from the page name; nothing not on disk', () => {
+    const list = [videoRow(1), videoRow(2), videoRow(3, NASA, { status: 'missing' }), videoRow(4)];
+    const start = channelPageQueue(list, 4, CLOCK, 'NASA playlist');
+    expect(videoIds(start)).toEqual([1, 2, 4]);
+    expect(start).toMatchObject({ index: 2, from: 'NASA playlist' });
+    expect(channelPageQueue(list, 1, CLOCK)).toMatchObject({ from: 'NASA' });
+    expect(channelPageQueue(list, 3, CLOCK)).toBeNull();
+  });
+});
+
+describe('a one-item queue opens Now Playing', () => {
+  // The route push mounts Now Playing, which sets nowOpen.
+  const open = vi.fn<() => void>(() => setNowOpen(true));
+
+  beforeEach(() => {
+    open.mockClear();
+    setNowPlayingOpener(open);
+  });
+
+  afterEach(() => {
+    setNowPlayingOpener(null);
+    resetPlayer();
+  });
+
+  it('opens it for one track (a clicked track, or a playlist with one on disk)', () => {
+    startQueue(tracksTableQueue([track(1), track(2)], 2));
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(playerState().player).toMatchObject({ from: 'Mood Valiant' });
+    resetPlayer();
+    open.mockClear();
+    startQueue(playlistQueue([track(1), track(2, { status: 'missing' })], 'Road Trip'));
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(playerState()).toMatchObject({ nowOpen: true, cardOpen: false });
+    expect(playerState().player).toMatchObject({ kind: 'music', from: 'Road Trip' });
+  });
+
+  it('opens it for one video (a channel showing only that one)', () => {
+    startQueue(videosTabQueue([videoRow(1), videoRow(2, ESA)], 2, CLOCK));
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(playerState().player).toMatchObject({ kind: 'video', from: 'ESA' });
+  });
+
+  it('keeps the bar and the card for two or more items, and does nothing without a queue', () => {
+    startQueue(artistQueue([track(1), track(2)], 'Hiatus Kaiyote'));
+    startQueue(channelPageQueue([videoRow(1), videoRow(2)], 1, CLOCK));
+    startQueue(null);
+    expect(open).not.toHaveBeenCalled();
+    expect(playerState()).toMatchObject({ nowOpen: false, cardOpen: true });
+  });
+
+  it('"+" opens it when it starts a new one-item queue, never when it appends', () => {
+    addToQueue(trackItem(track(1)));
+    expect(open).toHaveBeenCalledTimes(1);
+    setNowOpen(false);
+    addToQueue(trackItem(track(2)));
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(playerState().player?.queue).toHaveLength(2);
+  });
+
+  it('"+" on music while a video plays starts a new queue and opens it; a missing track does not', () => {
+    startQueue(channelPageQueue([videoRow(1), videoRow(2)], 1, CLOCK));
+    addToQueue(trackItem(track(3)));
+    expect(open).toHaveBeenCalledTimes(1);
+    resetPlayer();
+    addToQueue(trackItem(track(4, { status: 'missing' })));
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(playerState().player).toBeNull();
   });
 });

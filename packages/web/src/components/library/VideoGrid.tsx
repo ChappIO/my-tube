@@ -1,6 +1,7 @@
 import { type VideoFilter, useVideos } from '../../api/library';
 import { useNow } from '../../use-now';
 import { CardGrid } from '../media';
+import { channelPageQueue, startQueue, videosTabQueue } from '../player/queues';
 import { StatusLine } from '../sources/SourceBits';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
@@ -12,13 +13,21 @@ export interface VideoGridProps {
   filter?: VideoFilter;
   /** Avatar and channel name on each card (Videos tab); off on the channel page. */
   showChannel: boolean;
+  /**
+   * What a card plays. `channel` (Videos tab): the loaded list filtered to the card's channel.
+   * `page` (channel page): the whole loaded list, `from` = `pageName`.
+   */
+  queue: 'channel' | 'page';
+  /** The channel page's name, the queue's `from`. */
+  pageName?: string;
 }
 
 /**
  * A grid of downloaded videos as wide `VideoCard`s (Videos tab, channel page): 60 per page and an outlined
- * **Load more** under the grid while there are more. "Nothing downloaded yet." when empty.
+ * **Load more** under the grid while there are more. "Nothing downloaded yet." when empty. A card
+ * starts a queue of its channel in the order shown (`queue`).
  */
-export function VideoGrid({ filter = {}, showChannel }: VideoGridProps) {
+export function VideoGrid({ filter = {}, showChannel, queue, pageName }: VideoGridProps) {
   const videos = useVideos(filter);
   const now = useNow();
 
@@ -31,7 +40,19 @@ export function VideoGrid({ filter = {}, showChannel }: VideoGridProps) {
     <>
       <CardGrid>
         {items.map((video) => (
-          <VideoCard key={video.id} video={video} showChannel={showChannel} now={now} />
+          <VideoCard
+            key={video.id}
+            video={video}
+            showChannel={showChannel}
+            now={now}
+            onPlay={() =>
+              startQueue(
+                queue === 'page'
+                  ? channelPageQueue(items, video.id, now, pageName)
+                  : videosTabQueue(items, video.id, now),
+              )
+            }
+          />
         ))}
       </CardGrid>
       {videos.hasNextPage && (

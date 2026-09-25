@@ -1,9 +1,6 @@
 import type { VideoListItem } from '@mytube/shared';
-import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { primeVideo } from '../../api/library';
 import { formatLength, publishedAgo } from '../../format';
-import { openPreview } from '../../ui-state';
 import { Artwork, MediaTile } from '../media';
 
 /**
@@ -17,16 +14,17 @@ export interface VideoTileProps {
   meta: VideoTileMeta;
   /** The clock for the relative date (`useNow()` of the grid). */
   now: number;
+  /** Plays the video in the player (Home builds the queue from the day group). */
+  onPlay: () => void;
 }
 
 /**
  * A downloaded video as a square tile with a fixed chin: the cached thumbnail, the duration
- * badge, the title and the secondary line. The tile opens Preview; the channel name opens the
- * channel page when the channel was added as a source, and is plain text otherwise.
+ * badge, the title and the secondary line. The tile plays the video (`onPlay`); the channel name
+ * opens the channel page when the channel was added as a source, and is plain text otherwise.
  */
-export function VideoTile({ video, meta, now }: VideoTileProps) {
+export function VideoTile({ video, meta, now, onPlay }: VideoTileProps) {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const when = publishedAgo(video.publishedAt, now) || undefined;
   const channelPage = video.channel.sourceId;
   return (
@@ -38,10 +36,7 @@ export function VideoTile({ video, meta, now }: VideoTileProps) {
       channel={meta === 'when' ? undefined : video.channel.name}
       when={meta === 'channel-when' ? when : undefined}
       subtitle={meta === 'when' ? when : undefined}
-      onOpen={() => {
-        primeVideo(queryClient, video);
-        openPreview(video.id);
-      }}
+      onOpen={onPlay}
       onOpenChannel={
         channelPage === null
           ? undefined

@@ -7,7 +7,7 @@ import { Library, SourceKind, SourceOptions } from './rules.js';
  * sources. The `Source` DTO lives in `rules.ts`, the rules (matchers) in `matchers.ts`.
  *
  * Removing a source or unsubscribing never deletes media. Only revalidation (a file the
- * source's rules no longer match) and the explicit Delete in Preview do.
+ * source's rules no longer match) does.
  */
 
 // ---------------------------------------------------------------------------------------

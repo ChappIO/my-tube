@@ -23,7 +23,7 @@ const COLUMNS = [
 export interface AlbumTrackTableProps {
   tracks: readonly TrackListItem[];
   totalDurationSeconds: number;
-  /** A row click: plays the album from that track (rows of tracks not on disk do nothing). */
+  /** A row click: plays that track alone (rows of tracks not on disk do nothing). */
   onPlay: (track: TrackListItem) => void;
   /** The row's "+": adds the track to the player's queue. */
   onAdd: (track: TrackListItem) => void;

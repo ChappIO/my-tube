@@ -1,10 +1,27 @@
 import { useEffect, useRef } from 'react';
-import { SEEK_STEP_SECONDS, playerState, seekBy, togglePlay } from '../../player-state';
+import {
+  SEEK_STEP_SECONDS,
+  VOLUME_STEP,
+  changeVolume,
+  playerState,
+  seekBy,
+  toggleMute,
+  togglePlay,
+} from '../../player-state';
 import { hasOpenModal } from '../ui/Modal';
 
-export type Shortcut = 'toggle' | 'forward' | 'back' | 'leave';
+export type Shortcut =
+  | 'toggle'
+  | 'forward'
+  | 'back'
+  | 'leave'
+  | 'captions'
+  | 'theater'
+  | 'mute'
+  | 'volumeUp'
+  | 'volumeDown';
 
-/** The global keys: Space, ← → and J L (10 s), Esc (leave Now Playing). */
+/** The global keys: Space, ← → and J L (10 s), ↑ ↓ (volume), M (mute), Esc, C and T (video). */
 export function shortcutFor(key: string): Shortcut | null {
   switch (key) {
     case ' ':
@@ -19,6 +36,19 @@ export function shortcutFor(key: string): Shortcut | null {
       return 'back';
     case 'Escape':
       return 'leave';
+    case 'c':
+    case 'C':
+      return 'captions';
+    case 't':
+    case 'T':
+      return 'theater';
+    case 'm':
+    case 'M':
+      return 'mute';
+    case 'ArrowUp':
+      return 'volumeUp';
+    case 'ArrowDown':
+      return 'volumeDown';
     default:
       return null;
   }
@@ -68,15 +98,26 @@ function pickKeys(event: KeyboardEvent) {
   return { key, altKey, ctrlKey, metaKey, defaultPrevented };
 }
 
+/** What C and T do while a video plays. */
+export interface VideoShortcuts {
+  /** C: the next captions choice (Off → each track → Off). */
+  onCaptions: () => void;
+  /** T: Theater / Fit. */
+  onTheater: () => void;
+}
+
 /**
  * The player's keyboard (global while a player exists): Space plays or pauses, → / L forward and
- * ← / J back 10 s, Esc leaves Now Playing (`onLeave`, only while it is open). Ignored in text fields and
- * while a modal is open. Mount once (the shell's `PlayerLayer`).
+ * ← / J back 10 s, ↑ ↓ change the volume by 5 %, M mutes or unmutes, Esc leaves Now Playing (`onLeave`, only while it is open), and while a video
+ * plays C cycles the captions and T toggles theater (`video`). Ignored in text fields and while
+ * a modal is open. Mount once (the shell's `PlayerLayer`).
  */
-export function useKeyboardShortcuts(onLeave: () => void): void {
+export function useKeyboardShortcuts(onLeave: () => void, video?: VideoShortcuts): void {
   const leave = useRef(onLeave);
+  const videoKeys = useRef(video);
   useEffect(() => {
     leave.current = onLeave;
+    videoKeys.current = video;
   });
 
   useEffect(() => {
@@ -92,8 +133,19 @@ export function useKeyboardShortcuts(onLeave: () => void): void {
         return;
       }
       if (!state.player) return;
+      if (shortcut === 'captions' || shortcut === 'theater') {
+        const keys = videoKeys.current;
+        if (state.player.kind !== 'video' || !keys) return;
+        event.preventDefault();
+        if (shortcut === 'captions') keys.onCaptions();
+        else keys.onTheater();
+        return;
+      }
       event.preventDefault();
-      if (shortcut === 'toggle') togglePlay();
+      if (shortcut === 'mute') toggleMute();
+      else if (shortcut === 'volumeUp') changeVolume(VOLUME_STEP);
+      else if (shortcut === 'volumeDown') changeVolume(-VOLUME_STEP);
+      else if (shortcut === 'toggle') togglePlay();
       else seekBy(shortcut === 'forward' ? SEEK_STEP_SECONDS : -SEEK_STEP_SECONDS);
     };
     window.addEventListener('keydown', onKeyDown);

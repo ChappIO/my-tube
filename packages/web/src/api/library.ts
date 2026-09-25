@@ -8,16 +8,16 @@ import {
   HomeFeed,
   LibrarySummary,
   PlaylistListItem,
+  SubtitleTrack,
   TrackListItem,
   type TrackListQuery,
   TrackPage,
   type VideoListQuery,
-  VideoListItem,
   VideoPage,
+  VideoPlayback,
   artworkPath,
 } from '@mytube/shared';
 import {
-  type QueryClient,
   keepPreviousData,
   queryOptions,
   useInfiniteQuery,
@@ -28,13 +28,14 @@ import {
 import { useEffect, useRef } from 'react';
 import { z } from 'zod';
 import { useActivitySummary } from './activity';
-import { ApiError, apiDelete, apiGet, apiPost } from './client';
+import { ApiError, apiDelete, apiGet, apiGetText, apiPost } from './client';
 
 /*
  * The library read models (`/api/library/*`, backend skill "Library"): the videos grid, the
- * Music tabs (artists, albums, playlists), Home, the header summaries, one video for Preview and
- * its Delete file, the player's queues (a playlist's and an artist's tracks) and the streams. Everything starts with `['library']`, so a finished download or a
- * deletion refreshes all of it at once.
+ * Music tabs (artists, albums, playlists), Home, the header summaries, the player's queues (a
+ * playlist's and an artist's tracks), the streams and the video player's playback and
+ * subtitles. Everything starts with `['library']`, so a finished download refreshes all of it
+ * at once.
  */
 
 /** The filter of a videos grid (`GET /api/library/videos`); the cursor is the page param. */
@@ -43,7 +44,9 @@ export type VideoFilter = Partial<Omit<VideoListQuery, 'cursor'>>;
 export const libraryKeys = {
   all: ['library'] as const,
   videos: (filter: VideoFilter) => ['library', 'videos', filter] as const,
-  video: (id: number) => ['library', 'video', id] as const,
+  playback: (id: number) => ['library', 'playback', id] as const,
+  subtitles: (id: number) => ['library', 'subtitles', id] as const,
+  subtitleText: (url: string) => ['library', 'subtitle-text', url] as const,
   home: ['library', 'home'] as const,
   summary: ['library', 'summary'] as const,
   artists: ['library', 'artists'] as const,
@@ -80,24 +83,6 @@ export function useVideos(filter: VideoFilter = {}) {
 }
 
 /**
- * One video (`GET /api/library/videos/:id`), for Preview. A 404 is not retried; ids below 1
- * never fetch.
- */
-export function useVideo(id: number) {
-  return useQuery({
-    queryKey: libraryKeys.video(id),
-    enabled: id > 0,
-    queryFn: () => apiGet(`/api/library/videos/${id}`, VideoListItem),
-    retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 2,
-  });
-}
-
-/** Seeds the single-video cache from a grid tile, so Preview renders without a request. */
-export function primeVideo(queryClient: QueryClient, video: VideoListItem): void {
-  queryClient.setQueryData(libraryKeys.video(video.id), video);
-}
-
-/**
  * Home (`GET /api/library/home`) in the browser's time zone. It refreshes through
  * `useLibraryFollowsDownloads` when a download finishes; the queue card reads the badge summary.
  */
@@ -116,24 +101,6 @@ export function useLibrarySummary() {
   return useQuery({
     queryKey: libraryKeys.summary,
     queryFn: () => apiGet('/api/library/summary', LibrarySummary),
-  });
-}
-
-/**
- * Delete file in Preview (`DELETE /api/library/videos/:id/file`). Afterwards every library
- * query, the sources (their sizes) and the Activity history refresh.
- */
-export function useDeleteVideoFile() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationKey: ['library', 'delete-file'],
-    mutationFn: (id: number) => apiDelete(`/api/library/videos/${id}/file`),
-    onSuccess: () => {
-      // Not awaited: Preview closes at once and the grids catch up behind it.
-      void queryClient.invalidateQueries({ queryKey: libraryKeys.all });
-      void queryClient.invalidateQueries({ queryKey: ['sources'] });
-      void queryClient.invalidateQueries({ queryKey: ['activity'] });
-    },
   });
 }
 
@@ -330,9 +297,44 @@ export function trackStreamUrl(id: number): string {
   return `/api/library/tracks/${id}/stream`;
 }
 
-/** Preview's `<video>` source: the file with HTTP Range support. */
-export function videoStreamUrl(id: number): string {
-  return `/api/library/videos/${id}/stream`;
+/**
+ * The video player's source (`GET /api/library/videos/:id/play`): mp4 and webm redirect to the
+ * file (Range support, native seeking); an mkv is remuxed from `t` seconds (seeking reloads).
+ */
+export function videoPlayUrl(id: number, t = 0): string {
+  const base = `/api/library/videos/${id}/play`;
+  return t > 0 ? `${base}?t=${Math.round(t * 1000) / 1000}` : base;
+}
+
+/**
+ * How a video plays (`GET /api/library/videos/:id/playback`): direct, remux or unsupported, and
+ * its codecs, size and length. Read by the video engine before it loads the source and by Now
+ * Playing's meta line; a file does not change while it is on disk, so it never goes stale.
+ */
+export function videoPlaybackQuery(id: number) {
+  return queryOptions({
+    queryKey: libraryKeys.playback(id),
+    queryFn: () => apiGet(`/api/library/videos/${id}/playback`, VideoPlayback),
+    staleTime: Infinity,
+  });
+}
+
+/** A video's subtitle tracks (`GET /api/library/videos/:id/subtitles`): sidecars, then embedded. */
+export function videoSubtitlesQuery(id: number) {
+  return queryOptions({
+    queryKey: libraryKeys.subtitles(id),
+    queryFn: () => apiGet(`/api/library/videos/${id}/subtitles`, z.array(SubtitleTrack)),
+    staleTime: 60_000,
+  });
+}
+
+/** One subtitle track's WebVTT text (a track's `url`). */
+export function subtitleTextQuery(url: string) {
+  return queryOptions({
+    queryKey: libraryKeys.subtitleText(url),
+    queryFn: () => apiGetText(url),
+    staleTime: Infinity,
+  });
 }
 
 /** A cached avatar or thumbnail (`/api/artwork/<kind>/<id>`). DTOs already carry these. */

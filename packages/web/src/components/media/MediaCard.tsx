@@ -24,7 +24,7 @@ export interface MediaCardProps {
   onOpenChannel?: () => void;
   /** Relative date, after the channel: `2 weeks ago`. */
   when?: string;
-  /** Opens the item (Preview). */
+  /** Opens the item (plays it). */
   onOpen?: () => void;
   /** Layout placement only. */
   className?: string;
@@ -128,7 +128,7 @@ function ChannelLink({ name, href, onOpen }: ChannelLinkProps) {
 }
 
 /**
- * The channel link's click: never reaches the card (Preview stays closed); a plain left click
+ * The channel link's click: never reaches the card (nothing starts playing); a plain left click
  * navigates in the app through `onOpen`, a modified one is left to the browser.
  */
 export function channelLinkClick(

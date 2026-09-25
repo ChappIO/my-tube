@@ -16,9 +16,7 @@ const colors = [
   { name: 'ok', light: '#2F9E6A', dark: '#2F9E6A', use: 'on disk, done' },
   { name: 'white', light: '#FFFFFF', dark: '#FFFFFF', use: 'text and glyphs on red' },
   { name: 'scrim', light: 'ink @ 0.45', dark: 'ink @ 0.45', use: 'modal overlay' },
-  { name: 'scrim-strong', light: 'ink @ 0.7', dark: 'ink @ 0.7', use: 'preview overlay' },
-  { name: 'player', light: '#0F1012', dark: '#0F1012', use: 'preview player area' },
-  { name: 'player-glyph', light: 'white @ 0.12', dark: 'white @ 0.12', use: 'preview play circle' },
+  { name: 'player', light: '#0F1012', dark: '#0F1012', use: 'Now Playing panel and frame' },
   { name: 'on-red-track', light: 'white @ 0.3', dark: 'white @ 0.3', use: 'player bar scrubber' },
   { name: 'on-red-hover', light: 'white @ 0.15', dark: 'white @ 0.15', use: 'player bar hover' },
   { name: 'player-card', light: '#151618', dark: '#151618', use: 'floating card' },
@@ -32,12 +30,28 @@ const colors = [
     dark: '#0F1012 @ 0.85',
     use: 'fade over Now Playing',
   },
+  { name: 'player-paused', light: '#0F1012 @ 0.6', dark: '#0F1012 @ 0.6', use: 'card paused' },
+  {
+    name: 'player-frame-glyph',
+    light: 'white @ 0.14',
+    dark: 'white @ 0.14',
+    use: 'frame play circle',
+  },
+  {
+    name: 'player-frame-track',
+    light: 'white @ 0.25',
+    dark: 'white @ 0.25',
+    use: 'frame progress track',
+  },
+  { name: 'player-caption', light: 'black @ 0.7', dark: 'black @ 0.7', use: 'card caption' },
+  { name: 'player-subtitle', light: 'black @ 0.72', dark: 'black @ 0.72', use: 'subtitles' },
 ] as const;
 
 const motions = [
   { cls: 'motion-tile', value: 'transform, box-shadow .2s ease', use: 'tile hover' },
   { cls: 'motion-chin', value: 'transform .2s ease', use: 'chin reveal' },
   { cls: 'motion-knob', value: 'left .15s', use: 'toggle knob' },
+  { cls: 'motion-scrub', value: 'height .15s ease', use: 'frame scrubber' },
   { cls: 'motion-spin', value: 'rotate .8s linear, repeating', use: 'player buffering' },
 ] as const;
 
@@ -71,7 +85,6 @@ const radii = [
 const shadows = [
   { cls: 'shadow-tile', value: '0 12px 28px -12px rgba(0,0,0,.35)', use: 'tile hover' },
   { cls: 'shadow-modal', value: '0 40px 80px -30px rgba(0,0,0,.5)', use: 'modals' },
-  { cls: 'shadow-preview', value: '0 40px 80px -30px rgba(0,0,0,.6)', use: 'preview modal' },
   { cls: 'shadow-player-bar', value: 'red glow + 0 8px 20px -10px', use: 'player bar' },
   { cls: 'shadow-player-card', value: '0 30px 60px -24px rgba(0,0,0,.55)', use: 'floating card' },
   { cls: 'shadow-player-art', value: '0 8px 18px -8px rgba(0,0,0,.5)', use: 'bar art' },
@@ -80,6 +93,8 @@ const shadows = [
     value: '0 12px 24px -12px rgba(0,0,0,.6)',
     use: 'Now Playing cover',
   },
+  { cls: 'shadow-popover', value: '0 24px 48px -20px rgba(0,0,0,.35)', use: 'CC, style menus' },
+  { cls: 'text-shadow-subtitle', value: '0 1px 2px, 0 0 8px black', use: 'subtitles, no bg' },
 ] as const;
 
 const choices: ThemeChoice[] = ['light', 'dark', 'system'];

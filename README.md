@@ -1,6 +1,6 @@
 # MyTube
 
-MyTube is for breaking free from the algorithmic YouTube feed. You decide which channels, artists and playlists you follow; MyTube checks them on a schedule, downloads what your rules let through with [yt-dlp](https://github.com/yt-dlp/yt-dlp), and files it into two plain folders: a Music library (artist, album, track, tagged, with cover art) and a Video library (channel, video, with a sidecar thumbnail). Nothing is recommended, nothing trends, nothing plays next. Watch and listen with Plex (or anything else that reads folders); the web app is for managing subscriptions, the queue, the history and the settings, plus a quick preview.
+MyTube is for breaking free from the algorithmic YouTube feed. You decide which channels, artists and playlists you follow; MyTube checks them on a schedule, downloads what your rules let through with [yt-dlp](https://github.com/yt-dlp/yt-dlp), and files it into two plain folders: a Music library (artist, album, track, tagged, with cover art) and a Video library (channel, video, with a sidecar thumbnail). Nothing is recommended, nothing trends, nothing plays next. Watch and listen with Plex (or anything else that reads folders); the web app is for managing subscriptions, the queue, the history and the settings, plus an in-browser player.
 
 It is one Docker container with three mounts.
 
@@ -47,7 +47,7 @@ Images are built for `linux/amd64` and `linux/arm64`.
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `/config`      | The database (`mytube.db`, settings included), backups, logs, the yt-dlp binary, the artwork cache and an optional `cookies.txt`. Small. |
 | `/media/music` | The Music library: `Artist / Album / ## Title.m4a`. Point Plex's music library here.                                                     |
-| `/media/video` | The Video library: `Channel / Title (Date).mkv` with `Title (Date).jpg` next to it. Point Plex's video library here.                     |
+| `/media/video` | The Video library: `Channel / Title (Date).mp4` with `Title (Date).jpg` next to it. Point Plex's video library here.                     |
 
 The folder structures and formats are editable in Settings → Music and Settings → Video.
 
@@ -78,7 +78,7 @@ MyTube has no login. Anyone who can reach the port can add sources, change rules
 4. Subscribe. The source is checked at once and then every 2 hours (Settings → General). Downloads show up in Activity.
 5. Point Plex (or Jellyfin, or a music player) at the two library folders.
 
-Removing a source or turning its bell off never deletes files. Files are removed only by a source's rules or by **Delete file** in the preview.
+Removing a source or turning its bell off never deletes files. Files are removed only by a source's rules.
 
 ## Where things are
 

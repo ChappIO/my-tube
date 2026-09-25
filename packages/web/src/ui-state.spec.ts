@@ -2,14 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   closeAdd,
   closeJobLog,
-  closePreview,
   isAddOpen,
   jobLogTarget,
   openAdd,
   openJobLog,
-  openPreview,
-  previewKey,
-  previewTarget,
   subscribeUiState,
 } from './ui-state';
 
@@ -38,32 +34,6 @@ describe('Add modal state', () => {
     unsubscribe();
     openAdd();
     expect(listener).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe('Preview state', () => {
-  afterEach(() => {
-    closePreview();
-  });
-
-  it('holds what is being previewed and notifies on changes only', () => {
-    const listener = vi.fn<() => void>();
-    const unsubscribe = subscribeUiState(listener);
-    expect(previewTarget()).toBeNull();
-    openPreview(4);
-    openPreview(4);
-    expect(previewTarget()).toEqual({ kind: 'video', id: 4 });
-    openPreview(5);
-    expect(previewTarget()).toEqual({ kind: 'video', id: 5 });
-    closePreview();
-    closePreview();
-    expect(previewTarget()).toBeNull();
-    expect(listener).toHaveBeenCalledTimes(3);
-    unsubscribe();
-  });
-
-  it('keys each target', () => {
-    expect(previewKey({ kind: 'video', id: 4 })).toBe('video:4');
   });
 });
 

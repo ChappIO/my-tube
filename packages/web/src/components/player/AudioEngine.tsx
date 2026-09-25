@@ -11,6 +11,7 @@ import {
   setPlaying,
   usePlayerState,
 } from '../../player-state';
+import { analyserOutput, applyAudioVolume } from './audio-output';
 import { connectAnalyser } from './useAnalyser';
 
 /** The bar's error line when a file does not load or decode. */
@@ -25,11 +26,12 @@ export const PLAYBACK_ERROR = 'This file could not be played. Skipping.';
  * the app (a headset unplugged) pauses the store too.
  *
  * Every play also calls `connectAnalyser` (the visualizer's `AnalyserNode`, built once on the
- * first play from a user gesture); slice C adds a `<video>` engine beside it for `kind: 'video'`.
+ * first play from a user gesture). `VideoEngine` plays video items beside it; the error skip
+ * below serves both engines.
  */
 export function AudioEngine() {
   const ref = useRef<HTMLAudioElement>(null);
-  const { player, load, seekRequest, error } = usePlayerState();
+  const { player, load, seekRequest, error, volume, muted } = usePlayerState();
   const item = currentItem(player);
   const src = item?.kind === 'music' ? item.fileUrl : null;
   const playing = player?.playing ?? false;
@@ -46,6 +48,7 @@ export function AudioEngine() {
       return;
     }
     audio.src = src;
+    applyAudioVolume(audio, playerState(), analyserOutput);
     // `load` is the trigger: it bumps when the same URL has to start over.
     // oxlint-disable-next-line react/exhaustive-effect-dependencies
   }, [load, src]);
@@ -57,6 +60,8 @@ export function AudioEngine() {
       reportBuffering(audio.readyState < HTMLMediaElement.HAVE_FUTURE_DATA);
       // The visualizer's analyser: built on the first play from a click, resumed on every play.
       connectAnalyser(audio);
+      // The graph may exist only now (the first play from a click): the level moves to its gain.
+      applyAudioVolume(audio, playerState(), analyserOutput);
       audio.play().catch((reason: unknown) => {
         // A newer load interrupted this play (AbortError): the next effect plays again.
         if (reason instanceof DOMException && reason.name === 'NotAllowedError') setPlaying(false);
@@ -67,6 +72,11 @@ export function AudioEngine() {
     // After every load the element is paused again, so a new load plays anew.
     // oxlint-disable-next-line react/exhaustive-effect-dependencies
   }, [playing, load, src]);
+
+  // The bar's volume and mute: the gain after the visualizer's analyser, or the element's own.
+  useEffect(() => {
+    if (ref.current) applyAudioVolume(ref.current, { volume, muted }, analyserOutput);
+  }, [volume, muted]);
 
   // Seeks the store asked for (the scrubber, ±10 s, prev's restart, play after the end).
   const firstSeek = useRef(seekRequest);
@@ -102,8 +112,11 @@ export function AudioEngine() {
       onCanPlay={() => reportBuffering(false)}
       onEnded={() => next()}
       onPause={(event) => {
-        // Our own pause already set the store; this catches pauses from outside the app.
-        if (!event.currentTarget.ended) setPlaying(false);
+        // Our own pause already set the store; this catches pauses from outside the app. The
+        // pause that lets go of the element when a video starts is not one.
+        if (!event.currentTarget.ended && playerState().player?.kind === 'music') {
+          setPlaying(false);
+        }
       }}
       onError={(event) => {
         // No source (a closed player) is not an error.

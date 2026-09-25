@@ -6,14 +6,14 @@ import { Matcher } from './matchers.js';
 /*
  * The library read models (`/api/library/*`): the Videos tab and channel page grid, the Music
  * tabs (artists, albums, playlists), the Home feed with its stats, the header summaries, and
- * what Preview needs to play a file.
+ * what the player needs to queue and play a file.
  */
 
 // ---------------------------------------------------------------------------------------
 // Media types. Shared so the API's Content-Type and the web's `canPlayType` check agree.
 // ---------------------------------------------------------------------------------------
 
-/** Content type per video container. Browsers play mp4 and webm; mkv mostly not. */
+/** Content type per video container. Browsers play mp4 and webm; an mkv is remuxed (`playback.ts`). */
 export const VIDEO_MIME_TYPES: Readonly<Record<string, string>> = {
   mkv: 'video/x-matroska',
   mp4: 'video/mp4',
@@ -86,7 +86,7 @@ export const VideoChannel = z.object({
 });
 export type VideoChannel = z.infer<typeof VideoChannel>;
 
-/** One video in a library list: the `Video` DTO plus its channel and what Preview needs. */
+/** One video in a library list: the `Video` DTO plus its channel and what the player needs. */
 export const VideoListItem = Video.extend({
   /** The cached thumbnail (`/api/artwork/video/<id>`): the sidecar `.jpg` when on disk. */
   thumbnailUrl: ArtworkPath.nullable(),
@@ -128,7 +128,7 @@ export const TrackAlbum = z.object({
 });
 export type TrackAlbum = z.infer<typeof TrackAlbum>;
 
-/** One track with its artist, album and what Preview needs (`GET /api/library/tracks/:id`). */
+/** One track with its artist, album and what the player needs (`GET /api/library/tracks/:id`). */
 export const TrackListItem = Track.extend({
   /** The album cover when the album has one, else the track's own thumbnail; both cached. */
   coverUrl: ArtworkPath.nullable(),
@@ -240,7 +240,7 @@ export const AlbumListItem = z.object({
   artist: z.object({ id: z.number().int().positive(), name: z.string() }),
   trackCount: z.number().int().nonnegative(),
   onDiskCount: z.number().int().nonnegative(),
-  /** The first track on disk in album order (the tile opens Preview on it), or null. */
+  /** The first track on disk in album order, or null. */
   firstTrackId: z.number().int().positive().nullable(),
 });
 export type AlbumListItem = z.infer<typeof AlbumListItem>;
@@ -396,7 +396,7 @@ export const PlaylistListItem = z.object({
   durationSeconds: z.number().int().nonnegative(),
   /** The first four distinct covers of the items on disk, in playlist order (the stack). */
   covers: z.array(ArtworkPath).max(4),
-  /** The first item on disk in playlist order (the tile opens Preview on it), or null. */
+  /** The first item on disk in playlist order, or null. */
   firstTrackId: z.number().int().positive().nullable(),
 });
 export type PlaylistListItem = z.infer<typeof PlaylistListItem>;

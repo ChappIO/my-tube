@@ -9,10 +9,12 @@ import {
   setPlaying,
   usePlayerState,
 } from '../../player-state';
+import { useVideoPrefs } from '../../video-prefs';
 
 /**
- * The Media Session metadata for an item: title, artist (the item's `sub`), album and the cover
- * as artwork (a same-origin path; the browser resolves it against the page).
+ * The Media Session metadata for an item: title, artist (the item's `sub`: the artist or the
+ * channel), album and the cover or video thumbnail as artwork (a same-origin path; the browser
+ * resolves it against the page).
  */
 export function mediaMetadataInit(item: PlayerItem): MediaMetadataInit {
   const init: MediaMetadataInit = { title: item.title, artist: item.sub };
@@ -101,13 +103,15 @@ export function useMediaSession(): void {
 
   const pos = player?.pos ?? 0;
   const dur = item?.dur ?? 0;
+  const { speed } = useVideoPrefs();
+  const rate = item?.kind === 'video' ? speed : 1;
   useEffect(() => {
     const session = mediaSession();
     if (!session?.setPositionState || !playerState().player || dur <= 0) return;
     try {
-      session.setPositionState({ duration: dur, position: Math.min(pos, dur), playbackRate: 1 });
+      session.setPositionState({ duration: dur, position: Math.min(pos, dur), playbackRate: rate });
     } catch {
       // An inconsistent state (the position a moment past a rounded duration) is not worth failing.
     }
-  }, [pos, dur]);
+  }, [pos, dur, rate]);
 }

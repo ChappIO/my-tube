@@ -34,7 +34,7 @@ describe('videoExtraArgs', () => {
   it('maps the defaults: remux, embedded en/nl subtitles, jpg thumbnail sidecar', () => {
     expect(videoExtraArgs(video)).toEqual([
       '--remux-video',
-      'mkv',
+      'mp4',
       '--embed-subs',
       '--sub-langs',
       'en,nl',
@@ -47,7 +47,7 @@ describe('videoExtraArgs', () => {
   it('keeps subtitles as sidecars, drops them without languages and skips thumbnails', () => {
     expect(videoExtraArgs({ ...video, subtitlesEmbedded: false, saveThumbnails: false })).toEqual([
       '--remux-video',
-      'mkv',
+      'mp4',
       '--write-subs',
       '--sub-langs',
       'en,nl',

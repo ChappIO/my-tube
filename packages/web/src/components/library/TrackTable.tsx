@@ -17,7 +17,7 @@ export interface TrackTableProps {
   sort: TrackSort;
   dir: SortDir;
   onSort: (column: TrackSort) => void;
-  /** A row click: plays the table from that row (rows of tracks not on disk do nothing). */
+  /** A row click: plays that track alone (rows of tracks not on disk do nothing). */
   onPlay: (track: TrackListItem) => void;
   /** The clock for the Added column. */
   now: number;
@@ -26,7 +26,7 @@ export interface TrackTableProps {
 /**
  * The Tracks table: a bordered radius-12 list with a `surface` header row of
  * sortable column labels (every column but # and Status; the active one in `ink` with ↑/↓)
- * over rows that play (the table from that row down, in the player). Below 760px the header is hidden (`TrackSortPills` sorts
+ * over rows that play (that track alone, in the player). Below 760px the header is hidden (`TrackSortPills` sorts
  * instead) and each row collapses to a list item.
  */
 export function TrackTable({ tracks, sort, dir, onSort, onPlay, now }: TrackTableProps) {

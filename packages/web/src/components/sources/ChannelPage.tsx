@@ -44,7 +44,12 @@ export function ChannelPage({ id }: { id: string }) {
     body = (
       <>
         <ChannelHeader source={source.data} />
-        <VideoGrid filter={{ sourceId: source.data.id }} showChannel={false} />
+        <VideoGrid
+          filter={{ sourceId: source.data.id }}
+          showChannel={false}
+          queue="page"
+          pageName={source.data.name}
+        />
       </>
     );
   }

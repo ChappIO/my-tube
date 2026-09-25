@@ -23,7 +23,7 @@ const FILTER_DEBOUNCE_MS = 300;
 
 /**
  * Music → Tracks: the toolbar, the narrow sort pills, the table and **Load
- * more** (60 per page). A row plays the table from there down. Filtering and sorting are server-side (`GET /api/library/tracks`); the
+ * more** (60 per page). A row plays that track alone. Filtering and sorting are server-side (`GET /api/library/tracks`); the
  * filter text, the filter and the sort are the URL search params of `/music/tracks`.
  */
 export function TracksTab() {

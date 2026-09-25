@@ -1,8 +1,11 @@
 import { type Player, type PlayerItem, currentItem, next, upNext } from '../../player-state';
-import { NextIcon } from '../icons';
+import { NextIcon, PlayIcon } from '../icons';
 import { Artwork } from '../media';
 import { cx, focusRing, focusRingInset } from '../ui/cx';
 import { progressFraction } from './Scrubber';
+import { SubtitleLayer } from './VideoFrame';
+import { VideoSurface } from './VideoSurface';
+import { useCaption } from './subtitles';
 
 /** The card's width per kind: 260 for a cover, 320 for the video surface. */
 export const CARD_WIDTHS = { music: 260, video: 320 } as const;
@@ -18,9 +21,9 @@ export interface FloatingCardProps {
  * open Now Playing from the bar's art). It appears with every new queue and stays until its ×
  * or Now Playing, which hides it. The art block opens Now Playing; the Up next row skips ahead.
  *
- * The art block is the seam for video: music shows the square cover (`MusicCardArt`); the video
- * player puts its 16/9 `<video>` surface in the same place at `CARD_WIDTHS.video`, with the same
- * bottom overlay, progress line and ×.
+ * The art block is the one kind-specific part: music shows the square cover (`MusicCardArt`),
+ * video the 16/9 `<video>` surface (`VideoCardArt`, 320 wide), with the same bottom overlay,
+ * progress line and ×.
  */
 export function FloatingCard({ player, onOpenNowPlaying, onDismiss }: FloatingCardProps) {
   const item = currentItem(player);
@@ -32,11 +35,20 @@ export function FloatingCard({ player, onOpenNowPlaying, onDismiss }: FloatingCa
       className="fixed right-4 bottom-[calc(16px+var(--player-bar-height,118px)+12px)] z-[8] hidden overflow-hidden rounded-[16px] bg-player-card text-white shadow-player-card wide:block"
     >
       <div className="relative">
-        <MusicCardArt
-          item={item}
-          progress={progressFraction(player.pos, item.dur)}
-          onOpen={onOpenNowPlaying}
-        />
+        {item.kind === 'video' ? (
+          <VideoCardArt
+            item={item}
+            pos={player.pos}
+            playing={player.playing}
+            onOpen={onOpenNowPlaying}
+          />
+        ) : (
+          <MusicCardArt
+            item={item}
+            progress={progressFraction(player.pos, item.dur)}
+            onOpen={onOpenNowPlaying}
+          />
+        )}
         <button
           type="button"
           aria-label="Dismiss"
@@ -77,16 +89,70 @@ function MusicCardArt({
       className={cx('relative block aspect-square w-full cursor-pointer text-left', focusRingInset)}
     >
       <Artwork fill src={item.artUrl ?? undefined} seed={item.album ?? item.title} size="flush" />
-      <span className="absolute inset-x-0 bottom-0 grid gap-[2px] bg-linear-to-t from-player-fade to-transparent px-[14px] pt-9 pb-3">
-        <span className="truncate font-sans text-[15px] font-extrabold tracking-[-0.01em]">
-          {item.title}
-        </span>
-        <span className="truncate font-sans text-[12px] opacity-80">{item.sub}</span>
-      </span>
-      <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] bg-player-line">
-        <span className="block h-full bg-red" style={{ width: `${progress * 100}%` }} />
-      </span>
+      <CardTitle item={item} />
+      <ProgressLine progress={progress} />
     </button>
+  );
+}
+
+/**
+ * The video art block (the picture-in-picture surface): 16/9 with the one `<video>` in it, a
+ * button to Now Playing over it. Paused: the 34px play glyph over a dark veil. Playing with
+ * captions on: the caption line 64px above the bottom. Then the bottom overlay and the 3px
+ * progress line, as for music.
+ */
+function VideoCardArt({
+  item,
+  pos,
+  playing,
+  onOpen,
+}: {
+  item: PlayerItem;
+  pos: number;
+  playing: boolean;
+  onOpen: () => void;
+}) {
+  const caption = useCaption(item, pos);
+  return (
+    <div className="relative aspect-video w-full bg-player">
+      <VideoSurface kind="card" />
+      {playing && <SubtitleLayer text={caption} variant="card" />}
+      <button
+        type="button"
+        aria-label={`Now Playing: ${item.title}`}
+        onClick={onOpen}
+        className={cx('absolute inset-0 z-[1] block cursor-pointer text-left', focusRingInset)}
+      >
+        {!playing && (
+          <span className="absolute inset-0 grid place-items-center bg-player-paused">
+            <PlayIcon size={34} />
+          </span>
+        )}
+        <CardTitle item={item} />
+        <ProgressLine progress={progressFraction(pos, item.dur)} />
+      </button>
+    </div>
+  );
+}
+
+/** The card art's bottom overlay: title (Archivo 800 15) and sub (Archivo 12 at .8) over a fade. */
+function CardTitle({ item }: { item: PlayerItem }) {
+  return (
+    <span className="absolute inset-x-0 bottom-0 grid gap-[2px] bg-linear-to-t from-player-fade to-transparent px-[14px] pt-9 pb-3">
+      <span className="truncate font-sans text-[15px] font-extrabold tracking-[-0.01em]">
+        {item.title}
+      </span>
+      <span className="truncate font-sans text-[12px] opacity-80">{item.sub}</span>
+    </span>
+  );
+}
+
+/** The 3px progress line along the bottom edge of the card art. */
+function ProgressLine({ progress }: { progress: number }) {
+  return (
+    <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] bg-player-line">
+      <span className="block h-full bg-red" style={{ width: `${progress * 100}%` }} />
+    </span>
   );
 }
 

@@ -157,10 +157,10 @@ describe('DownloadRunner (fake binary)', () => {
     // Format, container, subtitles and thumbnails come from Settings → Video.
     const args = z.array(z.string()).parse(JSON.parse(readFileSync(argsFile, 'utf8')));
     const after = (flag: string) => args[args.indexOf(flag) + 1];
-    // The default quality is "best available": no height cap.
-    expect(after('-f')).toBe('bestvideo+bestaudio/best');
-    expect(after('--merge-output-format')).toBe('mkv');
-    expect(after('--remux-video')).toBe('mkv');
+    // The default quality is "best available": no height cap; the default container is mp4.
+    expect(after('-f')).toBe('bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best');
+    expect(after('--merge-output-format')).toBe('mp4');
+    expect(after('--remux-video')).toBe('mp4');
     expect(after('--sub-langs')).toBe('en,nl');
     expect(args).toEqual(expect.arrayContaining(['--embed-subs', '--write-thumbnail']));
     expect(args).not.toContain('--write-subs');
@@ -179,7 +179,7 @@ describe('DownloadRunner (fake binary)', () => {
     ).toBe(true);
     // The metadata call resolves the same format selector as the download.
     expect(log).toMatch(
-      /^[\d:.]{12} \$ .* --dump-single-json .* -f bestvideo\+bestaudio\/best -- /m,
+      /^[\d:.]{12} \$ .* --dump-single-json .* -f bestvideo\[ext=mp4\]\+bestaudio\[ext=m4a\]\/bestvideo\+bestaudio\/best -- /m,
     );
     expect(log).toContain('[mytube-progress]');
     expect(log).toContain(`saved ${path} (10 bytes)`);

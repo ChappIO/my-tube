@@ -27,7 +27,7 @@ export interface MusicTileProps {
   covers?: readonly string[];
   /** Placeholder seed when there is no art. */
   seed?: string;
-  /** Opens the item (Preview). */
+  /** Opens the item (plays it). */
   onOpen?: () => void;
   /**
    * The item's page, built with `linkOptions` (albums: the album page). The tile renders as a

@@ -120,7 +120,7 @@ describe('album tiles', () => {
     history: createMemoryHistory(),
   });
 
-  it('link to the album page instead of opening Preview', () => {
+  it('link to the album page instead of playing', () => {
     const html = renderToStaticMarkup(
       <RouterContextProvider router={router}>
         <MusicTile kind="album" title="In Rainbows" link={albumPageLink(7)} />
@@ -131,7 +131,7 @@ describe('album tiles', () => {
     expect(html).not.toContain('role="button"');
   });
 
-  it('without a link stay a Preview button', () => {
+  it('without a link stay a play button', () => {
     const html = renderToStaticMarkup(
       <MusicTile kind="playlist" title="Road Trip" onOpen={() => undefined} />,
     );

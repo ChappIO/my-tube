@@ -6,7 +6,6 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import {
   DEFAULT_SOURCE_OPTIONS,
-  HistoryEntry,
   HomeFeed,
   LibrarySummary,
   Source,
@@ -17,14 +16,13 @@ import {
 import { eq } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { z } from 'zod';
 import { AppModule } from '../src/app.module.js';
 import { ArtworkService } from '../src/artwork/artwork.service.js';
 import { DATABASE, type Database } from '../src/database/database.module.js';
 import { channels, history, sources, videos } from '../src/database/schema.js';
 
 /*
- * The library read endpoints, the artwork cache, Preview's streaming and Delete file, against
+ * The library read endpoints, the artwork cache and the video stream, against
  * rows seeded straight into the database and files in a temp VIDEO_DIR.
  */
 
@@ -409,50 +407,8 @@ describe('Library (e2e)', () => {
       writeFileSync(join(root, 'secret.mp4'), 'secret');
       db.update(videos).set({ filePath: '../secret.mp4' }).where(eq(videos.id, ids.c!)).run();
       await request(server()).get(`/api/library/videos/${ids.c}/stream`).expect(403);
-      await request(server()).delete(`/api/library/videos/${ids.c}/file`).expect(403);
       expect(existsSync(join(root, 'secret.mp4'))).toBe(true);
       db.update(videos).set({ filePath: 'NASA/Video c.mp4' }).where(eq(videos.id, ids.c!)).run();
-    });
-  });
-
-  describe('DELETE /api/library/videos/:id/file', () => {
-    it('removes the file and sidecars, marks the video deleted and records history', async () => {
-      file('NASA/Video b.jpg', 'jpg');
-      file('NASA/Video b.en.vtt', 'vtt');
-      await request(server()).delete(`/api/library/videos/${ids.b}/file`).expect(204);
-      for (const name of ['Video b.mp4', 'Video b.jpg', 'Video b.en.vtt']) {
-        expect(existsSync(join(videoDir(), 'NASA', name))).toBe(false);
-      }
-      expect(existsSync(join(videoDir(), 'NASA', 'Video a.mp4'))).toBe(true);
-
-      const item = VideoListItem.parse(
-        (await request(server()).get(`/api/library/videos/${ids.b}`).expect(200)).body,
-      );
-      expect(item).toMatchObject({
-        status: 'skipped',
-        skipReason: 'deleted_by_user',
-        filePath: null,
-        fileSizeBytes: null,
-        mimeType: null,
-      });
-      const listed = VideoPage.parse((await request(server()).get('/api/library/videos')).body);
-      expect(listed.items.map((row) => row.id)).not.toContain(ids.b);
-
-      const [latest] = z
-        .array(HistoryEntry)
-        .parse((await request(server()).get('/api/activity/history?limit=1')).body);
-      expect(latest).toMatchObject({
-        kind: 'video',
-        title: 'Video b',
-        result: 'removed',
-        details: 'deleted by user',
-      });
-      const source = Source.parse((await request(server()).get(`/api/sources/${sourceId}`)).body);
-      expect(source.sizeBytes).toBe(500);
-      expect(source.itemCount).toBe(5);
-
-      await request(server()).delete(`/api/library/videos/${ids.b}/file`).expect(409);
-      await request(server()).delete('/api/library/videos/9999/file').expect(404);
     });
   });
 });
