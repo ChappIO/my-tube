@@ -482,6 +482,27 @@ export function describeMatcher(matcher: Matcher): string[] {
   return [phrase(matcher, false)];
 }
 
+/**
+ * A negated group, as the builder names it: `none of (a, b)` for `not(or)`, `not all of (a, b)`
+ * for `not(and)`; titles read `no "A" or "B"`. A `not` around a `not` cancels out.
+ */
+function negatedGroup(group: MatcherGate): string {
+  if (group.type === 'not') return phrase(group.item, true);
+  const [first] = group.items;
+  if (group.items.length === 1 && first) {
+    return isGate(first) ? negatedGroup(first) : describeLeaf(first, true);
+  }
+  if (group.items.length === 0) return group.type === 'and' ? 'nothing' : 'everything';
+  const titles = group.items.flatMap((item) =>
+    item.type === 'title_contains' ? [`"${item.text}"`] : [],
+  );
+  if (group.type === 'or' && titles.length === group.items.length) {
+    return `no ${titles.join(' or ')}`;
+  }
+  const items = group.items.map((item) => phrase(item, true)).join(', ');
+  return group.type === 'or' ? `none of (${items})` : `not all of (${items})`;
+}
+
 function phrase(node: Matcher, nested: boolean): string {
   switch (node.type) {
     case 'and':
@@ -499,7 +520,7 @@ function phrase(node: Matcher, nested: boolean): string {
       return nested ? `(${text})` : text;
     }
     case 'not':
-      return isGate(node.item) ? `not ${phrase(node.item, true)}` : describeLeaf(node.item, true);
+      return isGate(node.item) ? negatedGroup(node.item) : describeLeaf(node.item, true);
     default:
       return describeLeaf(node);
   }

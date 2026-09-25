@@ -21,17 +21,22 @@ import {
  * condition's type and back does not lose what was typed. `matcherFromDraft` turns it into the
  * shared `Matcher` or says why it cannot be saved yet.
  *
- * Groups carry one gate: `and` (all of), `or` (any of) or `not` (none of). A `not` group is
- * `not(or(items))`, or `not(item)` with one item. A leaf has its own NOT toggle, which wraps it
- * in `not`. Only the root group may be empty (an empty `and` matches everything).
+ * Groups carry one gate, `and` (all of) or `or` (any of). Every node, group or condition, has a
+ * NOT toggle (`negated`) that wraps it in `not`: a negated OR group reads "none of these", a
+ * negated AND group "not all of these". There is no NOT gate: NOT over several children reads
+ * badly and is expressible with the toggles. Loading a tree folds every `not` into the toggle
+ * of the node it wraps, so double negations cancel. Only the root group may be empty, as a
+ * plain AND (an empty `and` matches everything).
  */
 
-export type DraftGate = 'and' | 'or' | 'not';
+export type DraftGate = 'and' | 'or';
 
 export interface DraftGroup {
   kind: 'group';
   id: string;
   gate: DraftGate;
+  /** Wrapped in `not`. */
+  negated: boolean;
   items: DraftNode[];
 }
 
@@ -82,11 +87,13 @@ export function leafOptions(playlist: boolean) {
 export const LIVE_STATUS_OPTIONS: readonly { value: LiveStatus; label: string }[] =
   LIVE_STATUSES.map((status) => ({ value: status, label: LIVE_STATUS_LABELS[status] }));
 
-export const GATE_LABELS: Record<DraftGate, { pill: string; hint: string }> = {
-  and: { pill: 'AND', hint: 'all of these' },
-  or: { pill: 'OR', hint: 'any of these' },
-  not: { pill: 'NOT', hint: 'none of these' },
-};
+export const GATE_LABELS: Record<DraftGate, string> = { and: 'AND', or: 'OR' };
+
+/** What a group means, for its hint: all of / any of / none of / not all of these. */
+export function groupHint(gate: DraftGate, negated: boolean): string {
+  if (gate === 'and') return negated ? 'not all of these' : 'all of these';
+  return negated ? 'none of these' : 'any of these';
+}
 
 /** A new condition: an empty "Title contains". */
 export function newLeaf(type: LeafType = 'title_contains'): DraftLeaf {
@@ -108,7 +115,7 @@ export function newLeaf(type: LeafType = 'title_contains'): DraftLeaf {
 
 /** A new group: "any of" with one empty condition (an empty nested group is not valid). */
 export function newGroup(gate: DraftGate = 'or'): DraftGroup {
-  return { kind: 'group', id: nextId(), gate, items: [newLeaf()] };
+  return { kind: 'group', id: nextId(), gate, negated: false, items: [newLeaf()] };
 }
 
 // ---------------------------------------------------------------------------------------
@@ -118,23 +125,26 @@ export function newGroup(gate: DraftGate = 'or'): DraftGroup {
 /** The editable form of a tree. The root is always a group. */
 export function draftFromMatcher(matcher: Matcher): DraftGroup {
   const node = toDraft(matcher);
-  return node.kind === 'group' ? node : { kind: 'group', id: nextId(), gate: 'and', items: [node] };
+  return node.kind === 'group'
+    ? node
+    : { kind: 'group', id: nextId(), gate: 'and', negated: false, items: [node] };
 }
 
 function toDraft(matcher: Matcher): DraftNode {
   switch (matcher.type) {
     case 'and':
     case 'or':
-      return { kind: 'group', id: nextId(), gate: matcher.type, items: matcher.items.map(toDraft) };
+      return {
+        kind: 'group',
+        id: nextId(),
+        gate: matcher.type,
+        negated: false,
+        items: matcher.items.map(toDraft),
+      };
     case 'not': {
-      const inner = matcher.item;
-      if (inner.type === 'or') {
-        return { kind: 'group', id: nextId(), gate: 'not', items: inner.items.map(toDraft) };
-      }
-      if (inner.type === 'and' || inner.type === 'not') {
-        return { kind: 'group', id: nextId(), gate: 'not', items: [toDraft(inner)] };
-      }
-      return { ...leafDraft(inner), negated: true };
+      // Fold the `not` into the toggle of what it wraps; not(not(x)) is x.
+      const inner = toDraft(matcher.item);
+      return { ...inner, negated: !inner.negated };
     }
     default:
       return leafDraft(matcher);
@@ -198,12 +208,8 @@ function toMatcher(node: DraftNode): Matcher {
     const leaf = leafFromDraft(node);
     return node.negated ? { type: 'not', item: leaf } : leaf;
   }
-  const items = node.items.map(toMatcher);
-  if (node.gate === 'not') {
-    const [only] = items;
-    return { type: 'not', item: items.length === 1 && only ? only : { type: 'or', items } };
-  }
-  return { type: node.gate, items };
+  const group: Matcher = { type: node.gate, items: node.items.map(toMatcher) };
+  return node.negated ? { type: 'not', item: group } : group;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -217,9 +223,9 @@ export function nodeError(
 ): string | undefined {
   if (node.kind === 'group') {
     if (node.items.length > 0) return undefined;
-    if (root && node.gate === 'and') return undefined;
+    if (root && node.gate === 'and' && !node.negated) return undefined;
     return root
-      ? 'An empty group matches nothing. Add a condition or switch it to AND.'
+      ? 'An empty group matches nothing. Add a condition, or use AND without NOT.'
       : 'Add a condition to this group or remove it.';
   }
   if (!playlist && PLAYLIST_ONLY_LEAVES.includes(node.type)) {
@@ -309,8 +315,8 @@ function depthOf(node: DraftNode, id: string, depth: number): number | undefined
   if (node.id === id) return depth;
   if (node.kind === 'leaf') return undefined;
   for (const item of node.items) {
-    // A `not` group with several items adds an `or` level in the tree.
-    const found = depthOf(item, id, depth + (node.gate === 'not' && node.items.length > 1 ? 2 : 1));
+    // A negated node sits one level lower, under its `not`.
+    const found = depthOf(item, id, depth + 1 + (item.negated ? 1 : 0));
     if (found !== undefined) return found;
   }
   return undefined;
@@ -376,7 +382,7 @@ export function moveNode(root: DraftGroup, id: string, offset: -1 | 1): DraftGro
   return move(root);
 }
 
-/** Changes a leaf's type or parameters. */
+/** Changes a leaf's type or parameters (or its NOT). */
 export function updateLeaf(
   root: DraftGroup,
   id: string,
@@ -385,7 +391,12 @@ export function updateLeaf(
   return mapRoot(root, id, (node) => (node.kind === 'leaf' ? { ...node, ...patch } : node));
 }
 
-/** Changes a group's gate. */
+/** Changes a group's gate (AND / OR). */
 export function setGate(root: DraftGroup, id: string, gate: DraftGate): DraftGroup {
   return mapRoot(root, id, (node) => (node.kind === 'group' ? { ...node, gate } : node));
+}
+
+/** Sets the NOT toggle of any node, group or condition (the root included). */
+export function setNegated(root: DraftGroup, id: string, negated: boolean): DraftGroup {
+  return mapRoot(root, id, (node) => ({ ...node, negated }));
 }

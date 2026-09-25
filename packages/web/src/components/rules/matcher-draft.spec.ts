@@ -14,6 +14,7 @@ import {
   addNode,
   canAddGroup,
   draftFromMatcher,
+  groupHint,
   leafOptions,
   matcherFromDraft,
   moveNode,
@@ -22,6 +23,7 @@ import {
   nodeError,
   removeNode,
   setGate,
+  setNegated,
   updateLeaf,
 } from './matcher-draft';
 
@@ -49,7 +51,6 @@ describe('draftFromMatcher / matcherFromDraft', () => {
     ],
     ['a none-of group', and(not(or(artemis, orion)))],
     ['a negated and', and(not(and(artemis, { type: 'is_short' })))],
-    ['double negation', and(not(not({ type: 'is_short' })))],
     [
       'every value kind',
       and(
@@ -73,7 +74,30 @@ describe('draftFromMatcher / matcherFromDraft', () => {
       matcher: and({ type: 'is_short' }),
     });
     expect(roundTrip(or(artemis, orion))).toEqual({ ok: true, matcher: or(artemis, orion) });
-    expect(draftFromMatcher(not(or(artemis, orion))).gate).toBe('not');
+    expect(draftFromMatcher(not(or(artemis, orion)))).toMatchObject({ gate: 'or', negated: true });
+    expect(roundTrip(not(or(artemis, orion)))).toEqual({
+      ok: true,
+      matcher: not(or(artemis, orion)),
+    });
+  });
+
+  it('shows a not around a group as the group toggle and around a leaf as the leaf toggle', () => {
+    const root = draftFromMatcher(and(not(and(artemis, orion)), not(artemis)));
+    const [group, leaf] = root.items;
+    expect(group).toMatchObject({ kind: 'group', gate: 'and', negated: true });
+    expect(leaf).toMatchObject({ kind: 'leaf', type: 'title_contains', negated: true });
+  });
+
+  it('collapses double negations', () => {
+    expect(roundTrip(and(not(not({ type: 'is_short' }))))).toEqual({
+      ok: true,
+      matcher: and({ type: 'is_short' }),
+    });
+    expect(roundTrip(and(not(not(not(or(artemis, orion))))))).toEqual({
+      ok: true,
+      matcher: and(not(or(artemis, orion))),
+    });
+    expect(draftFromMatcher(not(not(and(artemis))))).toMatchObject({ negated: false });
   });
 
   it('keeps every parameter when the type changes, and trims texts', () => {
@@ -164,7 +188,8 @@ describe('edits', () => {
     expect(root.items).toHaveLength(2);
     expect(root.items[0]).toBe(untouched);
 
-    root = setGate(root, group.id, 'not');
+    root = setGate(root, group.id, 'and');
+    root = setNegated(root, group.id, true);
     root = moveNode(root, group.id, -1);
     expect(root.items.map((item) => item.kind)).toEqual(['group', 'leaf']);
     expect(moveNode(root, group.id, -1)).toEqual(root);
@@ -174,12 +199,23 @@ describe('edits', () => {
     expect(removeNode(root, root.id)).toBe(root);
   });
 
-  it('turns a NOT group with several items into not(or(...))', () => {
-    let root = draftFromMatcher(and(artemis, orion));
-    root = setGate(root, root.id, 'not');
-    expect(matcherFromDraft(root)).toEqual({ ok: true, matcher: not(or(artemis, orion)) });
-    root = removeNode(root, firstLeaf(root).id);
-    expect(matcherFromDraft(root)).toEqual({ ok: true, matcher: not(orion) });
+  it('negates a group with its NOT toggle: none of / not all of these', () => {
+    let root = draftFromMatcher(and(or(artemis, orion)));
+    const group = root.items[0];
+    if (group?.kind !== 'group') throw new Error('expected a group');
+    root = setNegated(root, group.id, true);
+    expect(matcherFromDraft(root)).toEqual({ ok: true, matcher: and(not(or(artemis, orion))) });
+    root = setGate(root, group.id, 'and');
+    expect(matcherFromDraft(root)).toEqual({ ok: true, matcher: and(not(and(artemis, orion))) });
+    expect(groupHint('or', true)).toBe('none of these');
+    expect(groupHint('and', true)).toBe('not all of these');
+    expect(groupHint('or', false)).toBe('any of these');
+    expect(groupHint('and', false)).toBe('all of these');
+  });
+
+  it('refuses an empty negated root (it would match nothing)', () => {
+    const empty = draftFromMatcher(and());
+    expect(matcherFromDraft(setNegated(empty, empty.id, true)).ok).toBe(false);
   });
 
   it('negates a single condition with its NOT toggle', () => {

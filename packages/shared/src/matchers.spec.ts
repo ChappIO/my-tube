@@ -277,7 +277,22 @@ describe('describeMatcher', () => {
     ).toEqual([
       'since 2026-01-01',
       '(only shorts and under 30 s) or regex /live/',
-      'not (only shorts or past stream)',
+      'none of (only shorts, past stream)',
+    ]);
+    expect(
+      describeMatcher(
+        and(
+          not(or({ type: 'title_contains', text: 'A' }, { type: 'title_contains', text: 'B' })),
+          not(and({ type: 'is_short' }, { type: 'duration_under', seconds: 30 })),
+          not(not({ type: 'is_short' })),
+          not(or({ type: 'is_short' })),
+        ),
+      ),
+    ).toEqual([
+      'no "A" or "B"',
+      'not all of (only shorts, under 30 s)',
+      'only shorts',
+      'no shorts',
     ]);
     expect(describeMatcher({ type: 'is_short' })).toEqual(['only shorts']);
   });

@@ -14,6 +14,7 @@ import {
   type DraftGroup,
   type DraftLeaf,
   GATE_LABELS,
+  groupHint,
   LIVE_STATUS_OPTIONS,
   addNode,
   canAddGroup,
@@ -23,6 +24,7 @@ import {
   nodeError,
   removeNode,
   setGate,
+  setNegated,
   updateLeaf,
 } from './matcher-draft';
 
@@ -36,17 +38,14 @@ export interface MatcherBuilderProps {
   label?: string;
 }
 
-const gateItems = (['and', 'or', 'not'] as const).map((gate) => ({
-  id: gate,
-  label: GATE_LABELS[gate].pill,
-}));
+const gateItems = (['and', 'or'] as const).map((gate) => ({ id: gate, label: GATE_LABELS[gate] }));
 
 /**
- * The rule builder: one nested group of conditions (a matcher tree). Each group has an
- * AND / OR / NOT pill track (all of, any of, none of), its items indented behind a left
- * `line` border, and "Condition" / "Group" outlined buttons to add to it; nested groups and
- * conditions have a × to remove them. A condition is a type select, its value (text, regex,
- * date, days, seconds, live status, channel, position) and a NOT toggle. Adding moves focus to
+ * The rule builder: one nested group of conditions (a matcher tree). Each group has a NOT
+ * toggle and an AND / OR pill track (all of / any of; with NOT: not all of / none of), its items
+ * indented behind a left `line` border, and "Condition" / "Group" outlined buttons to add to it;
+ * nested groups and conditions have a × to remove them. A condition is a NOT toggle, a type
+ * select and its value (text, regex, date, days, seconds, live status, channel, position). Adding moves focus to
  * the new condition's type, removing to the group's add button. Controlled: `value` in,
  * `onChange` out.
  */
@@ -106,6 +105,8 @@ function GroupNode({
 }) {
   const error = nodeError(group, { root });
   const errorId = ctx.domId(group.id, 'error');
+  const gate = GATE_LABELS[group.gate];
+  const hint = groupHint(group.gate, group.negated);
   const addCondition = () => {
     const leaf = newLeaf();
     ctx.change(addNode(ctx.root, group.id, leaf));
@@ -120,19 +121,24 @@ function GroupNode({
   return (
     <div
       role="group"
-      aria-label={`${GATE_LABELS[group.gate].pill} group: ${GATE_LABELS[group.gate].hint}`}
+      aria-label={`${group.negated ? 'NOT ' : ''}${gate} group: ${hint}`}
       aria-describedby={error ? errorId : undefined}
       className="grid min-w-0 gap-2"
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <NotToggle
+          pressed={group.negated}
+          label={`NOT: this ${gate} group`}
+          onChange={(negated) => ctx.change(setNegated(ctx.root, group.id, negated))}
+        />
         <TabPills
           size="sm"
           label="Match"
           items={gateItems}
           value={group.gate}
-          onChange={(gate: DraftGate) => ctx.change(setGate(ctx.root, group.id, gate))}
+          onChange={(next: DraftGate) => ctx.change(setGate(ctx.root, group.id, next))}
         />
-        <Meta>{GATE_LABELS[group.gate].hint}</Meta>
+        <Meta>{hint}</Meta>
         {!root && parentId && (
           <IconButton
             size="sm"
@@ -155,7 +161,7 @@ function GroupNode({
             <LeafRow key={item.id} leaf={item} ctx={ctx} groupId={group.id} />
           ),
         )}
-        {root && group.items.length === 0 && group.gate === 'and' && (
+        {root && group.items.length === 0 && group.gate === 'and' && !group.negated && (
           <Meta as="p">No conditions: everything is downloaded and kept.</Meta>
         )}
         {error && (
@@ -168,7 +174,7 @@ function GroupNode({
             id={ctx.domId(group.id, 'add')}
             variant="outlined"
             icon={<AddConditionIcon />}
-            aria-label={`Add a condition to this ${GATE_LABELS[group.gate].pill} group`}
+            aria-label={`Add a condition to this ${gate} group`}
             onClick={addCondition}
           >
             Condition
@@ -177,7 +183,7 @@ function GroupNode({
             <Button
               variant="outlined"
               icon={<AddGroupIcon />}
-              aria-label={`Add a nested group to this ${GATE_LABELS[group.gate].pill} group`}
+              aria-label={`Add a nested group to this ${gate} group`}
               onClick={addGroup}
             >
               Group
@@ -414,7 +420,7 @@ function NotToggle({
       type="button"
       aria-pressed={pressed}
       aria-label={label}
-      title={pressed ? 'Negated: matches when this condition does not' : 'Negate this condition'}
+      title={pressed ? 'Negated: matches when this does not' : 'Negate'}
       onClick={() => onChange(!pressed)}
       className={cx(
         'cursor-pointer rounded-pill border px-2 py-[3px] font-mono text-[11px] font-bold',
