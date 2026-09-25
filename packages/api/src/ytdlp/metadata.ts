@@ -92,6 +92,10 @@ export const RawInfo = z.object({
   /** Total bitrate in kbit/s. */
   tbr: num,
   requested_formats: z.array(z.unknown()).nullish().catch(null),
+  // Subtitle tracks by language: uploaded ones, and YouTube's automatic captions (the spoken
+  // language plus a machine translation into every other language). Single videos only.
+  subtitles: z.record(z.string(), z.array(z.unknown())).nullish().catch(null),
+  automatic_captions: z.record(z.string(), z.array(z.unknown())).nullish().catch(null),
   // Entries are validated one by one in `toSourceMetadata`, so one odd entry does not
   // reject the whole listing.
   entries: z.array(z.unknown()).nullish().catch(null),
@@ -143,10 +147,26 @@ export interface SourceEntry {
    */
   expectedBytes: number | null;
   /**
+   * The subtitle languages a single video's full metadata offers; null in flat listings, which
+   * carry none.
+   */
+  captions?: CaptionLanguages | null;
+  /**
    * YouTube Music tags from a track's full metadata (the watch page of a track); null in flat
    * listings. `artist` is yt-dlp's `artist`, else its `artists` joined with `, `.
    */
   music?: MusicTags;
+}
+
+/** A video's subtitle languages, as yt-dlp's `subtitles` and `automatic_captions` keys. */
+export interface CaptionLanguages {
+  /** Subtitles the uploader provided. */
+  uploaded: string[];
+  /**
+   * YouTube's automatic captions in the spoken language (also as `<lang>-orig`), without the
+   * machine translations into other languages that yt-dlp lists next to them.
+   */
+  generated: string[];
 }
 
 /** One stream yt-dlp selected for download. */
@@ -295,8 +315,37 @@ function toEntry(node: RawInfo, tab: ChannelTab | null): SourceEntry {
     channel: node.channel ?? node.uploader ?? null,
     thumbnails: node.thumbnails,
     ...expected(node),
+    captions: captionLanguages(node),
     music: musicTags(node),
   };
+}
+
+const CaptionTrack = z.object({ url: z.string() });
+
+/**
+ * The subtitle languages of a single video's metadata, or null when it lists none (flat
+ * listings). A machine translation of the automatic captions is fetched from the original
+ * track's URL with a `tlang` (target language) parameter; the spoken language has a track
+ * without one, so that is what counts as generated. (yt-dlp's `youtube:skip=translated_subs`
+ * only drops translations of uploaded subtitles, not these.) `live_chat` is not a subtitle.
+ */
+export function captionLanguages(node: RawInfo): CaptionLanguages | null {
+  if (!node.subtitles && !node.automatic_captions) return null;
+  const uploaded = Object.keys(node.subtitles ?? {}).filter((lang) => lang !== 'live_chat');
+  const generated = Object.entries(node.automatic_captions ?? {})
+    .filter(([, tracks]) => tracks.some(isUntranslatedTrack))
+    .map(([lang]) => lang);
+  return { uploaded, generated };
+}
+
+function isUntranslatedTrack(track: unknown): boolean {
+  const parsed = CaptionTrack.safeParse(track);
+  if (!parsed.success) return false;
+  try {
+    return !new URL(parsed.data.url, 'https://www.youtube.com').searchParams.has('tlang');
+  } catch {
+    return false;
+  }
 }
 
 /** A positive whole number, else null (yt-dlp sometimes reports 0 or floats). */

@@ -3,8 +3,10 @@ import { DEFAULT_MUSIC_MATCHER, DEFAULT_VIDEO_MATCHER } from './matchers.js';
 import {
   DEFAULT_METADATA_PROVIDERS,
   DEFAULT_SETTINGS,
+  SUBTITLE_LANGUAGES,
   Settings,
   SettingsPatch,
+  SubtitleLanguageCode,
   settingsKey,
 } from './settings.js';
 
@@ -30,6 +32,7 @@ describe('Settings', () => {
         container: 'mp4',
         subtitleLanguages: ['en', 'nl'],
         subtitlesEmbedded: true,
+        autoSubtitles: true,
         defaultRules: DEFAULT_VIDEO_MATCHER,
         saveThumbnails: true,
       },
@@ -106,6 +109,40 @@ describe('music.metadataProviders', () => {
     expect(patch({ ...providers, discogs: { enabled: true, token: 'a b' } })).toBe(false);
     expect(patch({ ...providers, discogs: { enabled: true, token: '' } })).toBe(false);
     expect(patch({ ...providers, discogs: { enabled: true, token: null } })).toBe(true);
+  });
+});
+
+describe('video subtitles', () => {
+  it('turns generated subtitles on for an install that never stored the field', () => {
+    // A stored group without the new field (an install from before it existed).
+    const stored = Settings.parse({
+      video: { subtitleLanguages: ['en'], subtitlesEmbedded: false },
+    });
+    expect(stored.video.autoSubtitles).toBe(true);
+    expect(SettingsPatch.parse({ video: { autoSubtitles: false } })).toEqual({
+      video: { autoSubtitles: false },
+    });
+    expect(SettingsPatch.safeParse({ video: { autoSubtitles: 'yes' } }).success).toBe(false);
+  });
+
+  it('keeps the picked order and accepts codes outside the list', () => {
+    expect(
+      SettingsPatch.parse({ video: { subtitleLanguages: ['nl', 'en-US', 'zh-Hans'] } }),
+    ).toEqual({ video: { subtitleLanguages: ['nl', 'en-US', 'zh-Hans'] } });
+    expect(SettingsPatch.safeParse({ video: { subtitleLanguages: ['English'] } }).success).toBe(
+      false,
+    );
+  });
+
+  it('offers valid, unique codes with names, English and Dutch first', () => {
+    const codes = SUBTITLE_LANGUAGES.map((language) => language.code);
+    expect(codes.slice(0, 2)).toEqual(['en', 'nl']);
+    expect(new Set(codes).size).toBe(codes.length);
+    expect(codes.length).toBeGreaterThanOrEqual(40);
+    for (const { code, name } of SUBTITLE_LANGUAGES) {
+      expect(SubtitleLanguageCode.parse(code)).toBe(code);
+      expect(name).not.toBe('');
+    }
   });
 });
 

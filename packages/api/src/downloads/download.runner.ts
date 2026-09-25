@@ -21,6 +21,7 @@ import { YtdlpRunner } from '../ytdlp/ytdlp-runner.js';
 import {
   DownloadProgressTracker,
   isUnavailableReason,
+  subtitleLanguages,
   videoExtraArgs,
   videoFormat,
 } from './video-options.js';
@@ -120,6 +121,11 @@ export class DownloadRunner implements JobRunner {
       mkdirSync(dirname(target), { recursive: true });
       log.line(`target ${target}.<ext>`);
 
+      const { skipped } = subtitleLanguages(settings.video, entry?.captions);
+      if (skipped.length > 0) {
+        log.line(`subtitles: no ${skipped.join(', ')} (only machine translations on YouTube)`);
+      }
+
       const tracker = new DownloadProgressTracker(entry?.expectedStreams);
       progress(tracker.start());
       const result = await this.runner.download(
@@ -129,7 +135,7 @@ export class DownloadRunner implements JobRunner {
           output: `${target.replaceAll('%', '%%')}.%(ext)s`,
           format,
           mergeOutputFormat: settings.video.container,
-          extraArgs: videoExtraArgs(settings.video),
+          extraArgs: videoExtraArgs(settings.video, entry?.captions),
           network,
           signal,
           log: log.line,

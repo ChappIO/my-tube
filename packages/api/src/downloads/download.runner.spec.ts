@@ -161,7 +161,15 @@ describe('DownloadRunner (fake binary)', () => {
     expect(after('-f')).toBe('bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best');
     expect(after('--merge-output-format')).toBe('mp4');
     expect(after('--remux-video')).toBe('mp4');
-    expect(after('--sub-langs')).toBe('en,nl');
+    // video.json has automatic English captions; Dutch only as a machine translation.
+    expect(after('--sub-langs')).toBe('en');
+    expect(args).toEqual(
+      expect.arrayContaining([
+        '--write-auto-subs',
+        '--extractor-args',
+        'youtube:skip=translated_subs',
+      ]),
+    );
     expect(args).toEqual(expect.arrayContaining(['--embed-subs', '--write-thumbnail']));
     expect(args).not.toContain('--write-subs');
     expect(after('--convert-thumbnails')).toBe('jpg');
@@ -182,6 +190,7 @@ describe('DownloadRunner (fake binary)', () => {
       /^[\d:.]{12} \$ .* --dump-single-json .* -f bestvideo\[ext=mp4\]\+bestaudio\[ext=m4a\]\/bestvideo\+bestaudio\/best -- /m,
     );
     expect(log).toContain('[mytube-progress]');
+    expect(log).toContain('subtitles: no nl (only machine translations on YouTube)');
     expect(log).toContain(`saved ${path} (10 bytes)`);
   });
 

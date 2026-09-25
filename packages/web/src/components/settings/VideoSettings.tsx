@@ -16,7 +16,7 @@ import { LibraryCard } from './LibraryCard';
 import { optionsOf, qualityLabel, schemaError } from './fields';
 import { SettingsTab } from './SettingsTab';
 import { DefaultRulesEditor } from './DefaultRulesEditor';
-import { SubtitlesControl } from './VideoControls';
+import { AutoSubtitlesRow, SubtitlesControl } from './VideoControls';
 
 const qualityOptions = optionsOf(VIDEO_QUALITIES, qualityLabel);
 const containerOptions = optionsOf(VIDEO_CONTAINERS);
@@ -68,7 +68,7 @@ export function VideoSettings() {
                   onChange={(container) => save({ container })}
                 />
               </KeyValueRow>
-              <KeyValueRow label="Subtitles">
+              <KeyValueRow label="Subtitles" align="start">
                 <SubtitlesControl
                   languages={video.subtitleLanguages}
                   embedded={video.subtitlesEmbedded}
@@ -76,6 +76,11 @@ export function VideoSettings() {
                 />
               </KeyValueRow>
             </KeyValueGrid>
+            <AutoSubtitlesRow
+              checked={video.autoSubtitles}
+              disabled={video.subtitleLanguages.length === 0}
+              onChange={save}
+            />
           </SettingsCard>
           <SettingsCard title="Defaults for new channels">
             <DefaultRulesEditor

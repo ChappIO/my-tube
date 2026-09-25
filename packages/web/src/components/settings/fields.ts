@@ -16,19 +16,6 @@ export function textOrNull(text: string): string | null {
   return trimmed === '' ? null : trimmed;
 }
 
-/** `en, nl` → `['en', 'nl']`: split at commas and whitespace, blanks dropped. */
-export function parseLanguageList(text: string): string[] {
-  return text
-    .split(/[\s,]+/)
-    .map((code) => code.trim())
-    .filter((code) => code !== '');
-}
-
-/** `['en', 'nl']` → `en, nl`. */
-export function formatLanguageList(codes: readonly string[]): string {
-  return codes.join(', ');
-}
-
 /** Labels for quality options: `best` reads "best available". */
 export function qualityLabel(value: string): string {
   return value === 'best' ? 'best available' : value;
