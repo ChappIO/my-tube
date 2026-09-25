@@ -345,6 +345,46 @@ describe('MusicSync (fake binary)', () => {
     expect(existsSync(join(root, 'music', file))).toBe(false);
   });
 
+  it('wants the tracks of a pinned album whatever the rules say, until it is unpinned', async () => {
+    root = mkdtempSync(join(tmpdir(), 'mytube-music-pin-'));
+    const { sync, addArtist, addPlaylist, track, db, jobs, history: historyService } = setup();
+    const artist = addArtist(and({ type: 'title_contains', text: 'nothing matches this' }));
+    await sync.checkSource(artist.id);
+    expect(track('trk00000002')).toMatchObject({ status: 'skipped', skipReason: 'no_match' });
+    const album = db.select().from(albums).where(eq(albums.youtubeId, 'OLAK5uy_album1')).get()!;
+    db.update(albums).set({ pinned: true }).where(eq(albums.id, album.id)).run();
+
+    // The sync: a playlist whose rules skip the track lists it; the pin makes it wanted.
+    const playlist = addPlaylist(and({ type: 'title_contains', text: 'nothing either' }));
+    await sync.checkSource(playlist.id);
+    expect(track('trk00000002')).toMatchObject({ status: 'wanted', skipReason: null });
+
+    // Revalidation: the album's other skipped tracks are wanted again, the file on disk stays.
+    const config = new AppConfig({
+      CONFIG_DIR: join(root, 'config'),
+      VIDEO_DIR: join(root, 'video'),
+      MUSIC_DIR: join(root, 'music'),
+    });
+    const revalidation = new RevalidationService(db, config, historyService, jobs, sync);
+    expect(revalidation.revalidate(artist.id)).toMatchObject({ rewanted: 2, unwanted: 0 });
+    expect(track('trk00000003')?.status).toBe('wanted');
+    const file = 'Test Artist/First Light/01 Heatwave.m4a';
+    mkdirSync(join(root, 'music', dirname(file)), { recursive: true });
+    writeFileSync(join(root, 'music', file), 'audio');
+    db.update(tracks)
+      .set({ status: 'on_disk', filePath: file })
+      .where(eq(tracks.youtubeId, 'trk00000001'))
+      .run();
+    expect(revalidation.revalidate(artist.id)).toMatchObject({ removed: 0, kept: 1 });
+    expect(revalidation.preview(artist.id, artist.matcher).wouldRemove).toEqual([]);
+
+    // Unpinned, the rules decide again: the file goes and the wanted tracks are skipped.
+    db.update(albums).set({ pinned: false }).where(eq(albums.id, album.id)).run();
+    expect(revalidation.revalidate(artist.id)).toMatchObject({ removed: 1, unwanted: 2 });
+    expect(existsSync(join(root, 'music', file))).toBe(false);
+    expect(track('trk00000002')).toMatchObject({ status: 'skipped', skipReason: 'no_match' });
+  });
+
   it('revalidation removes a track that no longer matches, with the video wording', async () => {
     root = mkdtempSync(join(tmpdir(), 'mytube-music-revalidate-'));
     const { sync, addArtist, track, db, jobs, history: historyService } = setup();

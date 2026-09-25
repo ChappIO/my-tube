@@ -10,7 +10,7 @@ import type { NetworkOptions } from '../ytdlp/args.js';
 import { YtdlpError } from '../ytdlp/ytdlp-error.js';
 import type { YtdlpRunner } from '../ytdlp/ytdlp-runner.js';
 import { cleanTrackTitle } from '../metadata/clean-title.js';
-import { wantedElsewhere } from './claims.js';
+import { onPinnedAlbum, wantedElsewhere } from './claims.js';
 import { entryContext, evaluateItem } from './rules.js';
 import type { CheckContext, ListingResult } from './sync.service.js';
 
@@ -392,8 +392,13 @@ export class MusicSync {
         channelId: entry.channelId === null ? source.youtubeId : null,
         playlistPosition: input.playlistPosition,
       };
-      const verdict = evaluateItem(track, source.matcher, entryCtx);
+      let verdict = evaluateItem(track, source.matcher, entryCtx);
       if (!verdict.accept && verdict.transient) continue;
+      const existing = tx.select().from(tracks).where(eq(tracks.youtubeId, entry.id)).get();
+      // A track on a pinned album counts as matching: the user asked for the whole album.
+      if (!verdict.accept && onPinnedAlbum(tx, existing?.albumId ?? input.albumId)) {
+        verdict = { accept: true };
+      }
       const fields = {
         title,
         durationSeconds: entry.duration === null ? null : Math.round(entry.duration),
@@ -402,7 +407,6 @@ export class MusicSync {
         // The listing's badge is current: a members-only upload made public loses it.
         availability: entry.availability,
       };
-      const existing = tx.select().from(tracks).where(eq(tracks.youtubeId, entry.id)).get();
       let id: number;
       let status = existing?.status;
       if (!existing) {

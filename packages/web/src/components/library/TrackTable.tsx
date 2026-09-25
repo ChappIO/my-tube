@@ -4,6 +4,7 @@ import { formatLength, relativeTime } from '../../format';
 import { Artwork } from '../media';
 import { cx, focusRingInset } from '../ui/cx';
 import { TableHeaderLabel } from '../ui/typography';
+import { ArtistLink } from './ArtistLink';
 import { TRACK_COLUMNS, sortArrow, trackStatus } from './track-list';
 
 /** The wide grid: `40px 2fr 1.3fr 1.3fr 80px 110px 90px`, gap 16. */
@@ -96,8 +97,11 @@ interface TrackRowProps {
 /**
  * One track. Wide: `#`, 32px cover (radius 6) + title Archivo 500, 24px round avatar + artist
  * muted, album muted, length and added in Space Mono 12 muted, status. Narrow: 44px cover,
- * title over `artist · album`, the length over the status on the right. The whole row is one
- * button that opens Preview.
+ * title over `artist · album`, the length over the status on the right.
+ *
+ * Overlay pattern (as on media tiles), so no control is nested in another: a transparent
+ * full-size button opens Preview, the cells let clicks through to it, and the wide artist name
+ * is a link to the artist page above it.
  */
 function TrackRow({ track, number, now, onOpen }: TrackRowProps) {
   const status = trackStatus(track.status);
@@ -106,15 +110,18 @@ function TrackRow({ track, number, now, onOpen }: TrackRowProps) {
   const length = track.durationSeconds === null ? '—' : formatLength(track.durationSeconds);
   const added = track.downloadedAt ? relativeTime(track.downloadedAt, now) : '—';
   return (
-    <li className="border-t border-line first:border-t-0 wide:first:border-t">
+    <li className="relative border-t border-line first:border-t-0 hover:bg-surface wide:first:border-t">
       <button
         type="button"
+        aria-label={track.title}
         onClick={onOpen}
+        className={cx('absolute inset-0 z-0 cursor-pointer', focusRingInset)}
+      />
+      <div
         className={cx(
-          'flex w-full cursor-pointer items-center gap-3 px-3 py-[10px] text-left font-sans text-[14px] font-normal text-ink hover:bg-surface',
+          'pointer-events-none relative z-[1] flex w-full items-center gap-3 px-3 py-[10px] text-left font-sans text-[14px] font-normal text-ink',
           'wide:items-center wide:px-4 wide:py-2',
           WIDE_GRID,
-          focusRingInset,
         )}
       >
         {/* Wide cells. */}
@@ -133,7 +140,9 @@ function TrackRow({ track, number, now, onOpen }: TrackRowProps) {
               shape="circle"
             />
           </span>
-          <span className="truncate">{track.artist.name}</span>
+          <ArtistLink id={track.artist.id} className="pointer-events-auto truncate">
+            {track.artist.name}
+          </ArtistLink>
         </span>
         <span className="hidden truncate text-muted wide:block">{album ?? '—'}</span>
         <CellMeta className="hidden text-right wide:block">{length}</CellMeta>
@@ -154,7 +163,7 @@ function TrackRow({ track, number, now, onOpen }: TrackRowProps) {
           <CellMeta className="block">{length}</CellMeta>
           <TrackStatusLabel {...status} small className="mt-[3px] block" />
         </span>
-      </button>
+      </div>
     </li>
   );
 }

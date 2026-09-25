@@ -1,7 +1,7 @@
 import { evaluateMatcher, type MatcherContext } from '@mytube/shared';
 import { and, eq, isNotNull, ne } from 'drizzle-orm';
 import type { Database } from '../database/database.module.js';
-import { playlistItems, playlists, sources, tracks, videos } from '../database/schema.js';
+import { albums, playlistItems, playlists, sources, tracks, videos } from '../database/schema.js';
 
 type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
 
@@ -66,4 +66,31 @@ export function wantedElsewhere(
     if (evaluateMatcher(source.matcher, { ...ctx, playlistPosition }).matches) return true;
   }
   return false;
+}
+
+/**
+ * Whether a track's album is pinned: the user asked for the whole album (the artist page's
+ * Download on a release the rules skip), so its tracks **count as matching** whatever the
+ * source's tree says. Checked next to `wantedElsewhere` by the sync (a pinned track is wanted)
+ * and by revalidation (never unwanted or removed, and wanted again when skipped). Unpinning hands
+ * the tracks back to the rules. Videos have no albums and are never pinned.
+ */
+export function onPinnedAlbum(db: Database | Transaction, albumId: number | null): boolean {
+  if (albumId === null) return false;
+  return (
+    db.select({ pinned: albums.pinned }).from(albums).where(eq(albums.id, albumId)).get()?.pinned ??
+    false
+  );
+}
+
+/** The ids of every pinned album (revalidation reads them once per run). */
+export function pinnedAlbumIds(db: Database | Transaction): Set<number> {
+  return new Set(
+    db
+      .select({ id: albums.id })
+      .from(albums)
+      .where(eq(albums.pinned, true))
+      .all()
+      .map((row) => row.id),
+  );
 }

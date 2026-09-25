@@ -2,20 +2,23 @@ import type { AlbumDetail } from '@mytube/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { linkOptions } from '@tanstack/react-router';
 import { ApiError, apiErrorMessage } from '../../api/client';
-import { primeTrack, useAlbum, useDownloadMissing } from '../../api/library';
+import { primeTrack, useAlbum, useDownloadMissing, useUnpinAlbum } from '../../api/library';
 import { useCheckSource, useSource } from '../../api/sources';
 import { countOf } from '../../format';
 import { openTrackPreview } from '../../ui-state';
 import { useNow } from '../../use-now';
-import { Artwork } from '../media';
+import { useState } from 'react';
+import { Artwork, PinnedChip } from '../media';
 import { StatusLine } from '../sources/SourceBits';
 import { BackLink } from '../ui/BackLink';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
 import { ErrorState, fromQuery, loadFailed } from '../ui/ErrorState';
+import { Modal, ModalActions } from '../ui/Modal';
 import { cx } from '../ui/cx';
-import { DisplayTitle, Meta, SectionLabel, SectionTitle } from '../ui/typography';
+import { Body, DisplayTitle, Meta, SectionLabel, SectionTitle } from '../ui/typography';
 import { ArtistCard, SourceCard } from './AlbumCards';
+import { ArtistLink } from './ArtistLink';
 import { AlbumTrackTable } from './AlbumTrackTable';
 import { albumEyebrow, albumMetaLine, albumStatus, downloadAction } from './album-page';
 
@@ -74,7 +77,7 @@ function AlbumContent({ album }: { album: AlbumDetail }) {
         </div>
         <aside aria-label="About this album" className="grid min-w-0 flex-[1_1_260px] gap-5">
           <ArtistCard artist={album.artist} source={sourceData} />
-          <SourceCard album={album.album} source={sourceData} />
+          <SourceCard youtubeUrl={album.album.youtubeUrl} source={sourceData} />
         </aside>
       </div>
     </>
@@ -83,7 +86,8 @@ function AlbumContent({ album }: { album: AlbumDetail }) {
 
 /**
  * The header: the square cover (240px; full width up to 320px below 760px) beside the eyebrow
- * `Album · 2007`, the display title, the artist, the meta line and `AlbumActions`.
+ * `Album · 2007` (with the `pinned` chip on a pinned album), the display title, the artist (a
+ * link to the artist page), the meta line and `AlbumActions`.
  */
 export function AlbumHeader({ album }: { album: AlbumDetail }) {
   return (
@@ -92,9 +96,14 @@ export function AlbumHeader({ album }: { album: AlbumDetail }) {
         <Artwork src={album.album.coverUrl ?? undefined} seed={album.album.title} />
       </div>
       <div className="grid min-w-0 gap-[10px]">
-        <SectionLabel as="p">{albumEyebrow(album.album.year)}</SectionLabel>
+        <div className="flex flex-wrap items-center gap-[10px]">
+          <SectionLabel as="p">{albumEyebrow(album.album.year)}</SectionLabel>
+          {album.album.pinned && <PinnedChip />}
+        </div>
         <DisplayTitle className="break-words">{album.album.title}</DisplayTitle>
-        <SectionTitle as="p">{album.artist.name}</SectionTitle>
+        <SectionTitle as="p">
+          <ArtistLink id={album.artist.id}>{album.artist.name}</ArtistLink>
+        </SectionTitle>
         <Meta as="p">{albumMetaLine(album)}</Meta>
         <AlbumActions album={album} className="mt-[6px]" />
       </div>
@@ -105,12 +114,14 @@ export function AlbumHeader({ album }: { album: AlbumDetail }) {
 /**
  * The row of pills under the meta line: the on-disk status, **Download N missing** (primary;
  * `N queued` and disabled while every missing track is queued; absent when complete) and
- * **Check for changes** (outlined; checks the artist's source, disabled without one). A status
- * line under the row reports what happened.
+ * **Check for changes** (outlined; checks the artist's source, disabled without one) and, on a
+ * pinned album, **Unpin** (outlined, confirmed first). A status line under the row reports what
+ * happened.
  */
 export function AlbumActions({ album, className }: { album: AlbumDetail; className?: string }) {
   const download = useDownloadMissing();
   const check = useCheckSource();
+  const [unpinning, setUnpinning] = useState(false);
   const action = downloadAction(album);
   const sourceId = album.artist.sourceId;
 
@@ -153,9 +164,49 @@ export function AlbumActions({ album, className }: { album: AlbumDetail; classNa
         >
           Check for changes
         </Button>
+        {album.album.pinned && (
+          <Button variant="outlined" onClick={() => setUnpinning(true)}>
+            Unpin
+          </Button>
+        )}
       </div>
       <StatusLine>{status}</StatusLine>
+      {unpinning && <UnpinModal album={album} onClose={() => setUnpinning(false)} />}
     </div>
+  );
+}
+
+/**
+ * Confirms Unpin (`DELETE /api/library/albums/:id/pin`): the album's tracks follow the artist's
+ * rules again, and the revalidation queued with it removes the files those rules do not match.
+ */
+function UnpinModal({ album, onClose }: { album: AlbumDetail; onClose: () => void }) {
+  const unpin = useUnpinAlbum();
+  return (
+    <Modal open onClose={onClose} title={`Unpin ${album.album.title}?`} width="min(460px, 100%)">
+      <Body>
+        Its tracks follow the rules of {album.artist.name} again. A revalidation starts now and
+        removes the files those rules do not match.
+      </Body>
+      <div className="grid gap-2">
+        <StatusLine>
+          {unpin.isError ? apiErrorMessage(unpin.error, 'Could not unpin it.') : undefined}
+        </StatusLine>
+        <ModalActions>
+          <Button variant="secondary" size="lg" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            size="lg"
+            disabled={unpin.isPending}
+            onClick={() => unpin.mutate(album.album.id, { onSuccess: onClose })}
+          >
+            {unpin.isPending ? 'Unpinning…' : 'Unpin'}
+          </Button>
+        </ModalActions>
+      </div>
+    </Modal>
   );
 }
 

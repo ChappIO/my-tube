@@ -171,6 +171,7 @@ describe('Album page (e2e)', () => {
       coverUrl: `/api/artwork/album/${albumId}`,
       youtubeId: 'OLAK5uy_order',
       youtubeUrl: 'https://music.youtube.com/playlist?list=OLAK5uy_order',
+      pinned: false,
     });
     expect(page.artist).toMatchObject({
       name: 'Album Artist',
