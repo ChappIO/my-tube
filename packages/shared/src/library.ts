@@ -138,6 +138,68 @@ export const TrackListItem = Track.extend({
 });
 export type TrackListItem = z.infer<typeof TrackListItem>;
 
+// ---------------------------------------------------------------------------------------
+// Tracks tab.
+// ---------------------------------------------------------------------------------------
+
+/**
+ * The Tracks tab filters: every track in the library, the ones not on disk (known but not on
+ * disk: wanted, downloading or missing), or the ones downloaded in the last `RECENT_TRACK_DAYS`.
+ */
+export const TRACK_FILTERS = ['all', 'missing', 'recent'] as const;
+export const TrackFilter = z.enum(TRACK_FILTERS);
+export type TrackFilter = z.infer<typeof TrackFilter>;
+
+/** "Recent" is the last 30 days (the handoff's prototype used the current month). */
+export const RECENT_TRACK_DAYS = 30;
+
+/** The sortable columns of the Tracks table; `added` is the download time. */
+export const TRACK_SORTS = ['title', 'artist', 'album', 'length', 'added'] as const;
+export const TrackSort = z.enum(TRACK_SORTS);
+export type TrackSort = z.infer<typeof TrackSort>;
+
+export const SORT_DIRS = ['asc', 'desc'] as const;
+export const SortDir = z.enum(SORT_DIRS);
+export type SortDir = z.infer<typeof SortDir>;
+
+/** The Tracks tab opens on the newest downloads first. */
+export const DEFAULT_TRACK_SORT: TrackSort = 'added';
+export const DEFAULT_TRACK_DIR: SortDir = 'desc';
+
+export const TRACK_PAGE_SIZE = 60;
+export const TRACK_PAGE_MAX = 200;
+/** The filter text is at most this long. */
+export const TRACK_QUERY_MAX = 200;
+
+/**
+ * `GET /api/library/tracks` query. `q` matches title, artist name and album title as a
+ * case- and accent-insensitive substring. Rows without the sort value (no album, no length,
+ * never downloaded) sort last in both directions.
+ */
+export const TrackListQuery = z.object({
+  q: z.string().trim().max(TRACK_QUERY_MAX).optional(),
+  filter: TrackFilter.default('all'),
+  sort: TrackSort.default(DEFAULT_TRACK_SORT),
+  dir: SortDir.default(DEFAULT_TRACK_DIR),
+  limit: z.coerce.number().int().min(1).max(TRACK_PAGE_MAX).default(TRACK_PAGE_SIZE),
+  /** `nextCursor` of the previous page, for the same `q`, filter and sort. Opaque. */
+  cursor: z.string().min(1).max(1000).optional(),
+});
+export type TrackListQuery = z.infer<typeof TrackListQuery>;
+
+/**
+ * `GET /api/library/tracks` response. `total` counts the tracks matching the filter and `q`,
+ * `libraryTotal` every track in the library (the toolbar's `17 of 42 tracks`). `nextCursor` is
+ * null on the last page.
+ */
+export const TrackPage = z.object({
+  items: z.array(TrackListItem),
+  total: z.number().int().nonnegative(),
+  libraryTotal: z.number().int().nonnegative(),
+  nextCursor: z.string().nullable(),
+});
+export type TrackPage = z.infer<typeof TrackPage>;
+
 /**
  * One artist on the Artists tab (`GET /api/library/artists`): every artist with a track in the
  * library (not skipped by the rules) or added as a source. Sorted by name.

@@ -14,7 +14,8 @@ import {
   type JobRow,
   type JobRunner,
 } from '../jobs/job-runner.js';
-import { cleanTrackTitle } from '../metadata/clean-title.js';
+import { cleanTrackTitle, parseTrackTitle } from '../metadata/clean-title.js';
+import { MetadataChain } from '../metadata/metadata-chain.js';
 import { type TrackTags, ytdlpTagArgs } from '../metadata/ytdlp-tags.js';
 import { SettingsService } from '../settings/settings.service.js';
 import type { SourceEntry } from '../ytdlp/metadata.js';
@@ -64,7 +65,10 @@ export function trackUrl(youtubeId: string): string {
  *    Progress goes through `DownloadProgressTracker` with the stream the metadata call (made with
  *    the same format selector) expects: the size up front, then the extraction, tagging and
  *    cover as post-processing stages.
- * 5. Marks the track `on_disk` with its path (relative to `MUSIC_DIR`), size and time, and adds
+ * 5. When the source tags its files and a metadata provider is enabled (MusicBrainz, Discogs),
+ *    runs the `MetadataChain` on the file: lookups logged per provider, merged tags rewritten.
+ *    It never fails the download.
+ * 6. Marks the track `on_disk` with its path (relative to `MUSIC_DIR`), size and time, and adds
  *    the size to its source. History: `{ kind: 'music', result: 'done', details: path }`.
  *
  * Failures, unavailable tracks, cancels and shutdowns behave as for videos.
@@ -79,6 +83,7 @@ export class TrackDownloadRunner implements JobRunner {
     private readonly settings: SettingsService,
     private readonly config: AppConfig,
     private readonly logs: JobLogsService,
+    private readonly chain: MetadataChain,
   ) {}
 
   async run(job: JobRow, { signal, progress }: JobContext): Promise<JobOutcome | null> {
@@ -136,6 +141,7 @@ export class TrackDownloadRunner implements JobRunner {
         discNumber: current.discNumber,
         year: values.year,
       };
+      const embedCoverArt = this.embedCoverArt(current);
       const tracker = new DownloadProgressTracker(entry?.expectedStreams);
       progress(tracker.start());
       const result = await this.runner.download(
@@ -143,10 +149,7 @@ export class TrackDownloadRunner implements JobRunner {
         {
           output: `${target.replaceAll('%', '%%')}.%(ext)s`,
           format,
-          extraArgs: [
-            ...musicExtraArgs(settings.music),
-            ...ytdlpTagArgs(tags, { embedCoverArt: this.embedCoverArt(current) }),
-          ],
+          extraArgs: [...musicExtraArgs(settings.music), ...ytdlpTagArgs(tags, { embedCoverArt })],
           network,
           signal,
           log: log.line,
@@ -156,6 +159,27 @@ export class TrackDownloadRunner implements JobRunner {
           if (report) progress(report);
         },
       );
+
+      // The metadata chain after yt-dlp's tags: only when a provider is enabled and the source
+      // tags its files at all. It logs every provider result and never fails the download.
+      if (embedCoverArt && this.chain.active(settings.music).length > 0) {
+        // An upload's title (no YouTube Music `track`) was cleaned for the library; the
+        // providers search the clean title first and the upload's as the fallback, with the
+        // artists it credits next to ours.
+        const upload =
+          entry?.title && !entry.music?.track ? parseTrackTitle(entry.title, trackArtist) : null;
+        await this.chain.enrich(
+          result.filePath,
+          {
+            youtubeId: current.youtubeId,
+            tags,
+            durationSeconds: current.durationSeconds,
+            uploadTitle: upload && upload.plain !== current.title ? upload.plain : null,
+            featuredArtists: upload?.featuredArtists ?? [],
+          },
+          { settings: settings.music, signal, log: log.line },
+        );
+      }
 
       const size = statSync(result.filePath).size;
       const filePath = relative(this.config.musicDir, result.filePath).split(sep).join('/');

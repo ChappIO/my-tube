@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Inject,
@@ -8,6 +9,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  RECENT_TRACK_DAYS,
   artworkPath,
   audioMimeType,
   type AlbumListItem,
@@ -17,11 +19,14 @@ import {
   type LibrarySummary,
   type PlaylistListItem,
   type TrackListItem,
+  type TrackListQuery,
+  type TrackPage,
+  type TrackSort,
 } from '@mytube/shared';
-import { and, desc, eq, gte, inArray, sql } from 'drizzle-orm';
+import { type SQL, and, desc, eq, gte, inArray, ne, sql } from 'drizzle-orm';
 import { HistoryService } from '../activity/history.service.js';
 import { AppConfig } from '../config/app-config.js';
-import { DATABASE, type Database } from '../database/database.module.js';
+import { DATABASE, type Database, foldText } from '../database/database.module.js';
 import { albums, artists, sources, tracks } from '../database/schema.js';
 import { OutsideLibraryError, libraryPath, removeMediaFiles } from '../files/media-files.js';
 
@@ -44,8 +49,8 @@ export interface TrackStream {
 
 /**
  * The music read models: the Artists, Albums and Playlists tabs, one track for Preview (with its
- * stream and Delete file), the music items of Home and the Music header sub. The filterable
- * Tracks list is a later slice; it builds on `toTrackItem` and `LIBRARY_TRACK_STATUSES`.
+ * stream and Delete file), the filterable Tracks tab, the music items of Home and the Music
+ * header sub.
  */
 @Injectable()
 export class MusicLibraryService {
@@ -187,6 +192,72 @@ export class MusicLibraryService {
     });
   }
 
+  /**
+   * The Tracks tab: tracks in the library, filtered (`all`, `missing` = not on disk, `recent` =
+   * downloaded in the last `RECENT_TRACK_DAYS`) and matched by `q` (title, artist or album,
+   * folded: case and accents ignored), sorted by a column with keyset pagination. Rows without
+   * the sort value come last in both directions; ties go by id in the same direction. `total`
+   * counts the matches, `libraryTotal` the whole library.
+   */
+  listTracks(query: TrackListQuery, now = new Date()): TrackPage {
+    const since = new Date(now.getTime() - RECENT_TRACK_DAYS * 86_400_000).toISOString();
+    const conditions: SQL[] = [inArray(tracks.status, [...LIBRARY_TRACK_STATUSES])];
+    if (query.filter === 'missing') conditions.push(ne(tracks.status, 'on_disk'));
+    if (query.filter === 'recent') conditions.push(gte(tracks.downloadedAt, since));
+    const needle = query.q ? foldText(query.q) : '';
+    if (needle !== '') {
+      conditions.push(sql`(
+        instr(mytube_fold(${tracks.title}), ${needle}) > 0
+        OR instr(mytube_fold(${artists.name}), ${needle}) > 0
+        OR instr(mytube_fold(coalesce(${albums.title}, '')), ${needle}) > 0)`);
+    }
+    const matching = and(...conditions);
+
+    const { value, empty } = TRACK_SORT_COLUMNS[query.sort];
+    // Rows without a value sort last: the flag first, then the value (with a stand-in so the
+    // comparison of flagged rows falls through to the id).
+    const missingFlag = sql<number>`(${value} IS NULL)`;
+    const sortValue = sql<string | number>`coalesce(${value}, ${empty})`;
+    const descending = query.dir === 'desc';
+    const cmp = sql.raw(descending ? '<' : '>');
+    const order = sql.raw(descending ? 'DESC' : 'ASC');
+    const pageConditions = [matching];
+    if (query.cursor !== undefined) {
+      const [flag, after, id] = decodeTrackCursor(query.cursor);
+      pageConditions.push(sql`(${missingFlag} > ${flag} OR (${missingFlag} = ${flag} AND (
+        ${sortValue} ${cmp} ${after} OR (${sortValue} = ${after} AND ${tracks.id} ${cmp} ${id}))))`);
+    }
+
+    const rows = this.db
+      .select({ track: tracks, artist: artists, album: albums, missingFlag, sortValue })
+      .from(tracks)
+      .innerJoin(artists, eq(artists.id, tracks.artistId))
+      .leftJoin(albums, eq(albums.id, tracks.albumId))
+      .where(and(...pageConditions))
+      .orderBy(missingFlag, sql`${sortValue} ${order}`, sql`${tracks.id} ${order}`)
+      .limit(query.limit + 1)
+      .all();
+    const page = rows.slice(0, query.limit);
+    const last = page.at(-1);
+    const count = (where: SQL | undefined) =>
+      this.db
+        .select({ count: sql<number>`count(*)` })
+        .from(tracks)
+        .innerJoin(artists, eq(artists.id, tracks.artistId))
+        .leftJoin(albums, eq(albums.id, tracks.albumId))
+        .where(where)
+        .get()?.count ?? 0;
+    return {
+      items: page.map((row) => toTrackItem(row.track, row.artist, row.album)),
+      total: count(matching),
+      libraryTotal: count(inArray(tracks.status, [...LIBRARY_TRACK_STATUSES])),
+      nextCursor:
+        rows.length > query.limit && last
+          ? encodeTrackCursor(last.missingFlag, last.sortValue, last.track.id)
+          : null,
+    };
+  }
+
   /** One track with its artist and album; 404 when unknown. */
   getTrack(id: number): TrackListItem {
     const row = this.trackRow(id);
@@ -309,6 +380,43 @@ export class MusicLibraryService {
       throw error;
     }
   }
+}
+
+/**
+ * The value each Tracks sort orders by, and the stand-in for rows without one. Text is folded
+ * (`mytube_fold`), so `émile` sorts with `emile` and case does not matter.
+ */
+const TRACK_SORT_COLUMNS: Record<TrackSort, { value: SQL; empty: SQL }> = {
+  title: { value: sql`mytube_fold(${tracks.title})`, empty: sql`''` },
+  artist: { value: sql`mytube_fold(${artists.name})`, empty: sql`''` },
+  album: { value: sql`mytube_fold(${albums.title})`, empty: sql`''` },
+  length: { value: sql`${tracks.durationSeconds}`, empty: sql`0` },
+  added: { value: sql`${tracks.downloadedAt}`, empty: sql`''` },
+};
+
+/** The Tracks cursor: the last row's missing-value flag, sort value and id (base64url JSON). */
+export function encodeTrackCursor(flag: number, value: string | number, id: number): string {
+  return Buffer.from(JSON.stringify([flag, value, id])).toString('base64url');
+}
+
+export function decodeTrackCursor(cursor: string): [number, string | number, number] {
+  try {
+    const parsed: unknown = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
+    if (Array.isArray(parsed) && parsed.length === 3) {
+      const [flag, value, id]: unknown[] = parsed;
+      if (
+        (flag === 0 || flag === 1) &&
+        (typeof value === 'string' || typeof value === 'number') &&
+        typeof id === 'number' &&
+        Number.isInteger(id)
+      ) {
+        return [flag, value, id];
+      }
+    }
+  } catch {
+    // Falls through to the 400.
+  }
+  throw new BadRequestException('Invalid cursor');
 }
 
 /** The art of a track: its album's cover when there is one, else its own thumbnail. */

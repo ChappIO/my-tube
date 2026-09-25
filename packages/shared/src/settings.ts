@@ -90,6 +90,33 @@ export const GeneralSettings = z.object({
 });
 export type GeneralSettings = z.infer<typeof GeneralSettings>;
 
+/**
+ * A Discogs personal access token (discogs.com → Settings → Developers). Never logged; the
+ * settings response returns it (single-user app).
+ */
+export const DiscogsToken = z
+  .string()
+  .trim()
+  .min(1, 'Enter a token.')
+  .max(200)
+  .regex(/^\S+$/, 'A token has no spaces.');
+
+/**
+ * The music metadata providers after yt-dlp's own tags (always on): MusicBrainz and Discogs,
+ * each off until enabled. Discogs needs a token and does nothing without one. Stored as one
+ * value (`music.metadataProviders`), so a change sends both providers.
+ */
+export const MetadataProviders = z.object({
+  musicbrainz: z.object({ enabled: z.boolean() }),
+  discogs: z.object({ enabled: z.boolean(), token: DiscogsToken.nullable() }),
+});
+export type MetadataProviders = z.infer<typeof MetadataProviders>;
+
+export const DEFAULT_METADATA_PROVIDERS: MetadataProviders = {
+  musicbrainz: { enabled: false },
+  discogs: { enabled: false, token: null },
+};
+
 /** Settings → Music. */
 export const MusicSettings = z.object({
   /** Handoff "Artist / Album / ## Title". */
@@ -102,6 +129,8 @@ export const MusicSettings = z.object({
   embedCoverArt: z.boolean().default(true),
   /** Rules new music sources start with. Default: everything (an artist's every release). */
   defaultRules: defaultRules(DEFAULT_MUSIC_MATCHER),
+  /** MusicBrainz and Discogs, run after each track download in that order. Both off. */
+  metadataProviders: MetadataProviders.default(DEFAULT_METADATA_PROVIDERS),
 });
 export type MusicSettings = z.infer<typeof MusicSettings>;
 

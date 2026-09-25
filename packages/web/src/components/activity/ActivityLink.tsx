@@ -8,14 +8,24 @@ const linkClass = cx(
 
 export type ActivityLinkProps =
   | { href: string; onClick?: never; disabled?: never; children: ReactNode; label?: string }
-  | { href?: never; onClick: () => void; disabled?: boolean; children: ReactNode; label?: string };
+  | {
+      href?: never;
+      onClick: () => void;
+      disabled?: boolean;
+      /** For a toggle ("View log"): whether what it shows is open. */
+      expanded?: boolean;
+      children: ReactNode;
+      label?: string;
+    };
 
 /**
  * A small text action in the Activity screen ("Retry", "View log"): Space Mono 12, underlined.
  * With `href` it opens the target in a new tab (logs are plain text the browser shows);
  * otherwise it is a button. `label` is the accessible name when the text alone is ambiguous.
  */
-export function ActivityLink({ href, onClick, disabled, children, label }: ActivityLinkProps) {
+export function ActivityLink(props: ActivityLinkProps) {
+  const { href, onClick, disabled, children, label } = props;
+  const expanded = props.href === undefined ? props.expanded : undefined;
   if (href !== undefined) {
     return (
       <a href={href} target="_blank" rel="noreferrer" aria-label={label} className={linkClass}>
@@ -28,6 +38,7 @@ export function ActivityLink({ href, onClick, disabled, children, label }: Activ
       type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-expanded={expanded}
       aria-label={label}
       className={linkClass}
     >

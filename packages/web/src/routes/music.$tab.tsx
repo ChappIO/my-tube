@@ -5,6 +5,7 @@ import { AlbumsTab } from '../components/library/AlbumsTab';
 import { ArtistsTab } from '../components/library/ArtistsTab';
 import { PlaylistsTab } from '../components/library/PlaylistsTab';
 import { TracksTab } from '../components/library/TracksTab';
+import { type TrackSearch, parseTrackSearch } from '../components/library/track-list';
 import { PageHeader } from '../components/ui/PageHeader';
 import { TabPillLinks } from '../components/ui/TabPills';
 import { musicLibrarySummary } from '../format';
@@ -36,6 +37,9 @@ export const Route = createFileRoute('/music/$tab')({
     },
     stringify: ({ tab }) => ({ tab }),
   },
+  // The Tracks tab's filter text, filter and sort (`?q=&filter=missing&sort=title&dir=asc`);
+  // invalid values and defaults are dropped.
+  validateSearch: (search: Record<string, unknown>): TrackSearch => parseTrackSearch(search),
   component: MusicPage,
 });
 

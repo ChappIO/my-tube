@@ -1,7 +1,7 @@
 import { ActivitySummary, HistoryEntry, Job } from '@mytube/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
-import { apiGet, apiPost, apiPostEmpty } from './client';
+import { ApiError, apiGet, apiGetText, apiPost, apiPostEmpty } from './client';
 
 /*
  * The Activity screen and the sidebar badge. Polling, not push (architecture skill): the screen
@@ -95,4 +95,26 @@ export function useCheckAll() {
 /** The job's yt-dlp log (`text/plain`), opened in a new tab. */
 export function jobLogUrl(id: number): string {
   return `/api/jobs/${id}/log`;
+}
+
+/** A live job log is fetched again this often (the queue's own pace). */
+export const JOB_LOG_POLL_MS = 2_000;
+
+/**
+ * The query of a job's log: polled every 2 s while `live` (the job is running), fetched once
+ * otherwise (a failed job's log no longer changes). A 404 (no log yet) is not retried.
+ */
+export function jobLogQuery(id: number, { live }: { live: boolean }) {
+  return {
+    queryKey: ['activity', 'job-log', id] as const,
+    queryFn: () => apiGetText(jobLogUrl(id)),
+    refetchInterval: live ? JOB_LOG_POLL_MS : (false as const),
+    retry: (count: number, error: Error) =>
+      !(error instanceof ApiError && error.status === 404) && count < 2,
+  };
+}
+
+/** `GET /api/jobs/:id/log` for the inline log panel; see `jobLogQuery`. */
+export function useJobLog(id: number, options: { live: boolean }) {
+  return useQuery(jobLogQuery(id, options));
 }

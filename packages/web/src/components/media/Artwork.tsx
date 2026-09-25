@@ -11,8 +11,11 @@ export interface ArtworkProps {
   seed?: string;
   /** `square` for covers and thumbnails, `circle` for artist and channel avatars. */
   shape?: 'square' | 'circle';
-  /** Corner radius of a square: `tile` 12px (tiles), `thumb` 6px (32px row covers). */
-  size?: 'tile' | 'thumb';
+  /**
+   * Corner radius of a square: `tile` 12px (tiles), `thumb` 6px (32px row covers), `list` 8px
+   * (the 44px covers of the narrow Tracks list).
+   */
+  size?: 'tile' | 'thumb' | 'list';
   /** Fill the positioned parent instead of sizing itself as a square. */
   fill?: boolean;
   /** Overlays drawn on the art, such as a duration badge. */
@@ -20,6 +23,12 @@ export interface ArtworkProps {
   /** Layout placement only. */
   className?: string;
 }
+
+const SQUARE_RADII = {
+  tile: 'rounded-tile',
+  thumb: 'rounded-chip',
+  list: 'rounded-[8px]',
+} as const;
 
 /** Square or round artwork with a `surface` background while loading and a placeholder fallback. */
 export function Artwork({
@@ -34,8 +43,7 @@ export function Artwork({
 }: ArtworkProps) {
   const status = useImageStatus(src);
   const showImage = src !== undefined && status.state === 'loading';
-  const radius =
-    shape === 'circle' ? 'rounded-full' : size === 'thumb' ? 'rounded-chip' : 'rounded-tile';
+  const radius = shape === 'circle' ? 'rounded-full' : SQUARE_RADII[size];
   const box = fill ? 'absolute inset-0' : 'relative aspect-square w-full';
 
   return (
