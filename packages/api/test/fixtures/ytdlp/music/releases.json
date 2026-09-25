@@ -1,0 +1,28 @@
+{
+  "id": "UCartist000000000000001",
+  "title": "Test Artist - Releases",
+  "channel": "Test Artist",
+  "channel_id": "UCartist000000000000001",
+  "uploader": "Test Artist",
+  "channel_url": "https://www.youtube.com/channel/UCartist000000000000001",
+  "_type": "playlist",
+  "webpage_url": "https://www.youtube.com/channel/UCartist000000000000001/releases",
+  "extractor": "youtube:tab",
+  "extractor_key": "YoutubeTab",
+  "entries": [
+    {
+      "_type": "url",
+      "ie_key": "YoutubeTab",
+      "id": "OLAK5uy_album1",
+      "url": "https://www.youtube.com/playlist?list=OLAK5uy_album1",
+      "title": "First Light"
+    },
+    {
+      "_type": "url",
+      "ie_key": "YoutubeTab",
+      "id": "OLAK5uy_single1",
+      "url": "https://www.youtube.com/playlist?list=OLAK5uy_single1",
+      "title": "Heatwave"
+    }
+  ]
+}

@@ -24,6 +24,7 @@ import {
 import { removeMediaFiles } from '../files/media-files.js';
 import type { JobRow } from '../jobs/job-runner.js';
 import { JobsService } from '../jobs/jobs.service.js';
+import { wantedElsewhere } from './claims.js';
 import { SourceGoneError, SyncService } from './sync.service.js';
 
 /** How often each subscribed source's files are compared with its rules. */
@@ -84,6 +85,8 @@ export interface RevalidationContext {
  *   `wanted` and its download is queued.
  * - Items that are downloading, missing or `unavailable` are left alone, and so is every item
  *   of another source (items belong to the source that first listed them, `source_id`).
+ * - An item another source still wants (a playlist listing it, or the source that owns it,
+ *   whose tree matches) is neither removed nor unwanted: a match wins (`wantedElsewhere`).
  *
  * `preview` runs the same evaluation against a candidate tree without touching anything.
  */
@@ -208,6 +211,13 @@ export class RevalidationService {
         rewantedVideos.map((item) => item.id),
       );
     }
+    const rewantedTracks = plan.rewant.filter((item) => item.table === 'tracks');
+    if (rewantedTracks.length > 0) {
+      this.sync.music.enqueueDownloads(
+        source,
+        rewantedTracks.map((item) => item.id),
+      );
+    }
 
     this.db
       .update(sources)
@@ -269,13 +279,19 @@ export class RevalidationService {
 
   private plan(source: SourceRow, matcher: Matcher, now: Date): Plan {
     const plan: Plan = { remove: [], keep: 0, unwant: [], rewant: [] };
+    // Another source that lists the item and still matches it keeps it (a match wins).
+    const elsewhere = (item: Item) =>
+      wantedElsewhere(this.db, item.table, item.id, source.id, {
+        ...item.ctx,
+        playlistPosition: null,
+      });
     for (const item of this.items(source, now)) {
       if (item.status === 'on_disk') {
         const result = evaluateMatcher(matcher, item.ctx);
-        if (result.matches) plan.keep++;
+        if (result.matches || elsewhere(item)) plan.keep++;
         else plan.remove.push({ item, failing: result.failing ?? [] });
       } else if (item.status === 'wanted') {
-        if (!evaluateMatcher(matcher, item.ctx).matches) plan.unwant.push(item);
+        if (!evaluateMatcher(matcher, item.ctx).matches && !elsewhere(item)) plan.unwant.push(item);
       } else if (
         item.status === 'skipped' &&
         (item.skipReason === 'no_match' || item.skipReason === 'no_longer_matches')
@@ -288,6 +304,7 @@ export class RevalidationService {
 
   /** The source's videos (video library) or tracks (music library), oldest id first. */
   private items(source: SourceRow, now: Date): Item[] {
+    const positions = this.positions(source);
     if (source.library === 'music') {
       return this.db
         .select({ track: tracks, artistName: artists.name, artistId: artists.youtubeId })
@@ -312,22 +329,12 @@ export class RevalidationService {
             liveStatus: null,
             channelName: artistName,
             channelId: artistId,
-            playlistPosition: null,
+            playlistPosition: positions.get(track.id) ?? null,
             now,
           },
         }));
     }
 
-    const positions = new Map<number, number>();
-    if (source.kind === 'playlist') {
-      const rows = this.db
-        .select({ videoId: playlistItems.videoId, position: playlistItems.position })
-        .from(playlistItems)
-        .innerJoin(playlists, eq(playlists.id, playlistItems.playlistId))
-        .where(eq(playlists.youtubeId, source.youtubeId))
-        .all();
-      for (const row of rows) if (row.videoId !== null) positions.set(row.videoId, row.position);
-    }
     return this.db
       .select({ video: videos, channelName: channels.name, channelId: channels.youtubeId })
       .from(videos)
@@ -355,6 +362,31 @@ export class RevalidationService {
           now,
         },
       }));
+  }
+
+  /**
+   * For a playlist source, its items' positions (`videos.id` or `tracks.id` → position, the
+   * first when listed twice); empty for channels and artists.
+   */
+  private positions(source: SourceRow): Map<number, number> {
+    const positions = new Map<number, number>();
+    if (source.kind !== 'playlist') return positions;
+    const rows = this.db
+      .select({
+        videoId: playlistItems.videoId,
+        trackId: playlistItems.trackId,
+        position: playlistItems.position,
+      })
+      .from(playlistItems)
+      .innerJoin(playlists, eq(playlists.id, playlistItems.playlistId))
+      .where(eq(playlists.youtubeId, source.youtubeId))
+      .orderBy(playlistItems.position)
+      .all();
+    for (const row of rows) {
+      const id = source.library === 'music' ? row.trackId : row.videoId;
+      if (id !== null && !positions.has(id)) positions.set(id, row.position);
+    }
+    return positions;
   }
 
   private countItems(source: SourceRow): number {

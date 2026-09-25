@@ -14,6 +14,7 @@ import {
   videoMimeType,
   type HomeFeed,
   type HomeGroup,
+  type HomeItem,
   type HomeQuery,
   type LibrarySummary,
   type VideoListItem,
@@ -27,6 +28,7 @@ import { DATABASE, type Database } from '../database/database.module.js';
 import { channels, history, sources, tracks, videos } from '../database/schema.js';
 import { OutsideLibraryError, libraryPath, removeMediaFiles } from '../files/media-files.js';
 import { JobsService } from '../jobs/jobs.service.js';
+import { MusicLibraryService } from './music-library.service.js';
 
 const DAY_MS = 86_400_000;
 
@@ -40,9 +42,9 @@ export interface VideoStream {
 }
 
 /**
- * The library read models over `videos` and `channels` (tracks join in Stage 6): the videos
- * list, the Home feed and stats, the Video header summary, and the two file actions of Preview
- * (stream and delete).
+ * The library read models over `videos` and `channels`: the videos list, the Home feed (with the
+ * music items from `MusicLibraryService`) and stats, the header summaries, and the two file
+ * actions of Preview (stream and delete).
  */
 @Injectable()
 export class LibraryService {
@@ -53,6 +55,7 @@ export class LibraryService {
     private readonly config: AppConfig,
     private readonly jobs: JobsService,
     private readonly historyService: HistoryService,
+    private readonly music: MusicLibraryService,
   ) {}
 
   /**
@@ -114,16 +117,27 @@ export class LibraryService {
       .orderBy(desc(videos.downloadedAt), desc(videos.id))
       .limit(HOME_ITEM_LIMIT)
       .all();
+    const items: HomeItem[] = [
+      ...rows.map(({ video, channel }): HomeItem => ({
+        kind: 'video',
+        ...toListItem(video, channel),
+      })),
+      ...this.music
+        .recentTracks(since, HOME_ITEM_LIMIT)
+        .map((track): HomeItem => ({ kind: 'music', ...track })),
+    ];
+    // Both lists are newest first; merge them by download time.
+    items.sort((a, b) => (b.downloadedAt ?? '').localeCompare(a.downloadedAt ?? '') || b.id - a.id);
     const dayOf = localDay(query.tz);
     const groups: HomeGroup[] = [];
-    for (const { video, channel } of rows) {
-      const day = dayOf(new Date(video.downloadedAt!));
+    for (const item of items.slice(0, HOME_ITEM_LIMIT)) {
+      const day = dayOf(new Date(item.downloadedAt!));
       let group = groups.at(-1);
       if (!group || group.day !== day) {
         group = { day, items: [] };
         groups.push(group);
       }
-      group.items.push({ kind: 'video', ...toListItem(video, channel) });
+      group.items.push(item);
     }
     return { stats: this.stats(), groups };
   }
@@ -143,7 +157,10 @@ export class LibraryService {
     };
   }
 
-  /** The Video header sub: channel and playlist sources, videos on disk and their size. */
+  /**
+   * The header subs: for Video the channel and playlist sources, videos on disk and their size;
+   * for Music the artists, albums and playlists of its tabs and the subscribed artists.
+   */
   summary(): LibrarySummary {
     const kinds = this.db
       .select({ kind: sources.kind, count: sql<number>`count(*)` })
@@ -164,6 +181,7 @@ export class LibraryService {
         videos: onDisk?.count ?? 0,
         sizeBytes: this.onDiskBytes(videos),
       },
+      music: this.music.summary(),
     };
   }
 

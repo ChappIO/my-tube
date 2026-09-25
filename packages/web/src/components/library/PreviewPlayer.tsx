@@ -1,5 +1,5 @@
 import type { VideoListItem } from '@mytube/shared';
-import { useCallback, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { videoStreamUrl } from '../../api/library';
 import { PlayIcon } from '../icons';
 import { cx, focusRing } from '../ui/cx';
@@ -71,21 +71,46 @@ export function PreviewPlayer({ video, playable, onUnplayable }: PreviewPlayerPr
         )
       )}
       {video && playable && !started && (
-        <button
-          type="button"
-          aria-label={`Play ${video.title}`}
-          onClick={() => {
+        <PlayCircle
+          label={`Play ${video.title}`}
+          onPlay={() => {
             setStarted(true);
             void ref.current?.play();
           }}
-          className={cx(
-            'absolute top-1/2 left-1/2 grid size-[72px] -translate-1/2 cursor-pointer place-items-center rounded-full bg-player-glyph text-white',
-            focusRing,
-          )}
-        >
-          <PlayIcon size={28} fill="currentColor" strokeWidth={0} className="ml-1" />
-        </button>
+        />
       )}
     </div>
+  );
+}
+
+/**
+ * A plain line in the empty 16/9 player area, such as "Nothing on disk yet." for an album or
+ * playlist tile with no track on disk (`text-meta` in `player-note`).
+ */
+export function PreviewNote({ children }: { children: ReactNode }) {
+  return (
+    <div className="grid aspect-video w-full place-items-center bg-player px-6 text-center text-meta text-player-note">
+      {children}
+    </div>
+  );
+}
+
+/**
+ * The 72px translucent play circle over the player area until playback starts (video and audio
+ * Preview share it).
+ */
+export function PlayCircle({ label, onPlay }: { label: string; onPlay: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onPlay}
+      className={cx(
+        'absolute top-1/2 left-1/2 grid size-[72px] -translate-1/2 cursor-pointer place-items-center rounded-full bg-player-glyph text-white',
+        focusRing,
+      )}
+    >
+      <PlayIcon size={28} fill="currentColor" strokeWidth={0} className="ml-1" />
+    </button>
   );
 }

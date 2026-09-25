@@ -1,6 +1,13 @@
+import type { ComponentType } from 'react';
 import { createFileRoute, linkOptions, redirect } from '@tanstack/react-router';
-import { PlaceholderPage } from '../components/PlaceholderPage';
+import { useLibrarySummary } from '../api/library';
+import { AlbumsTab } from '../components/library/AlbumsTab';
+import { ArtistsTab } from '../components/library/ArtistsTab';
+import { PlaylistsTab } from '../components/library/PlaylistsTab';
+import { TracksTab } from '../components/library/TracksTab';
+import { PageHeader } from '../components/ui/PageHeader';
 import { TabPillLinks } from '../components/ui/TabPills';
+import { musicLibrarySummary } from '../format';
 import {
   DEFAULT_MUSIC_TAB,
   MUSIC_TABS,
@@ -32,13 +39,26 @@ export const Route = createFileRoute('/music/$tab')({
   component: MusicPage,
 });
 
+const TAB_CONTENT = {
+  artists: ArtistsTab,
+  albums: AlbumsTab,
+  playlists: PlaylistsTab,
+  tracks: TracksTab,
+} satisfies Record<MusicTab, ComponentType>;
+
+/** Music (handoff Screen 2): the header with the library summary and the four tabs. */
 function MusicPage() {
   const { tab } = Route.useParams();
+  const summary = useLibrarySummary();
+  const Content = TAB_CONTENT[tab];
   return (
-    <PlaceholderPage
-      title="Music"
-      sub={`${TAB_LABELS[tab]}. Nothing here yet.`}
-      actions={<TabPillLinks label="Music view" items={musicTabItems} value={tab} />}
-    />
+    <>
+      <PageHeader
+        title="Music"
+        sub={summary.data ? musicLibrarySummary(summary.data.music) : undefined}
+        actions={<TabPillLinks label="Music view" items={musicTabItems} value={tab} />}
+      />
+      <Content />
+    </>
   );
 }

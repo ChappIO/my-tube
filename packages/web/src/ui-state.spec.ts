@@ -4,8 +4,11 @@ import {
   closePreview,
   isAddOpen,
   openAdd,
+  openEmptyPreview,
   openPreview,
-  previewVideoId,
+  openTrackPreview,
+  previewKey,
+  previewTarget,
   subscribeUiState,
 } from './ui-state';
 
@@ -42,19 +45,28 @@ describe('Preview state', () => {
     closePreview();
   });
 
-  it('holds the video being previewed and notifies on changes only', () => {
+  it('holds what is being previewed and notifies on changes only', () => {
     const listener = vi.fn<() => void>();
     const unsubscribe = subscribeUiState(listener);
-    expect(previewVideoId()).toBeNull();
+    expect(previewTarget()).toBeNull();
     openPreview(4);
     openPreview(4);
-    expect(previewVideoId()).toBe(4);
-    openPreview(5);
-    expect(previewVideoId()).toBe(5);
+    expect(previewTarget()).toEqual({ kind: 'video', id: 4 });
+    openTrackPreview(4);
+    expect(previewTarget()).toEqual({ kind: 'track', id: 4 });
+    openEmptyPreview('First Light');
+    openEmptyPreview('First Light');
+    expect(previewTarget()).toEqual({ kind: 'empty', title: 'First Light' });
     closePreview();
     closePreview();
-    expect(previewVideoId()).toBeNull();
-    expect(listener).toHaveBeenCalledTimes(3);
+    expect(previewTarget()).toBeNull();
+    expect(listener).toHaveBeenCalledTimes(4);
     unsubscribe();
+  });
+
+  it('keys each target', () => {
+    expect(previewKey({ kind: 'video', id: 4 })).toBe('video:4');
+    expect(previewKey({ kind: 'track', id: 4 })).toBe('track:4');
+    expect(previewKey({ kind: 'empty', title: 'X' })).toBe('empty:X');
   });
 });

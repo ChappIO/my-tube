@@ -6,7 +6,15 @@ import type { ArtworkKind } from '@mytube/shared';
 import { asc, eq, sql } from 'drizzle-orm';
 import { AppConfig } from '../config/app-config.js';
 import { DATABASE, type Database } from '../database/database.module.js';
-import { artists, artworkCache, channels, playlists, videos } from '../database/schema.js';
+import {
+  albums,
+  artists,
+  artworkCache,
+  channels,
+  playlists,
+  tracks,
+  videos,
+} from '../database/schema.js';
 import { OutsideLibraryError, libraryPath } from '../files/media-files.js';
 
 /** Cached artwork is pruned to this many bytes, least recently served first. */
@@ -20,7 +28,7 @@ export const ARTWORK_NEGATIVE_TTL_MS = 30_000;
 /** `used_at` is written at most this often per image, so serving stays read-only. */
 const TOUCH_INTERVAL_MS = 3_600_000;
 
-/** Sidecar thumbnails yt-dlp writes next to a video, in the order they are preferred. */
+/** Sidecar thumbnails yt-dlp writes next to a video or track, in the order they are preferred. */
 const SIDECAR_EXTENSIONS = ['jpg', 'webp', 'png'] as const;
 
 const EXTENSION_BY_TYPE: Readonly<Record<string, string>> = {
@@ -48,7 +56,7 @@ export interface ArtworkFile {
 interface ArtworkOrigin {
   /** The remote image stored on the row. */
   remoteUrl: string | null;
-  /** A thumbnail next to the video file, preferred over the remote one. */
+  /** A thumbnail next to the video or track file, preferred over the remote one. */
   sidecar: string | null;
 }
 
@@ -56,7 +64,8 @@ interface ArtworkOrigin {
  * The artwork cache behind `GET /api/artwork/:kind/:id`. The web never loads Google's image
  * hosts itself; every avatar and thumbnail goes through here and is downloaded once.
  *
- * - A video on disk is served from its sidecar thumbnail (`<name>.jpg`) when there is one.
+ * - A video or track on disk is served from its sidecar thumbnail (`<name>.jpg`) when there
+ *   is one. An album is its cover (`albums.cover_url`), else its first track's thumbnail.
  * - Otherwise the remote URL on the row (`avatar_url`, `thumbnail_url`) is downloaded into
  *   `CONFIG_DIR/cache/artwork/<kind>/<id>.<ext>` with a MyTube User-Agent, a 10 s timeout and
  *   at most 4 fetches at once (concurrent requests for the same image share one fetch), and
@@ -151,8 +160,48 @@ export class ArtworkService {
       if (!row) throw missing();
       return {
         remoteUrl: row.thumbnailUrl,
-        sidecar: row.status === 'on_disk' && row.filePath ? this.sidecar(row.filePath) : null,
+        sidecar:
+          row.status === 'on_disk' && row.filePath
+            ? this.sidecar(this.config.videoDir, row.filePath)
+            : null,
       };
+    }
+    if (kind === 'track') {
+      const row = this.db
+        .select({
+          thumbnailUrl: tracks.thumbnailUrl,
+          status: tracks.status,
+          filePath: tracks.filePath,
+        })
+        .from(tracks)
+        .where(eq(tracks.id, id))
+        .get();
+      if (!row) throw missing();
+      return {
+        remoteUrl: row.thumbnailUrl,
+        sidecar:
+          row.status === 'on_disk' && row.filePath
+            ? this.sidecar(this.config.musicDir, row.filePath)
+            : null,
+      };
+    }
+    if (kind === 'album') {
+      const row = this.db
+        .select({ coverUrl: albums.coverUrl })
+        .from(albums)
+        .where(eq(albums.id, id))
+        .get();
+      if (!row) throw missing();
+      if (row.coverUrl) return { remoteUrl: row.coverUrl, sidecar: null };
+      // An album known only from track metadata has no cover of its own: its first track's.
+      const first = this.db
+        .select({ thumbnailUrl: tracks.thumbnailUrl })
+        .from(tracks)
+        .where(eq(tracks.albumId, id))
+        .orderBy(sql`${tracks.trackNumber} IS NULL`, asc(tracks.trackNumber), asc(tracks.id))
+        .limit(1)
+        .get();
+      return { remoteUrl: first?.thumbnailUrl ?? null, sidecar: null };
     }
     const table = kind === 'channel' ? channels : kind === 'artist' ? artists : null;
     if (table) {
@@ -173,10 +222,10 @@ export class ArtworkService {
     return { remoteUrl: row.url, sidecar: null };
   }
 
-  /** The sidecar thumbnail next to a video file (`<name>.jpg|webp|png`), if one exists. */
-  private sidecar(filePath: string): string | null {
+  /** The sidecar thumbnail next to a media file (`<name>.jpg|webp|png`), if one exists. */
+  private sidecar(root: string, filePath: string): string | null {
     try {
-      const media = libraryPath(this.config.videoDir, filePath);
+      const media = libraryPath(root, filePath);
       const stem = join(dirname(media), basename(media, extname(media)));
       for (const extension of SIDECAR_EXTENSIONS) {
         const candidate = `${stem}.${extension}`;

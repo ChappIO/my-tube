@@ -1,4 +1,10 @@
-import type { Job } from '@mytube/shared';
+import type {
+  AlbumListItem,
+  ArtistListItem,
+  Job,
+  LibrarySummary,
+  PlaylistListItem,
+} from '@mytube/shared';
 
 /*
  * Display formatting shared by the screens: relative times, sizes, counts, upload cadence, and
@@ -230,4 +236,72 @@ export function publishedAgo(publishedAt: string | null, now: number = Date.now(
   if (days <= 0) return 'today';
   if (days === 1) return 'yesterday';
   return relativeTime(new Date(now - days * DAY).toISOString(), now);
+}
+
+// Music tabs (handoff Screen 2).
+
+/** A playlist's total length on its meta line: `2h51`, `4h12`, `42 min`. */
+export function formatTotalLength(seconds: number): string {
+  const minutes = Math.round(Math.max(0, seconds) / 60);
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.floor(minutes / 60)}h${pad(minutes % 60)}`;
+}
+
+/** A tile meta line and whether it shows red (some tracks are not on disk). */
+export interface MusicMeta {
+  text: string;
+  incomplete: boolean;
+}
+
+/** `10 tracks`, or `12/14 tracks` when fewer are on disk. */
+function trackTally(trackCount: number, onDiskCount: number): string {
+  return onDiskCount < trackCount
+    ? `${formatCount(onDiskCount)}/${countOf(trackCount, 'track')}`
+    : countOf(trackCount, 'track');
+}
+
+/**
+ * An album tile's meta line: `2007 · 10 tracks` (`10 tracks` without a year) when every track is
+ * on disk; `12/14 tracks` in red when some are not.
+ */
+export function albumMeta(
+  album: Pick<AlbumListItem, 'year' | 'trackCount' | 'onDiskCount'>,
+): MusicMeta {
+  const incomplete = album.onDiskCount < album.trackCount;
+  const tracks = trackTally(album.trackCount, album.onDiskCount);
+  return {
+    text: !incomplete && album.year !== null ? `${album.year} · ${tracks}` : tracks,
+    incomplete,
+  };
+}
+
+/** An artist tile's meta line: `9 albums · 112 tracks`. */
+export function artistMeta(artist: Pick<ArtistListItem, 'albumCount' | 'trackCount'>): string {
+  return `${countOf(artist.albumCount, 'album')} · ${countOf(artist.trackCount, 'track')}`;
+}
+
+/**
+ * A playlist tile's meta line: `42 tracks · 2h51`; `65/68 tracks · 4h12` in red when some tracks
+ * are not on disk.
+ */
+export function playlistMeta(
+  playlist: Pick<PlaylistListItem, 'trackCount' | 'onDiskCount' | 'durationSeconds'>,
+): MusicMeta {
+  return {
+    text: `${trackTally(playlist.trackCount, playlist.onDiskCount)} · ${formatTotalLength(playlist.durationSeconds)}`,
+    incomplete: playlist.onDiskCount < playlist.trackCount,
+  };
+}
+
+/**
+ * The Music header sub line from `GET /api/library/summary`:
+ * `31 artists · 84 albums · 3 playlists · 4 artist subscriptions`.
+ */
+export function musicLibrarySummary(summary: LibrarySummary['music']): string {
+  return [
+    countOf(summary.artists, 'artist'),
+    countOf(summary.albums, 'album'),
+    countOf(summary.playlists, 'playlist'),
+    countOf(summary.artistSubscriptions, 'artist subscription'),
+  ].join(' · ');
 }

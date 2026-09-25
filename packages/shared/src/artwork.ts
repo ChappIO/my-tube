@@ -8,18 +8,21 @@ import { z } from 'zod';
  * modal, which describes a source that is not saved yet and so has no row to cache for.
  */
 
-/** Which row an artwork URL belongs to: its avatar (channel, artist) or thumbnail. */
-export const ARTWORK_KINDS = ['channel', 'artist', 'video', 'playlist'] as const;
+/**
+ * Which row an artwork URL belongs to: its avatar (channel, artist), thumbnail (video, playlist,
+ * track) or cover (album).
+ */
+export const ARTWORK_KINDS = ['channel', 'artist', 'video', 'playlist', 'album', 'track'] as const;
 export const ArtworkKind = z.enum(ARTWORK_KINDS);
 export type ArtworkKind = z.infer<typeof ArtworkKind>;
 
-const ARTWORK_PATH = /^\/api\/artwork\/(channel|artist|video|playlist)\/[1-9]\d*$/;
+const ARTWORK_PATH = /^\/api\/artwork\/(channel|artist|video|playlist|album|track)\/[1-9]\d*$/;
 
 /** `/api/artwork/<kind>/<row id>`: a same-origin path to the cached image. */
 export const ArtworkPath = z.string().regex(ARTWORK_PATH, 'Expected /api/artwork/<kind>/<id>');
 export type ArtworkPath = z.infer<typeof ArtworkPath>;
 
-/** The artwork path of a `channels`, `artists`, `videos` or `playlists` row. */
+/** The artwork path of a `channels`, `artists`, `videos`, `playlists`, `albums` or `tracks` row. */
 export function artworkPath(kind: ArtworkKind, id: number): ArtworkPath {
   return `/api/artwork/${kind}/${id}`;
 }

@@ -1,0 +1,58 @@
+{
+  "id": "UCartist000000000000001",
+  "title": "Test Artist - Videos",
+  "channel": "Test Artist",
+  "channel_id": "UCartist000000000000001",
+  "_type": "playlist",
+  "webpage_url": "https://www.youtube.com/channel/UCartist000000000000001/videos",
+  "extractor": "youtube:tab",
+  "entries": [
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "upl00000001",
+      "url": "https://www.youtube.com/watch?v=upl00000001",
+      "title": "Heatwave (Official Video)",
+      "duration": 215,
+      "timestamp": 1757000000,
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/upl00000001/hqdefault.jpg",
+          "height": 270,
+          "width": 480
+        }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "upl00000002",
+      "url": "https://www.youtube.com/shorts/upl00000002",
+      "title": "Studio clip",
+      "duration": 20,
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/upl00000002/hqdefault.jpg",
+          "height": 270,
+          "width": 480
+        }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "upl00000003",
+      "url": "https://www.youtube.com/watch?v=upl00000003",
+      "title": "Tour diary",
+      "duration": 900,
+      "timestamp": 1756000000,
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/upl00000003/hqdefault.jpg",
+          "height": 270,
+          "width": 480
+        }
+      ]
+    }
+  ]
+}

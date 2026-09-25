@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useAddModal, usePreview } from '../../ui-state';
+import { previewKey, useAddModal, usePreview } from '../../ui-state';
 import { PreviewModal } from '../library/PreviewModal';
 import { AddSourceModal } from '../sources/AddSourceModal';
 import { Sidebar } from './Sidebar';
@@ -26,7 +26,7 @@ export function AppShell({
   children: ReactNode;
 }) {
   const { open: addOpen, openAdd, closeAdd } = useAddModal();
-  const { videoId: previewId, closePreview } = usePreview();
+  const { target: preview, closePreview } = usePreview();
   return (
     <div className="min-h-screen bg-bg text-ink wide:flex">
       <Sidebar activityCount={activityCount} onAdd={openAdd} footer={sidebarFooter} />
@@ -37,9 +37,9 @@ export function AppShell({
       <TabBar activityCount={activityCount} />
       {/* Mounted only while open, so every opening starts empty. */}
       {addOpen && <AddSourceModal onClose={closeAdd} />}
-      {/* Keyed by the video, so each opening starts at the poster. */}
-      {previewId !== null && (
-        <PreviewModal key={previewId} videoId={previewId} onClose={closePreview} />
+      {/* Keyed by what it shows, so each opening starts at the poster. */}
+      {preview !== null && (
+        <PreviewModal key={previewKey(preview)} target={preview} onClose={closePreview} />
       )}
     </div>
   );

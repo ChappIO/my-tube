@@ -55,16 +55,18 @@ export function MusicTile({
     }
   }
 
+  // Without `onOpen` (artists: there is no artist page) the tile is plain content, not a button.
+  const interactive = onOpen !== undefined;
   return (
     <div
-      role="button"
-      tabIndex={0}
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
       onClick={onOpen}
-      onKeyDown={handleKeyDown}
+      onKeyDown={interactive ? handleKeyDown : undefined}
       className={cx(
-        'grid cursor-pointer gap-3 rounded-card hover:scale-[1.03] hover:bg-surface',
+        'grid min-w-0 content-start gap-3 rounded-card hover:scale-[1.03] hover:bg-surface',
         'motion-tile',
-        focusRing,
+        interactive && cx('cursor-pointer', focusRing),
         artist ? 'p-3 text-center' : 'p-2.5 text-left',
         className,
       )}

@@ -1,0 +1,28 @@
+{
+  "id": "trk00000001",
+  "title": "Heatwave",
+  "track": "Heatwave",
+  "artist": "Test Artist",
+  "artists": ["Test Artist"],
+  "album": "First Light",
+  "release_year": 2024,
+  "release_date": "20240405",
+  "upload_date": "20240117",
+  "duration": 201,
+  "channel": "Test Artist",
+  "channel_id": "UCartist000000000000001",
+  "uploader": "Test Artist",
+  "timestamp": 1705485893,
+  "live_status": "not_live",
+  "_type": "video",
+  "webpage_url": "https://music.youtube.com/watch?v=trk00000001",
+  "thumbnails": [
+    {
+      "url": "https://i.ytimg.com/vi/trk00000001/hqdefault.jpg",
+      "height": 270,
+      "width": 480
+    }
+  ],
+  "format_id": "18",
+  "filesize": 3000000
+}

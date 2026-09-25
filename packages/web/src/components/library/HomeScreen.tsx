@@ -9,6 +9,7 @@ import { PageHeader } from '../ui/PageHeader';
 import { StatCard, StatCardGroup } from '../ui/StatCard';
 import { Body } from '../ui/typography';
 import { DayGroup } from './DayGroup';
+import { TrackTile } from './TrackTile';
 import { VideoTile } from './VideoTile';
 
 /**
@@ -66,9 +67,10 @@ export function HomeScreen() {
 }
 
 /**
- * One Home item. Videos get the fixed chin with the channel; music items (Stage 6) will use
- * `MediaTile`'s reveal chin.
+ * One Home item. Videos get the fixed chin with the channel; tracks show only their cover, with
+ * the chin sliding up on hover.
  */
 function HomeTile({ item, now }: { item: HomeItem; now: number }) {
+  if (item.kind === 'music') return <TrackTile track={item} />;
   return <VideoTile video={item} meta="channel" now={now} />;
 }

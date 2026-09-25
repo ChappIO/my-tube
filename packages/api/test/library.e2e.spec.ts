@@ -257,6 +257,7 @@ describe('Library (e2e)', () => {
     );
     expect(summary).toEqual({
       videos: { channels: 1, playlists: 0, videos: 6, sizeBytes: 600 },
+      music: { artists: 0, albums: 0, playlists: 0, artistSubscriptions: 0 },
     });
   });
 

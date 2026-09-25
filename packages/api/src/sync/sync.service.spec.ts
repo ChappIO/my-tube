@@ -237,12 +237,19 @@ describe('SyncService', () => {
     expect(result.wantedIds).toHaveLength(1);
   });
 
-  it('marks a music source checked without fetching (Stage 6)', async () => {
+  it('syncs a music artist source through its releases (music-sync.spec.ts has the rest)', async () => {
     const { sync, addSource, db } = setup();
-    process.env.FAKE_YTDLP_FAIL = '1';
     const source = addSource('artist', DEFAULT_MUSIC_MATCHER, 'music');
-    await expect(sync.checkSource(source.id)).resolves.toMatchObject({ synced: false });
-    expect(db.select().from(sources).get()?.lastCheckedAt).not.toBeNull();
+    await expect(sync.checkSource(source.id)).resolves.toMatchObject({
+      synced: true,
+      entries: 4,
+      added: 3,
+      wanted: 3,
+      queued: 3,
+    });
+    const checked = db.select().from(sources).get();
+    expect(checked?.lastCheckedAt).not.toBeNull();
+    expect(checked?.itemCount).toBe(3);
   });
 
   it('throws SourceGoneError for a removed source and rethrows yt-dlp failures', async () => {
