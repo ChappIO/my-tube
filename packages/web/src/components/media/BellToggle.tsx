@@ -14,6 +14,8 @@ export interface BellToggleProps {
    * defaults to `Subscribe`; the pill defaults to its visible label.
    */
   label?: string;
+  /** The pill stretches to its container with the label centred (the album page's artist card). */
+  fullWidth?: boolean;
   /** Layout placement only. */
   className?: string;
 }
@@ -27,6 +29,7 @@ export function BellToggle({
   onToggle,
   form = 'circle',
   label,
+  fullWidth = false,
   className,
 }: BellToggleProps) {
   const state = subscribed ? 'border-red bg-red text-white' : 'border-line bg-transparent text-ink';
@@ -51,6 +54,7 @@ export function BellToggle({
           minHit,
           focusRing,
           state,
+          fullWidth && 'w-full justify-center',
           className,
         )}
       >

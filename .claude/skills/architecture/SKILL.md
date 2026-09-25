@@ -91,7 +91,7 @@ Scheduling uses `@nestjs/schedule` inside the API process. No Redis, no external
 See the frontend skill for conventions.
 
 - A layout route renders the sidebar (wide) or top bar plus bottom tabs (narrow), the Add modal and the Preview modal. Modal state is global.
-- Routes: `/`, `/music/$tab`, `/video/$tab`, `/video/channel/$id`, `/activity`, `/settings/$tab`.
+- Routes: `/`, `/music/$tab`, `/music/album/$id`, `/video/$tab`, `/video/channel/$id`, `/activity`, `/settings/$tab`.
 - One hooks file per resource wraps API calls with the shared Zod schemas. The bell toggle mutates optimistically because the design demands an immediate flip.
 - Polling is React Query `refetchInterval` on the Activity queries and the badge count query.
 - A component library implements the design system (the frontend skill is the design reference): tokens as Tailwind theme variables, the logo in SVG, tiles, playlist stack, tab pill, bell toggle, buttons, inputs, tables that collapse below 760px.

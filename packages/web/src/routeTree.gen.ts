@@ -21,6 +21,7 @@ import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsTabRouteImport } from './routes/settings.$tab'
 import { Route as VideoIndexRouteImport } from './routes/video.index'
 import { Route as VideoTabRouteImport } from './routes/video.$tab'
+import { Route as MusicAlbumIdRouteImport } from './routes/music.album.$id'
 import { Route as VideoChannelIdRouteImport } from './routes/video.channel.$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -83,6 +84,11 @@ const VideoTabRoute = VideoTabRouteImport.update({
   path: '/video/$tab',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MusicAlbumIdRoute = MusicAlbumIdRouteImport.update({
+  id: '/music/album/$id',
+  path: '/music/album/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VideoChannelIdRoute = VideoChannelIdRouteImport.update({
   id: '/video/channel/$id',
   path: '/video/channel/$id',
@@ -102,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/music/': typeof MusicIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/video/': typeof VideoIndexRoute
+  '/music/album/$id': typeof MusicAlbumIdRoute
   '/video/channel/$id': typeof VideoChannelIdRoute
 }
 export interface FileRoutesByTo {
@@ -117,6 +124,7 @@ export interface FileRoutesByTo {
   '/music': typeof MusicIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/video': typeof VideoIndexRoute
+  '/music/album/$id': typeof MusicAlbumIdRoute
   '/video/channel/$id': typeof VideoChannelIdRoute
 }
 export interface FileRoutesById {
@@ -133,6 +141,7 @@ export interface FileRoutesById {
   '/music/': typeof MusicIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/video/': typeof VideoIndexRoute
+  '/music/album/$id': typeof MusicAlbumIdRoute
   '/video/channel/$id': typeof VideoChannelIdRoute
 }
 export interface FileRouteTypes {
@@ -150,6 +159,7 @@ export interface FileRouteTypes {
     | '/music/'
     | '/settings/'
     | '/video/'
+    | '/music/album/$id'
     | '/video/channel/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -165,6 +175,7 @@ export interface FileRouteTypes {
     | '/music'
     | '/settings'
     | '/video'
+    | '/music/album/$id'
     | '/video/channel/$id'
   id:
     | '__root__'
@@ -180,6 +191,7 @@ export interface FileRouteTypes {
     | '/music/'
     | '/settings/'
     | '/video/'
+    | '/music/album/$id'
     | '/video/channel/$id'
   fileRoutesById: FileRoutesById
 }
@@ -196,6 +208,7 @@ export interface RootRouteChildren {
   MusicIndexRoute: typeof MusicIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
   VideoIndexRoute: typeof VideoIndexRoute
+  MusicAlbumIdRoute: typeof MusicAlbumIdRoute
   VideoChannelIdRoute: typeof VideoChannelIdRoute
 }
 
@@ -285,6 +298,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VideoTabRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/music/album/$id': {
+      id: '/music/album/$id'
+      path: '/music/album/$id'
+      fullPath: '/music/album/$id'
+      preLoaderRoute: typeof MusicAlbumIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/video/channel/$id': {
       id: '/video/channel/$id'
       path: '/video/channel/$id'
@@ -308,6 +328,7 @@ const rootRouteChildren: RootRouteChildren = {
   MusicIndexRoute: MusicIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
   VideoIndexRoute: VideoIndexRoute,
+  MusicAlbumIdRoute: MusicAlbumIdRoute,
   VideoChannelIdRoute: VideoChannelIdRoute,
 }
 export const routeTree = rootRouteImport

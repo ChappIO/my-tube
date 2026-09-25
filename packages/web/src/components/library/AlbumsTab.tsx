@@ -1,13 +1,13 @@
 import { useAlbums } from '../../api/library';
 import { albumMeta } from '../../format';
-import { openEmptyPreview, openTrackPreview } from '../../ui-state';
 import { MusicTile } from '../media';
 import { MusicGrid } from './MusicGrid';
+import { albumPageLink } from './album-page';
 
 /**
  * Music → Albums: an open music tile per album with the artist and
- * `2007 · 10 tracks`, or `12/14 tracks` in red when tracks are missing. A tile opens Preview on
- * the album's first track on disk ("Nothing on disk yet." without one).
+ * `2007 · 10 tracks`, or `12/14 tracks` in red when tracks are missing. A tile is a link to the
+ * album page.
  */
 export function AlbumsTab() {
   return (
@@ -28,11 +28,7 @@ export function AlbumsTab() {
             incomplete={meta.incomplete}
             src={album.coverUrl ?? undefined}
             seed={album.title}
-            onOpen={() =>
-              album.firstTrackId === null
-                ? openEmptyPreview(album.title)
-                : openTrackPreview(album.firstTrackId)
-            }
+            link={albumPageLink(album.id)}
           />
         );
       }}

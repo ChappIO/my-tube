@@ -160,14 +160,14 @@ function TrackRow({ track, number, now, onOpen }: TrackRowProps) {
 }
 
 /** Space Mono 12 muted cell text (number, length, added). */
-function CellMeta({ children, className }: { children: ReactNode; className?: string }) {
+export function CellMeta({ children, className }: { children: ReactNode; className?: string }) {
   return <span className={cx('font-mono text-[12px] text-muted', className)}>{children}</span>;
 }
 
 const STATUS_TONES = { ok: 'text-ok', red: 'text-red', muted: 'text-muted' } as const;
 
 /** Status: Space Mono 700 11 (10 in the narrow list); `on disk` green, `missing` red. */
-function TrackStatusLabel({
+export function TrackStatusLabel({
   label,
   tone,
   small,

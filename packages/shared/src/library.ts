@@ -245,6 +245,58 @@ export const AlbumListItem = z.object({
 export type AlbumListItem = z.infer<typeof AlbumListItem>;
 
 /**
+ * The album page (`GET /api/library/albums/:id`): the album, its artist, its tracks in the library
+ * (wanted, downloading, on disk or missing; the statuses the Tracks tab lists) in album order
+ * (disc, then track number), and the totals of the header.
+ */
+export const AlbumDetail = z.object({
+  album: z.object({
+    id: z.number().int().positive(),
+    title: z.string(),
+    year: z.number().int().nullable(),
+    coverUrl: ArtworkPath.nullable(),
+    /** The album playlist id on YouTube Music (`OLAK5uy_…`), null for albums grouped from uploads. */
+    youtubeId: z.string().nullable(),
+    /** `https://music.youtube.com/playlist?list=<youtubeId>`, null without an id. */
+    youtubeUrl: z.url().nullable(),
+  }),
+  artist: z.object({
+    id: z.number().int().positive(),
+    name: z.string(),
+    avatarUrl: ArtworkPath.nullable(),
+    /** The artist's source (the bell, the rules, Check for changes), null when not added as one. */
+    sourceId: z.number().int().positive().nullable(),
+    subscribed: z.boolean(),
+    /** As on the Artists tab: albums with a track in the library, tracks in the library. */
+    albumCount: z.number().int().nonnegative(),
+    trackCount: z.number().int().nonnegative(),
+  }),
+  tracks: z.array(TrackListItem),
+  /** Tracks in the library (the rows). */
+  trackCount: z.number().int().nonnegative(),
+  onDiskCount: z.number().int().nonnegative(),
+  /** Rows the rules want that are not on disk yet (`wanted`, `downloading`). */
+  wantedCount: z.number().int().nonnegative(),
+  /** Rows not on disk (`trackCount − onDiskCount`): what makes the album incomplete. */
+  missingCount: z.number().int().nonnegative(),
+  /** Rows not on disk with a download job queued or running. */
+  queuedCount: z.number().int().nonnegative(),
+  /** Summed length of the rows. */
+  totalDurationSeconds: z.number().int().nonnegative(),
+  /** Bytes of the files on disk. */
+  sizeBytes: z.number().int().nonnegative(),
+  /** The files' extension (`m4a`) when every file on disk has the same one, else null. */
+  container: z.string().nullable(),
+});
+export type AlbumDetail = z.infer<typeof AlbumDetail>;
+
+/** `POST /api/library/albums/:id/download-missing` (202): download jobs created. */
+export const DownloadMissingResult = z.object({
+  queued: z.number().int().nonnegative(),
+});
+export type DownloadMissingResult = z.infer<typeof DownloadMissingResult>;
+
+/**
  * `GET /api/library/playlists` query. Only the Music library has a Playlists tab; the Video
  * library shows its playlists as sources on the Channels tab.
  */

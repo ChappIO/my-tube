@@ -470,9 +470,16 @@ export class MusicSync {
   /**
    * Enqueues downloads for `wanted` tracks, in listing order (same priority: oldest job first),
    * newest release first across albums. Returns how many were created. A track whose latest
-   * download failed for good or was cancelled waits for an explicit retry.
+   * download failed for good or was cancelled waits for an explicit retry, unless `explicit`
+   * (the user asked for these tracks: the album page's Download missing). `source` is the tracks'
+   * own source, null for tracks whose source was removed; it only matters for the positions of a
+   * sync-ordered playlist.
    */
-  enqueueDownloads(source: SourceRow, trackIds: readonly number[]): number {
+  enqueueDownloads(
+    source: SourceRow | null,
+    trackIds: readonly number[],
+    { explicit = false }: { explicit?: boolean } = {},
+  ): number {
     if (trackIds.length === 0) return 0;
     const settings = this.settings.get();
     const rows = this.db
@@ -484,13 +491,13 @@ export class MusicSync {
     const order = new Map(trackIds.map((id, index) => [id, index]));
     rows.sort((a, b) => (order.get(a.track.id) ?? 0) - (order.get(b.track.id) ?? 0));
     const positions =
-      source.kind === 'playlist' && source.options.syncOrder ? this.positions(source) : null;
+      source?.kind === 'playlist' && source.options.syncOrder ? this.positions(source) : null;
     const today = Math.floor(Date.now() / DAY_MS);
     let created = 0;
     for (const { track, artistName: subtitle } of rows) {
       const key = `track:${track.youtubeId}`;
       const last = this.jobs.latestForKey('download', key);
-      if (last && (last.status === 'failed' || last.status === 'cancelled')) continue;
+      if (!explicit && last && (last.status === 'failed' || last.status === 'cancelled')) continue;
       const published = track.publishedAt ? Date.parse(track.publishedAt) : Number.NaN;
       const position = positions?.get(track.id);
       const result = this.jobs.enqueue({

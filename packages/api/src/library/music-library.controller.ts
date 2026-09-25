@@ -1,6 +1,18 @@
-import { Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Query, Res } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  Res,
+} from '@nestjs/common';
 import {
   AlbumListQuery,
+  type AlbumDetail,
+  type DownloadMissingResult,
   PlaylistListQuery,
   TrackListQuery,
   type TrackPage,
@@ -12,12 +24,16 @@ import {
 import type { Response } from 'express';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { sendFile } from '../files/send-file.js';
+import { AlbumService } from './album.service.js';
 import { MusicLibraryService } from './music-library.service.js';
 
-/** The Music tabs (artists, albums, playlists) and Preview's track endpoints. */
+/** The Music tabs (artists, albums, playlists), the album page and Preview's track endpoints. */
 @Controller('library')
 export class MusicLibraryController {
-  constructor(private readonly music: MusicLibraryService) {}
+  constructor(
+    private readonly music: MusicLibraryService,
+    private readonly albumPage: AlbumService,
+  ) {}
 
   /** Artists with tracks in the library or added as sources, by name. */
   @Get('artists')
@@ -29,6 +45,19 @@ export class MusicLibraryController {
   @Get('albums')
   albums(@Query(new ZodValidationPipe(AlbumListQuery)) query: AlbumListQuery): AlbumListItem[] {
     return this.music.listAlbums(query);
+  }
+
+  /** The album page: the album, its artist, its tracks in the library and the totals. */
+  @Get('albums/:id')
+  album(@Param('id', ParseIntPipe) id: number): AlbumDetail {
+    return this.albumPage.getAlbum(id);
+  }
+
+  /** Download missing on the album page: a download job per track not on disk. 202. */
+  @Post('albums/:id/download-missing')
+  @HttpCode(202)
+  downloadMissing(@Param('id', ParseIntPipe) id: number): DownloadMissingResult {
+    return this.albumPage.downloadMissing(id);
   }
 
   /** The Music library's synced playlists (`?library=music`, the default and only value). */
