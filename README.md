@@ -82,14 +82,14 @@ Removing a source or turning its bell off never deletes files. Files are removed
 
 ## Where things are
 
-| What                  | Where                                                                                                                                              |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Application log       | `/config/logs/mytube.log` (rotated at 5 MB, three old files kept), also on stdout (`docker logs mytube`). Settings → Advanced → **Download logs**. |
-| yt-dlp output per job | `/config/logs/jobs/<job id>.log`, the newest 200. Linked from the Activity queue and history (**View log**).                                       |
-| Database and settings | `/config/mytube.db`                                                                                                                                |
-| Backups               | `/config/backups/mytube-<time>.sqlite`: every night at 04:00, and on **Back up now** in Settings → Advanced. The newest 7 are kept.                |
-| yt-dlp                | `/config/bin/yt-dlp`. Checked for updates every 6 hours and replaced automatically (Settings → Advanced).                                          |
-| Cookies (optional)    | Put a `cookies.txt` in `/config` and set Settings → Advanced → Network → Cookies file to `/config/cookies.txt` if YouTube asks for a sign-in.      |
+| What                  | Where                                                                                                                                                                                                                                                                                                                                    |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Application log       | `/config/logs/mytube.log` (rotated at 5 MB, three old files kept), also on stdout (`docker logs mytube`). Settings → Advanced → **Download logs**.                                                                                                                                                                                       |
+| yt-dlp output per job | `/config/logs/jobs/<job id>.log`, the newest 200. Linked from the Activity queue and history (**View log**).                                                                                                                                                                                                                             |
+| Database and settings | `/config/mytube.db`                                                                                                                                                                                                                                                                                                                      |
+| Backups               | `/config/backups/mytube-<time>.sqlite`: every night at 04:00, and on **Back up now** in Settings → Advanced. The newest 7 are kept.                                                                                                                                                                                                      |
+| yt-dlp                | `/config/bin/yt-dlp`. Checked for updates every 6 hours and replaced automatically (Settings → Advanced).                                                                                                                                                                                                                                |
+| Cookies (optional)    | If YouTube asks for a sign-in or a bot check: Settings → Advanced → Network → Cookies, **Upload** or **Paste** a cookies.txt exported from your browser (**How to export cookies** there has the steps). MyTube keeps it as `/config/cookies.txt`, owner-only, not in backups. Or mount your own file and type its path in the same row. |
 
 Every night at 04:30 MyTube also rescans both libraries: a file you deleted or moved outside the app shows as missing, a file that came back shows as on disk again, and the library sizes in Settings are recounted. Files MyTube does not know are counted in the history entry and left alone. **Rescan libraries** in Settings → Advanced does the same at once.
 
@@ -105,7 +105,7 @@ Every night at 04:30 MyTube also rescans both libraries: a file you deleted or m
 
 3. Start it again: `docker compose start mytube`.
 
-The backup holds everything MyTube knows: sources, rules, settings, the library index and the history. Media files are not in it; back those up the way you back up the rest of your media. After restoring an older backup, run **Rescan libraries** so the on-disk flags match the folders.
+The backup holds everything MyTube knows: sources, rules, settings, the library index and the history. Media files and the cookies file are not in it (export cookies again after a restore on a new machine); back those up the way you back up the rest of your media. After restoring an older backup, run **Rescan libraries** so the on-disk flags match the folders.
 
 ## Update
 

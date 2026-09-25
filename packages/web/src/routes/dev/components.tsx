@@ -19,6 +19,11 @@ import {
   SettingsRow,
 } from '../../components/ui/SettingsCard';
 import { TextValueInput } from '../../components/ui/TextValueInput';
+import { FileButton } from '../../components/ui/FileButton';
+import { Step, Steps } from '../../components/ui/Steps';
+import { TextAction } from '../../components/ui/TextAction';
+import { TextArea } from '../../components/ui/TextArea';
+import { TextLink } from '../../components/ui/TextLink';
 import { Modal, ModalActions } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { StatCard, StatCardGroup } from '../../components/ui/StatCard';
@@ -262,6 +267,31 @@ function ComponentsDemo() {
             <FieldLabel htmlFor="demo-path">Cookies file</FieldLabel>
             <Input id="demo-path" mono defaultValue="/config/cookies.txt" />
           </div>
+        </div>
+      </Story>
+
+      <Story
+        name="TextArea, FileButton, TextAction, TextLink, Steps"
+        note="TextArea: field look, mono for file contents · FileButton: a Button that opens the file picker · TextAction: Space Mono 12 underlined · TextLink: external link in running text · Steps: numbered instructions"
+      >
+        <div className="grid max-w-[504px] gap-4">
+          <TextArea mono rows={3} placeholder="# Netscape HTTP Cookie File" />
+          <Row>
+            <FileButton variant="outlined" accept=".txt" onFile={() => {}}>
+              Upload
+            </FileButton>
+            <TextAction onClick={() => {}}>How to export cookies</TextAction>
+          </Row>
+          <Steps>
+            <Step title="Install an exporter.">
+              Firefox:{' '}
+              <TextLink href="https://addons.mozilla.org/firefox/addon/cookies-txt/">
+                cookies.txt
+              </TextLink>
+              .
+            </Step>
+            <Step title="Export.">In Netscape format.</Step>
+          </Steps>
         </div>
       </Story>
 

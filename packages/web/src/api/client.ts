@@ -114,3 +114,26 @@ export async function apiDelete(path: string): Promise<void> {
   const response = await fetch(path, { method: 'DELETE', headers: { accept: 'application/json' } });
   if (!response.ok) throw new ApiError(response.status, await response.text());
 }
+
+/**
+ * PUT a plain-text body (a string or a picked `File`) and validate the JSON answer against its
+ * shared schema (the cookies file upload). Throws `ApiError` on non-2xx.
+ */
+export async function apiPutText<T>(
+  path: string,
+  body: string | Blob,
+  schema: z.ZodType<T>,
+): Promise<T> {
+  const response = await fetch(path, {
+    method: 'PUT',
+    headers: { accept: 'application/json', 'content-type': 'text/plain; charset=utf-8' },
+    body,
+  });
+  return parseResponse(response, schema);
+}
+
+/** DELETE a resource that answers with JSON, validated against its shared schema. */
+export async function apiDeleteJson<T>(path: string, schema: z.ZodType<T>): Promise<T> {
+  const response = await fetch(path, { method: 'DELETE', headers: { accept: 'application/json' } });
+  return parseResponse(response, schema);
+}
