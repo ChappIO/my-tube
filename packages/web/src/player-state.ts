@@ -75,6 +75,31 @@ export interface PlayerState {
   volume: number;
   /** Muted (M, the bar's button); the volume is kept for unmuting. */
   muted: boolean;
+  /**
+   * A session restored after a reload (`player-session.ts`): the engines load the item of this
+   * `load` paused at the store's position, then try to play once when it was playing. Stale as
+   * soon as `load` moves on.
+   */
+  resume: PlayerResume | null;
+}
+
+/** How the engines pick up a restored session (see `PlayerState.resume`). */
+export interface PlayerResume {
+  /** The `load` the restore belongs to. */
+  load: number;
+  /** It was playing when saved: try `play()` once the source is ready (a refusal stays paused). */
+  autoplay: boolean;
+}
+
+/** What a saved session restores (`player-session.ts`). */
+export interface PlayerSnapshot {
+  kind: PlayerKind;
+  queue: readonly PlayerItem[];
+  index: number;
+  pos: number;
+  from: string;
+  playing: boolean;
+  cardOpen: boolean;
 }
 
 /** Previous restarts the current item after this many seconds, else goes back one. */
@@ -139,6 +164,7 @@ const INITIAL: PlayerState = {
   seekRequest: 0,
   volume: 1,
   muted: false,
+  resume: null,
 };
 
 let state: PlayerState = { ...INITIAL, ...storedVolume() };
@@ -464,6 +490,35 @@ export function applyVolume(
 ): void {
   if (element.volume !== value.volume) element.volume = value.volume;
   if (element.muted !== value.muted) element.muted = value.muted;
+}
+
+/**
+ * Restores a saved session (a reload): the queue, index, position and card as they were, paused.
+ * One `load` bump makes the engines load the item once, at `pos` (`resume`), and try to play
+ * when it was playing; `seekRequest` stays, so nothing seeks or reloads twice.
+ */
+export function hydratePlayer(snapshot: PlayerSnapshot): void {
+  const item = snapshot.queue[snapshot.index];
+  if (!item) return;
+  const dur = item.dur;
+  const pos = Math.max(0, dur > 0 ? Math.min(snapshot.pos, dur) : snapshot.pos);
+  const load = state.load + 1;
+  set({
+    ...state,
+    player: {
+      kind: snapshot.kind,
+      queue: [...snapshot.queue],
+      index: snapshot.index,
+      playing: false,
+      pos,
+      from: snapshot.from,
+    },
+    cardOpen: snapshot.cardOpen,
+    buffering: false,
+    error: null,
+    load,
+    resume: { load, autoplay: snapshot.playing },
+  });
 }
 
 /** Back to the initial state (tests). */

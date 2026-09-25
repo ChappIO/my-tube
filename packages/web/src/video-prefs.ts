@@ -169,6 +169,16 @@ export function toggleTheater(): void {
   set({ theater: !state.theater });
 }
 
+/**
+ * A restored player session (`player-session.ts`): the track picked for the video that was
+ * playing before a reload. The stored preferences are untouched.
+ */
+export function restorePickedTrack(picked: PickedTrack | null): void {
+  if (picked === state.picked) return;
+  state = { ...state, picked };
+  for (const listener of listeners) listener();
+}
+
 /** Back to the defaults (tests). */
 export function resetVideoPrefs(): void {
   set({ ...DEFAULT_VIDEO_PREFS, picked: null });

@@ -16,6 +16,7 @@ import {
 } from '../../player-state';
 import { useVideoPrefs } from '../../video-prefs';
 import { PLAYBACK_ERROR } from './AudioEngine';
+import { resumeMedia } from './resume';
 import { setVideoMedia } from './video-surface';
 
 /** What the element plays for one load of one item. */
@@ -27,6 +28,8 @@ interface VideoSource {
   poster: string | null;
   /** Seconds before the source's start (a remux reloaded with `?t=`); 0 for a direct file. */
   offset: number;
+  /** A restored session's load: paused at the saved position, one play attempt (`resumeMedia`). */
+  resume?: { autoplay: boolean };
 }
 
 /**
@@ -80,6 +83,8 @@ export function VideoEngine() {
   const offsetRef = useRef(0);
   const changedAt = useRef(0);
   const speedRef = useRef(speed);
+  // Until a restore's seek is done the element's clock (0) is not the position.
+  const seekPending = useRef(false);
 
   // Create the element, report its events to the store while a video is the current item, and
   // hand it to the surfaces with the park as the fallback.
@@ -91,7 +96,9 @@ export function VideoEngine() {
       [
         'timeupdate',
         () => {
-          if (ours()) reportPosition(offsetRef.current + video.currentTime);
+          if (ours() && !seekPending.current) {
+            reportPosition(offsetRef.current + video.currentTime);
+          }
         },
       ],
       [
@@ -151,7 +158,14 @@ export function VideoEngine() {
           return;
         }
         if (playback.durationSeconds) reportDuration(playback.durationSeconds);
-        setLoaded({ id, load, url: videoPlayUrl(id), poster, offset: 0 });
+        // A restored session starts at the saved position: a remux streams from there (`?t=`),
+        // a direct file seeks once its metadata is in.
+        const state = playerState();
+        const resume =
+          state.resume?.load === load ? { autoplay: state.resume.autoplay } : undefined;
+        const pos = resume ? (state.player?.pos ?? 0) : 0;
+        const offset = resume && !playback.seekable && pos > 0 ? pos : 0;
+        setLoaded({ id, load, url: videoPlayUrl(id, offset), poster, offset, resume });
       },
       () => {
         if (!cancelled) reportError(PLAYBACK_ERROR);
@@ -169,23 +183,36 @@ export function VideoEngine() {
   useEffect(() => {
     sourceRef.current = source;
     const video = videoRef.current;
-    if (!video) return;
+    seekPending.current = false;
+    if (!video) return undefined;
     if (source === null) {
       if (video.getAttribute('src') !== null) {
         video.pause();
         video.removeAttribute('src');
         video.load();
       }
-      return;
+      return undefined;
     }
     offsetRef.current = source.offset;
     changedAt.current = performance.now();
     video.poster = source.poster ?? '';
+    video.preload = source.resume ? 'metadata' : 'auto';
     video.src = source.url;
     applyVolume(video, playerState());
     // The load resets the rate to the default one.
     video.defaultPlaybackRate = speedRef.current;
     video.playbackRate = speedRef.current;
+    if (!source.resume) return undefined;
+    // A direct file seeks to the saved position; a remux already starts there.
+    seekPending.current = source.offset === 0;
+    return resumeMedia(video, {
+      seekTo: () => (source.offset > 0 ? null : (playerState().player?.pos ?? null)),
+      autoplay: source.resume.autoplay,
+      current: () => sourceRef.current === source,
+      onReady: () => {
+        seekPending.current = false;
+      },
+    });
   }, [source]);
 
   useEffect(() => {
@@ -213,7 +240,9 @@ export function VideoEngine() {
     const pos = playerState().player?.pos ?? 0;
     if (!Number.isFinite(pos)) return;
     if (playback.seekable) video.currentTime = pos;
-    else setLoaded({ ...current, url: videoPlayUrl(current.id, pos), offset: pos });
+    else {
+      setLoaded({ ...current, url: videoPlayUrl(current.id, pos), offset: pos, resume: undefined });
+    }
   }, [seekRequest]);
 
   // The bar's volume and mute (shared with the audio engine).
