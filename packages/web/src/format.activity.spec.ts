@@ -3,7 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { summaryPollMs } from './api/activity';
 import {
   errorTail,
+  formatElapsed,
   formatSpeed,
+  jobAttempt,
+  jobDuration,
+  jobState,
+  jobTime,
   queueMeta,
   queuePercent,
   queueState,
@@ -140,5 +145,42 @@ describe('results and polling', () => {
     expect(summaryPollMs(undefined)).toBe(30_000);
     expect(summaryPollMs({ activeDownloads: 0, queued: 3 })).toBe(30_000);
     expect(summaryPollMs({ activeDownloads: 2, queued: 1 })).toBe(5_000);
+  });
+});
+
+describe('the log viewer header', () => {
+  it('shows the queue state, then done or cancelled', () => {
+    expect(jobState(job)).toEqual({ text: 'downloading 64%', tone: 'red' });
+    expect(jobState({ ...job, status: 'failed' })).toEqual({ text: 'failed', tone: 'red' });
+    expect(jobState({ ...job, status: 'done' })).toEqual({ text: 'done', tone: 'ok' });
+    expect(jobState({ ...job, status: 'cancelled' })).toEqual({ text: 'cancelled', tone: 'muted' });
+  });
+
+  it('counts the attempt that runs or ran', () => {
+    expect(jobAttempt(job)).toBe('1 of 3');
+    expect(jobAttempt({ ...job, status: 'queued', attempts: 1 })).toBe('2 of 3');
+    expect(jobAttempt({ ...job, status: 'failed', attempts: 3 })).toBe('3 of 3');
+    // A permanent failure on the first try.
+    expect(jobAttempt({ ...job, status: 'failed', attempts: 1 })).toBe('1 of 3');
+    expect(jobAttempt({ ...job, status: 'done', attempts: 0 })).toBe('1 of 3');
+  });
+
+  it('formats local times to the second and durations', () => {
+    const at = new Date(2026, 8, 5, 7, 3, 9).toISOString();
+    expect(jobTime(at)).toBe('2026-09-05 07:03:09');
+    expect(formatElapsed(0)).toBe('0s');
+    expect(formatElapsed(12_400)).toBe('12s');
+    expect(formatElapsed(187_000)).toBe('3m 07s');
+    expect(formatElapsed(3_840_000)).toBe('1h 04m');
+  });
+
+  it('measures a run from start to finish, or to now while running', () => {
+    const clock = Date.parse('2026-09-24T12:00:31.000Z');
+    expect(jobDuration(job, clock)).toBe('30s');
+    expect(jobDuration({ ...job, status: 'done', finishedAt: '2026-09-24T12:01:01.000Z' })).toBe(
+      '1m 00s',
+    );
+    expect(jobDuration({ ...job, status: 'queued', startedAt: null })).toBeNull();
+    expect(jobDuration({ ...job, status: 'cancelled', finishedAt: null })).toBeNull();
   });
 });

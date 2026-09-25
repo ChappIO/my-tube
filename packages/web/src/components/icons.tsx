@@ -19,9 +19,12 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  ChevronsDown,
+  Copy,
   Disc3,
   Ellipsis,
   ExternalLink,
+  FileDown,
   Film,
   House,
   ListMusic,
@@ -42,6 +45,7 @@ import {
   Users,
   Video,
   Wrench,
+  WrapText,
   X,
 } from 'lucide-react';
 import type { ReactElement, SVGProps } from 'react';
@@ -138,6 +142,18 @@ export const ICON_REGISTRY = {
     usedIn: 'Check now buttons (yt-dlp, Activity subscriptions check)',
   },
   MoreIcon: { base: Ellipsis, meaning: 'More actions menu', usedIn: 'row menus' },
+  CopyIcon: { base: Copy, meaning: 'Copy to the clipboard', usedIn: 'log viewer Copy' },
+  DownloadFileIcon: {
+    base: FileDown,
+    meaning: 'Save a file to this device',
+    usedIn: 'log viewer Download',
+  },
+  WrapIcon: { base: WrapText, meaning: 'Wrap long lines', usedIn: 'log viewer Wrap' },
+  AutoScrollIcon: {
+    base: ChevronsDown,
+    meaning: 'Follow the newest lines (auto-scroll)',
+    usedIn: 'log viewer Auto-scroll',
+  },
 
   // Direction.
   BackIcon: { base: ArrowLeft, meaning: 'Back to parent page', usedIn: 'BackLink ("← Video")' },
@@ -238,6 +254,14 @@ export const TrashIcon = icon('TrashIcon');
 export const UnlinkIcon = icon('UnlinkIcon');
 /** Checked / selected: CheckboxRow tick. */
 export const CheckIcon = icon('CheckIcon');
+/** Copy to the clipboard: log viewer Copy. */
+export const CopyIcon = icon('CopyIcon');
+/** Save a file to this device: log viewer Download. */
+export const DownloadFileIcon = icon('DownloadFileIcon');
+/** Wrap long lines: log viewer Wrap. */
+export const WrapIcon = icon('WrapIcon');
+/** Follow the newest lines (auto-scroll): log viewer Auto-scroll. */
+export const AutoScrollIcon = icon('AutoScrollIcon');
 /** Open on YouTube / external: external links. */
 export const ExternalLinkIcon = icon('ExternalLinkIcon');
 /** Check now / re-sync: Check now buttons (yt-dlp, Activity). */

@@ -112,3 +112,37 @@ export function usePreview(): {
   const target = useSyncExternalStore(subscribeUiState, previewTarget, () => null);
   return { target, openPreview, openTrackPreview, openEmptyPreview, closePreview };
 }
+
+let jobLog: number | null = null;
+
+/** The job whose log the log viewer shows, or null when it is closed. */
+export function jobLogTarget(): number | null {
+  return jobLog;
+}
+
+/** Opens the log viewer for a job (a queue row's or a history row's View log). */
+export function openJobLog(jobId: number): void {
+  if (jobLog === jobId) return;
+  jobLog = jobId;
+  notify();
+}
+
+/** Closes the log viewer. */
+export function closeJobLog(): void {
+  if (jobLog === null) return;
+  jobLog = null;
+  notify();
+}
+
+/**
+ * The log viewer. View log links call `openJobLog(jobId)`; `AppShell` renders `LogViewerModal`
+ * while `jobId` is set (keyed by it, so each opening starts fresh) and passes `closeJobLog`.
+ */
+export function useJobLogViewer(): {
+  jobId: number | null;
+  openJobLog: (jobId: number) => void;
+  closeJobLog: () => void;
+} {
+  const jobId = useSyncExternalStore(subscribeUiState, jobLogTarget, () => null);
+  return { jobId, openJobLog, closeJobLog };
+}

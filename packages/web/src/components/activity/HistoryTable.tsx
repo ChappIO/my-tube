@@ -1,6 +1,6 @@
 import type { HistoryEntry } from '@mytube/shared';
-import { jobLogUrl } from '../../api/activity';
 import { resultTone, whenLabel } from '../../format';
+import { openJobLog } from '../../ui-state';
 import { Meta } from '../ui/typography';
 import { ActivityLink } from './ActivityLink';
 
@@ -15,7 +15,7 @@ export interface HistoryTableProps {
  * (when, title, kind chip, result) with gap 16 and 12px 16px padding; below 760px `1fr auto`
  * with when and kind hidden. `when` groups by day (`Today 08:12`, `Yesterday 21:40`,
  * `3 days ago`). Results: `done`, `updated`, `installed` green, `failed` red, the rest muted.
- * Rows written by a job get a View log link (for troubleshooting);
+ * Rows written by a job get View log, which opens the log viewer (`openJobLog`);
  * `details` (the file path or the error) is the row's tooltip.
  */
 export function HistoryTable({ entries, now = new Date() }: HistoryTableProps) {
@@ -36,14 +36,18 @@ export function HistoryTable({ entries, now = new Date() }: HistoryTableProps) {
           </span>
           <span className="flex items-baseline justify-end gap-3 whitespace-nowrap">
             <Meta tone={resultTone(entry.result)}>{entry.result}</Meta>
-            {entry.jobId !== null && (
-              <ActivityLink href={jobLogUrl(entry.jobId)} label={`View log of ${entry.title}`}>
-                View log
-              </ActivityLink>
-            )}
+            {entry.jobId !== null && <ViewLog jobId={entry.jobId} title={entry.title} />}
           </span>
         </li>
       ))}
     </ul>
+  );
+}
+
+function ViewLog({ jobId, title }: { jobId: number; title: string }) {
+  return (
+    <ActivityLink onClick={() => openJobLog(jobId)} label={`View log of ${title}`}>
+      View log
+    </ActivityLink>
   );
 }

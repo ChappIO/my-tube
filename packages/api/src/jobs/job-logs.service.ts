@@ -9,14 +9,28 @@ import {
   writeSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { AppConfig } from '../config/app-config.js';
 import type { JobRow } from './job-runner.js';
+import { JOBS_CLOCK, type Clock } from './jobs.service.js';
 
 /** How many job logs are kept; older ones are removed after each job. */
 export const JOB_LOGS_KEPT = 200;
 /** Longer lines (yt-dlp's metadata JSON is one line) are cut, with a note of what was left out. */
 export const JOB_LOG_MAX_LINE = 64 * 1024;
+
+const pad = (n: number, width = 2) => String(n).padStart(width, '0');
+
+/**
+ * The prefix of every job log line after the header: the wall-clock time in the server's local
+ * time zone (`TZ` in the container), fixed width, so the lines line up: `HH:MM:SS.mmm `.
+ */
+export function logTimestamp(at: Date): string {
+  return (
+    `${pad(at.getHours())}:${pad(at.getMinutes())}:${pad(at.getSeconds())}.` +
+    `${pad(at.getMilliseconds(), 3)} `
+  );
+}
 
 /**
  * One open job log. `line` appends synchronously, so lines land in order and survive a crash;
@@ -32,15 +46,20 @@ export interface JobLog {
 /**
  * The per-job logs in `CONFIG_DIR/logs/jobs/<job id>.log`: the full output of every yt-dlp run a
  * job makes, line by line as it happens, so a failed download can be troubleshot. Each attempt
- * appends a header; retries of one job share its file. The newest `JOB_LOGS_KEPT` files are kept.
+ * appends a header (full ISO date); every other line starts with `logTimestamp` (`HH:MM:SS.mmm `,
+ * local time). Retries of one job share its file. The newest `JOB_LOGS_KEPT` files are kept.
  */
 @Injectable()
 export class JobLogsService {
   private readonly logger = new Logger('JobLogs');
   readonly dir: string;
 
-  constructor(config: AppConfig) {
+  private readonly now: Clock;
+
+  /** Lines are stamped with the jobs clock (`JOBS_CLOCK`, a test seam), else the wall clock. */
+  constructor(config: AppConfig, @Optional() @Inject(JOBS_CLOCK) clock?: Clock) {
     this.dir = join(config.configDir, 'logs', 'jobs');
+    this.now = clock ?? (() => new Date());
   }
 
   path(jobId: number): string {
@@ -71,11 +90,11 @@ export class JobLogsService {
     };
     write(
       `=== ${job.type} job ${job.id} · attempt ${job.attempts + 1} of ${job.maxAttempts} · ` +
-        `${new Date().toISOString()} · ${job.payload.title}`,
+        `${this.now().toISOString()} · ${job.payload.title}`,
     );
     return {
       path,
-      line: (text) => write(clip(text)),
+      line: (text) => write(logTimestamp(this.now()) + clip(text)),
       close: () => {
         if (fd === null) return;
         try {

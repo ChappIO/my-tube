@@ -6,39 +6,24 @@ const linkClass = cx(
   focusRing,
 );
 
-export type ActivityLinkProps =
-  | { href: string; onClick?: never; disabled?: never; children: ReactNode; label?: string }
-  | {
-      href?: never;
-      onClick: () => void;
-      disabled?: boolean;
-      /** For a toggle ("View log"): whether what it shows is open. */
-      expanded?: boolean;
-      children: ReactNode;
-      label?: string;
-    };
+export interface ActivityLinkProps {
+  onClick: () => void;
+  disabled?: boolean;
+  children: ReactNode;
+  /** The accessible name when the text alone is ambiguous ("View log of <title>"). */
+  label?: string;
+}
 
 /**
- * A small text action in the Activity screen ("Retry", "View log"): Space Mono 12, underlined.
- * With `href` it opens the target in a new tab (logs are plain text the browser shows);
- * otherwise it is a button. `label` is the accessible name when the text alone is ambiguous.
+ * A small text action in the Activity screen ("Retry", "View log"): a button in Space Mono 12,
+ * underlined.
  */
-export function ActivityLink(props: ActivityLinkProps) {
-  const { href, onClick, disabled, children, label } = props;
-  const expanded = props.href === undefined ? props.expanded : undefined;
-  if (href !== undefined) {
-    return (
-      <a href={href} target="_blank" rel="noreferrer" aria-label={label} className={linkClass}>
-        {children}
-      </a>
-    );
-  }
+export function ActivityLink({ onClick, disabled, children, label }: ActivityLinkProps) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      aria-expanded={expanded}
       aria-label={label}
       className={linkClass}
     >

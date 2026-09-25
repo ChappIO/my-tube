@@ -193,7 +193,7 @@ function ComponentsDemo() {
 
       <Story
         name="Button"
-        note="primary, secondary, outlined × md, lg · xl full width (sidebar Add) · optional leading icon"
+        note="primary, secondary, outlined × md, lg · xl full width (sidebar Add) · optional leading icon · outlined toggle with pressed (log viewer Wrap, Auto-scroll)"
       >
         <div className="grid gap-4">
           <Row>
@@ -205,6 +205,12 @@ function ComponentsDemo() {
             </Button>
             <Button variant="outlined" disabled>
               Disabled
+            </Button>
+            <Button variant="outlined" pressed={false}>
+              Wrap
+            </Button>
+            <Button variant="outlined" pressed>
+              Auto-scroll
             </Button>
           </Row>
           <Row>

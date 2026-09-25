@@ -84,8 +84,23 @@ describe('Activity (e2e)', () => {
 
     const log = await request(server()).get(`/api/jobs/${done.jobId}/log`).expect(200);
     expect(log.headers['content-type']).toMatch(/^text\/plain/);
+    expect(log.headers['content-disposition']).toBe(`inline; filename="job-${done.jobId}.log"`);
     expect(log.text).toMatch(/^=== download job \d+ · attempt 1 of 3/);
-    expect(log.text).toContain('$ ');
+    expect(log.text).toMatch(/^\d\d:\d\d:\d\d\.\d{3} \$ /m);
+
+    const download = await request(server())
+      .get(`/api/jobs/${done.jobId}/log?download=1`)
+      .expect(200);
+    expect(download.headers['content-disposition']).toBe(
+      `attachment; filename="job-${done.jobId}.log"`,
+    );
+    expect(download.text).toBe(log.text);
+
+    const job = Job.parse(
+      (await request(server()).get(`/api/jobs/${done.jobId}`).expect(200)).body,
+    );
+    expect(job).toMatchObject({ id: done.jobId, type: 'download', status: 'done', attempts: 0 });
+    expect(job.finishedAt).not.toBeNull();
 
     const checked = Source.parse(
       (await request(server()).get(`/api/sources/${source.id}`).expect(200)).body,
@@ -129,6 +144,8 @@ describe('Activity (e2e)', () => {
     await request(server()).post('/api/jobs/9999/cancel').expect(404);
     await request(server()).post('/api/jobs/9999/retry').expect(404);
     await request(server()).get('/api/jobs/9999/log').expect(404);
+    await request(server()).get('/api/jobs/9999').expect(404);
+    await request(server()).get('/api/jobs/nope').expect(400);
   });
 
   it('POST /api/sources/:id/check and /api/sync/check-all enqueue checks', async () => {

@@ -16,6 +16,11 @@ export interface ButtonProps extends Omit<ComponentProps<'button'>, 'children'> 
   icon?: ReactNode;
   /** Stretch to the container width (sidebar "Add to library", with `size="xl"`). */
   fullWidth?: boolean;
+  /**
+   * Makes the button a toggle (`aria-pressed`): pressed outlined buttons get an `ink` border,
+   * like the active sort pill (the log viewer's Wrap and Auto-scroll).
+   */
+  pressed?: boolean;
   children: ReactNode;
 }
 
@@ -24,6 +29,9 @@ const variants: Record<ButtonVariant, string> = {
   secondary: 'bg-surface text-ink border-surface',
   outlined: 'bg-transparent text-ink border-line hover:bg-surface',
 };
+
+// A pressed outlined toggle: the active sort pill's `ink` border.
+const pressedOutlined = 'bg-transparent text-ink border-ink hover:bg-surface';
 
 // Padding includes the 1px border every variant carries, so all three line up.
 const sizes: Record<ButtonSize, string> = {
@@ -38,6 +46,7 @@ export function Button({
   size = 'md',
   icon,
   fullWidth,
+  pressed,
   type = 'button',
   className,
   children,
@@ -53,13 +62,14 @@ export function Button({
         'inline-flex cursor-pointer items-center justify-center gap-2 rounded-pill border font-sans whitespace-nowrap disabled:cursor-default disabled:opacity-50',
         minHit,
         focusRing,
-        variants[variant],
+        pressed && variant === 'outlined' ? pressedOutlined : variants[variant],
         sizes[size],
         heavy && 'px-[19px]',
         heavy || size === 'xl' ? 'font-bold' : 'font-semibold',
         fullWidth && 'w-full',
         className,
       )}
+      aria-pressed={pressed}
       {...props}
     >
       {icon}

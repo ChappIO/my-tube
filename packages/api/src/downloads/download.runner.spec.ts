@@ -167,12 +167,20 @@ describe('DownloadRunner (fake binary)', () => {
     expect(after('--convert-thumbnails')).toBe('jpg');
     expect(after('-o')).toBe(join(config.videoDir, 'NASA/What It Takes (2026-09-04).%(ext)s'));
 
-    // The job log has both yt-dlp runs, command lines first.
+    // The job log has both yt-dlp runs, command lines first, every line after the header stamped.
     const log = readFileSync(logs.path(job.id), 'utf8');
     expect(log).toMatch(/^=== download job 1 · attempt 1 of 3 /);
-    expect(log.match(/^\$ /gm)).toHaveLength(2);
+    expect(log.match(/^\d\d:\d\d:\d\d\.\d{3} \$ /gm)).toHaveLength(2);
+    expect(
+      log
+        .split('\n')
+        .slice(1, -1)
+        .every((line) => /^\d\d:\d\d:\d\d\.\d{3} /.test(line)),
+    ).toBe(true);
     // The metadata call resolves the same format selector as the download.
-    expect(log).toMatch(/^\$ .* --dump-single-json .* -f bestvideo\+bestaudio\/best -- /m);
+    expect(log).toMatch(
+      /^[\d:.]{12} \$ .* --dump-single-json .* -f bestvideo\+bestaudio\/best -- /m,
+    );
     expect(log).toContain('[mytube-progress]');
     expect(log).toContain(`saved ${path} (10 bytes)`);
   });
