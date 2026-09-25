@@ -42,6 +42,8 @@ import {
   Unlink,
   Users,
   Video,
+  Volume2,
+  VolumeX,
   Wrench,
   WrapText,
   X,
@@ -137,7 +139,11 @@ export const ICON_REGISTRY = {
     usedIn: 'rule builder "+ group"',
   },
   SearchIcon: { base: Search, meaning: 'Search', usedIn: 'search inputs (demo only so far)' },
-  TrashIcon: { base: Trash2, meaning: 'Delete files', usedIn: 'explicit delete actions' },
+  TrashIcon: {
+    base: Trash2,
+    meaning: 'Delete files',
+    usedIn: 'explicit delete actions (demo only since video Preview went)',
+  },
   UnlinkIcon: {
     base: Unlink,
     meaning: 'Remove a source from the library (files stay)',
@@ -172,7 +178,7 @@ export const ICON_REGISTRY = {
   PlayIcon: {
     base: ownGlyph('M8 5v14l11-7z'),
     meaning: 'Play',
-    usedIn: 'player bar, album page Play, artist page Play all, video Preview play circle',
+    usedIn: 'player bar, album page Play, artist page Play all, paused video (card, frame)',
   },
   PauseIcon: {
     base: ownGlyph('M6 5h4v14H6zM14 5h4v14h-4z'),
@@ -188,6 +194,18 @@ export const ICON_REGISTRY = {
     base: ownGlyph('M16 6h2v12h-2zM6 18l8.5-6L6 6z'),
     meaning: 'Next item in the player queue',
     usedIn: 'player bar, floating card Up next',
+  },
+
+  // The player's volume (the bar's mute button).
+  VolumeIcon: {
+    base: Volume2,
+    meaning: 'Sound on (mute it)',
+    usedIn: 'player bar mute button, while sound plays',
+  },
+  MutedIcon: {
+    base: VolumeX,
+    meaning: 'Muted (unmute)',
+    usedIn: 'player bar mute button, while muted or at volume 0',
   },
 
   // Direction.
@@ -304,7 +322,7 @@ export const AddConditionIcon = icon('AddConditionIcon');
 export const AddGroupIcon = icon('AddGroupIcon');
 /** Search: search inputs. */
 export const SearchIcon = icon('SearchIcon');
-/** Delete files: explicit delete actions. */
+/** Delete files: explicit delete actions (demo only). */
 export const TrashIcon = icon('TrashIcon');
 /** Remove a source from the library (files stay): channel page "Remove from library". */
 export const UnlinkIcon = icon('UnlinkIcon');
@@ -325,7 +343,7 @@ export const RefreshIcon = icon('RefreshIcon');
 /** More actions menu: row menus. */
 export const MoreIcon = icon('MoreIcon');
 
-/** Play: player bar, album page Play, artist page Play all, video Preview. Own filled path. */
+/** Play: player bar, album page Play, artist page Play all, paused video. Own filled path. */
 export const PlayIcon = icon('PlayIcon');
 /** Pause: player bar. Own filled path. */
 export const PauseIcon = icon('PauseIcon');
@@ -333,6 +351,11 @@ export const PauseIcon = icon('PauseIcon');
 export const PreviousIcon = icon('PreviousIcon');
 /** Next item in the player queue: player bar, floating card Up next. Own filled path. */
 export const NextIcon = icon('NextIcon');
+
+/** Sound on (mute it): the player bar's mute button while sound plays. */
+export const VolumeIcon = icon('VolumeIcon');
+/** Muted (unmute): the player bar's mute button while muted or at volume 0. */
+export const MutedIcon = icon('MutedIcon');
 
 /** Back to parent page: BackLink ("← Video"). */
 export const BackIcon = icon('BackIcon');

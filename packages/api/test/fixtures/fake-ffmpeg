@@ -1,0 +1,45 @@
+#!/usr/bin/env node
+// A stand-in for ffmpeg in tests. Point FFMPEG_PATH at this file. It mimics the two things the
+// player asks of ffmpeg:
+//
+//   ... -f mp4 pipe:1          the remux: writes `FMP4 <argv as JSON>` to stdout and exits
+//   ... -f webvtt <output>     a subtitle extraction: writes a one-cue WebVTT to <output> whose
+//                              text names the input file and the `-map` argument
+//
+// Environment:
+//   FAKE_FFMPEG_ARGS_FILE=<path>  append the received argv as one JSON line per run
+//   FAKE_FFMPEG_HOLD=1            the remux keeps the pipe open after the first chunk (until killed)
+//   FAKE_FFMPEG_PID_FILE=<path>   write the process id there (to check it was killed)
+//   FAKE_FFMPEG_FAIL=1            print an error line to stderr and exit 1 without output
+import { appendFileSync, writeFileSync } from 'node:fs';
+import { basename } from 'node:path';
+
+const args = process.argv.slice(2);
+const env = process.env;
+if (env.FAKE_FFMPEG_ARGS_FILE) appendFileSync(env.FAKE_FFMPEG_ARGS_FILE, `${JSON.stringify(args)}\n`);
+if (env.FAKE_FFMPEG_PID_FILE) writeFileSync(env.FAKE_FFMPEG_PID_FILE, String(process.pid));
+
+const option = (name) => {
+  const index = args.indexOf(name);
+  return index === -1 ? undefined : args[index + 1];
+};
+
+if (env.FAKE_FFMPEG_FAIL) {
+  process.stderr.write(`${option('-i')}: Invalid data found when processing input\n`);
+  process.exit(1);
+}
+
+const output = args.at(-1);
+if (output === 'pipe:1') {
+  process.stdout.write(`FMP4 ${JSON.stringify(args)}`);
+  if (env.FAKE_FFMPEG_HOLD) {
+    // Keep writing until the reader goes away and the parent kills us.
+    setInterval(() => process.stdout.write('.'), 50);
+  }
+} else if (output) {
+  const map = option('-map') ?? 'only stream';
+  writeFileSync(
+    output,
+    `WEBVTT\n\n00:00:01.000 --> 00:00:02.500\n${basename(option('-i') ?? '')} ${map}\n`,
+  );
+}

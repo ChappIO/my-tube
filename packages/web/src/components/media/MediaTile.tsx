@@ -20,7 +20,7 @@ export interface MediaTileProps {
   when?: string;
   /** Plain secondary line for tiles without a channel, for example `Carole King · 12 tracks`. */
   subtitle?: string;
-  /** Opens the item (Preview). */
+  /** Opens the item (plays it). */
   onOpen?: () => void;
   /** Opens the channel page. Does not open the tile. */
   onOpenChannel?: () => void;

@@ -389,7 +389,7 @@ describe('nextStatus', () => {
       status: 'skipped',
       skipReason: 'unavailable',
     });
-    // A file deleted in Preview is never downloaded again by a check.
+    // A file the user deleted (Preview's former Delete file) is never downloaded again.
     expect(nextStatus('skipped', 'deleted_by_user', accept)).toEqual({
       status: 'skipped',
       skipReason: 'deleted_by_user',

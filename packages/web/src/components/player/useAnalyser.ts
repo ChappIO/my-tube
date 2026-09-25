@@ -2,7 +2,10 @@ import type { FrameInput } from './visualizer';
 
 /*
  * The visualizer's audio graph: `<audio>` → `MediaElementAudioSourceNode` → `AnalyserNode` →
- * destination, built once for the app's one `<audio>` element (`AudioEngine`).
+ * `GainNode` → destination, built once for the app's one `<audio>` element (`AudioEngine`). The
+ * analyser reads the full signal: the player's volume and mute are the gain after it
+ * (`setOutputVolume`), while the element itself stays at full volume (Thomas's request: turning
+ * the sound down must not flatten the bars).
  *
  * Once an element feeds a source node its sound only reaches the speakers through the context,
  * so the graph is built lazily, only while the page has a user activation (the click that starts
@@ -19,6 +22,7 @@ export const ANALYSER_SMOOTHING = 0.6;
 interface Graph {
   context: AudioContext;
   analyser: AnalyserNode;
+  gain: GainNode;
   element: HTMLMediaElement;
   reader: NonNullable<FrameInput['analyser']>;
 }
@@ -55,18 +59,44 @@ export function connectAnalyser(element: HTMLMediaElement): void {
     const analyser = context.createAnalyser();
     analyser.fftSize = ANALYSER_FFT_SIZE;
     analyser.smoothingTimeConstant = ANALYSER_SMOOTHING;
+    const gain = context.createGain();
     source.connect(analyser);
-    analyser.connect(context.destination);
+    analyser.connect(gain);
+    gain.connect(context.destination);
     const reader = {
       read: (out: Uint8Array<ArrayBuffer>) => analyser.getByteFrequencyData(out),
       binCount: analyser.frequencyBinCount,
       sampleRate: context.sampleRate,
     };
-    graph = { context, analyser, element, reader };
+    graph = { context, analyser, gain, element, reader };
     if (context.state === 'suspended') context.resume().catch(() => undefined);
   } catch {
     unavailable = true;
   }
+}
+
+/** How quickly the gain follows a new level (s): fast, but without a click. */
+export const GAIN_TIME_CONSTANT = 0.015;
+
+/** Whether `element` plays through the graph (its volume is then the gain node's). */
+export function analyserConnected(element: HTMLMediaElement): boolean {
+  return graph !== null && graph.element === element;
+}
+
+/** Sets the graph's output level (0 when muted), gliding to it; nothing without a graph. */
+export function setOutputVolume(volume: number, muted: boolean): void {
+  if (!graph) return;
+  try {
+    const target = muted ? 0 : volume;
+    graph.gain.gain.setTargetAtTime(target, graph.context.currentTime, GAIN_TIME_CONSTANT);
+  } catch {
+    // A closed context: the element is silent anyway.
+  }
+}
+
+/** The graph's gain as it is now (the browser check), or null without a graph. */
+export function outputGain(): number | null {
+  return graph ? graph.gain.gain.value : null;
 }
 
 /** The analyser as the visualizer reads it, or null while there is none. */

@@ -22,16 +22,14 @@
   --color-white: #ffffff;
   /*
    * Modal overlays: the light-theme ink at fixed opacity, the same in both themes
-   * `scrim` for Add to library and confirmations, `scrim-strong` for Preview.
+   * (Add to library, confirmations, the log viewer).
    */
   --color-scrim: rgba(21, 22, 24, 0.45);
-  --color-scrim-strong: rgba(21, 22, 24, 0.7);
   /*
-   * The Preview player: the black 16/9 area and its translucent white play
-   * circle. Picture content, the same in both themes (`player` is also the Now Playing panel).
+   * Behind pictures: the Now Playing panel (music) and player frame (video). Picture content,
+   * the same in both themes.
    */
   --color-player: #0f1012;
-  --color-player-glyph: rgba(255, 255, 255, 0.12);
   /*
    * The in-app player (frontend skill "Player"). The bar is red with white glyphs; these are
    * its translucent whites, the floating card's near-black box and the fades over art. Picture
@@ -45,6 +43,15 @@
   --color-player-dismiss: rgba(21, 22, 24, 0.55);
   --color-player-fade: rgba(15, 16, 18, 0.9);
   --color-player-fade-panel: rgba(15, 16, 18, 0.85);
+  /*
+   * The video player: the card's paused overlay, Now Playing's paused circle and progress
+   * track, and the caption boxes (card line, frame subtitles with the background on).
+   */
+  --color-player-paused: rgba(15, 16, 18, 0.6);
+  --color-player-frame-glyph: rgba(255, 255, 255, 0.14);
+  --color-player-frame-track: rgba(255, 255, 255, 0.25);
+  --color-player-caption: rgba(0, 0, 0, 0.7);
+  --color-player-subtitle: rgba(0, 0, 0, 0.72);
 
   --font-sans:
     'Archivo Variable', 'Archivo', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
@@ -63,13 +70,16 @@
 
   --shadow-tile: 0 12px 28px -12px rgba(0, 0, 0, 0.35);
   --shadow-modal: 0 40px 80px -30px rgba(0, 0, 0, 0.5);
-  --shadow-preview: 0 40px 80px -30px rgba(0, 0, 0, 0.6);
   /* The player: the red bar, the floating card, the bar's 56px art, the Now Playing cover. */
   --shadow-player-bar:
     0 24px 48px -20px rgba(234, 51, 62, 0.55), 0 8px 20px -10px rgba(0, 0, 0, 0.4);
   --shadow-player-card: 0 30px 60px -24px rgba(0, 0, 0, 0.55);
   --shadow-player-art: 0 8px 18px -8px rgba(0, 0, 0, 0.5);
   --shadow-player-cover: 0 12px 24px -12px rgba(0, 0, 0, 0.6);
+  /* Now Playing's control strip dropdowns (captions, subtitle style). */
+  --shadow-popover: 0 24px 48px -20px rgba(0, 0, 0, 0.35);
+  /* Subtitles with the background off: legible on any picture. */
+  --text-shadow-subtitle: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 8px rgba(0, 0, 0, 0.7);
 
   /* The single responsive breakpoint: narrow below, wide at and above. */
   --breakpoint-wide: 760px;
@@ -156,6 +166,42 @@
   }
 }
 
+/*
+ * The video player's controls (Now Playing's control strip and its menus): the ring for keyboard
+ * users only. Chromium also matches :focus-visible on a clicked button once a key is pressed
+ * (a global shortcut such as Space or C), so the ring is dropped while the last input was a
+ * pointer (`data-input="pointer"` on the root, set by `useInputModality`; Tab sets `keyboard`).
+ */
+@utility focus-ring-visible {
+  &:focus-visible {
+    outline: 2px solid var(--color-red);
+    outline-offset: 2px;
+  }
+  :root[data-input='pointer'] &:focus-visible {
+    outline: none;
+  }
+}
+
+@utility focus-ring-visible-inset {
+  &:focus-visible {
+    outline: 2px solid var(--color-red);
+    outline-offset: -2px;
+  }
+  :root[data-input='pointer'] &:focus-visible {
+    outline: none;
+  }
+}
+
+/*
+ * No ring at all: the Now Playing video frame (a large picture; Space plays and pauses) and its
+ * scrubber (focus shows as the grown line and the knob instead).
+ */
+@utility focus-ring-none {
+  &:focus-visible {
+    outline: none;
+  }
+}
+
 @utility focus-ring-overlay {
   &:has([data-overlay]:focus-visible) {
     outline: 2px solid var(--color-red);
@@ -207,6 +253,16 @@
 @keyframes player-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* The Now Playing frame's scrubber growing from 4px to 8px on hover. */
+@utility motion-scrub {
+  transition-property: height;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
   }
 }
 

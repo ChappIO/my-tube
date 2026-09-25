@@ -9,16 +9,12 @@ import { ModalTitle } from './typography';
 interface ModalBaseProps {
   open: boolean;
   onClose: () => void;
-  /** `default` scrim at 0.45 (Add to library), `strong` at 0.7 with the preview shadow (Preview). */
-  dim?: 'default' | 'strong';
   /** CSS width of the dialog. Default `min(560px, 100%)`. */
   width?: string;
-  /** CSS max height of the dialog (Preview: `calc(100vh - 48px)`). None by default. */
-  maxHeight?: string;
   /**
    * `large` (the log viewer): `min(1100px, 100vw - 32px)` by `min(85vh, 900px)` on wide screens,
-   * the whole screen below 760px, a flex column the children fill. Ignores `width` and
-   * `maxHeight`. Default `default`.
+   * the whole screen below 760px, a flex column the children fill. Ignores `width`. Default
+   * `default`.
    */
   size?: 'default' | 'large';
   children: ReactNode;
@@ -32,7 +28,7 @@ interface ModalWithTitle extends ModalBaseProps {
 
 interface ModalWithoutTitle extends ModalBaseProps {
   /**
-   * No title: the header-less variant (Preview). No title row, no close button and no
+   * No title: the header-less variant (the log viewer). No title row, no close button and no
    * padding; the children lay out the whole dialog. `aria-label` names it instead.
    */
   title?: undefined;
@@ -40,11 +36,6 @@ interface ModalWithoutTitle extends ModalBaseProps {
 }
 
 export type ModalProps = ModalWithTitle | ModalWithoutTitle;
-
-const scrims = {
-  default: 'bg-scrim',
-  strong: 'bg-scrim-strong',
-} as const;
 
 // Open modals, top-most last. Only the top one reacts to Escape and Tab, so a nested dialog
 // closes (and traps focus) before the one below it.
@@ -58,7 +49,7 @@ export function hasOpenModal(): boolean {
 /**
  * Modal frame: scrim overlay and a centered dialog (radius 18, modal shadow). With a `title`
  * it has padding 28, gap 22 and a title row with a round close button; without one it is a
- * bare frame for the Preview player. Closes on overlay click and Escape (top-most modal
+ * bare frame the children lay out (the log viewer). Closes on overlay click and Escape (top-most modal
  * only), locks page scroll, moves focus into the dialog, keeps Tab inside it and restores
  * focus on close.
  */
@@ -66,9 +57,7 @@ export function Modal({
   open,
   onClose,
   title,
-  dim = 'default',
   width = 'min(560px, 100%)',
-  maxHeight,
   size = 'default',
   children,
   'aria-label': ariaLabel,
@@ -117,7 +106,7 @@ export function Modal({
       className={cx(
         'fixed inset-0 z-10 grid place-items-center overflow-y-auto',
         large ? 'p-0 wide:p-4' : 'p-6',
-        scrims[dim],
+        'bg-scrim',
       )}
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
@@ -135,10 +124,10 @@ export function Modal({
           large
             ? 'flex h-dvh w-full flex-col wide:h-[min(85vh,900px)] wide:w-[min(1100px,100%)] wide:rounded-modal'
             : 'rounded-modal',
-          dim === 'strong' ? 'shadow-preview' : 'shadow-modal',
+          'shadow-modal',
           headed ? 'grid gap-[22px] p-7' : 'overflow-hidden',
         )}
-        style={large ? undefined : { width, maxHeight }}
+        style={large ? undefined : { width }}
       >
         {headed && (
           <div className="flex items-center justify-between gap-4">

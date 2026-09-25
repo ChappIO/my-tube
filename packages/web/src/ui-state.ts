@@ -46,54 +46,6 @@ export function useAddModal(): { open: boolean; openAdd: () => void; closeAdd: (
   return { open, openAdd, closeAdd };
 }
 
-/**
- * What Preview shows: a video. Music plays in the player instead (`player-state.ts`); video tiles
- * keep Preview until the video player replaces it.
- */
-export type PreviewTarget = { kind: 'video'; id: number };
-
-let preview: PreviewTarget | null = null;
-
-function setPreview(next: PreviewTarget | null): void {
-  if (preview?.id === next?.id) return;
-  preview = next;
-  notify();
-}
-
-/** What Preview shows, or null when it is closed. */
-export function previewTarget(): PreviewTarget | null {
-  return preview;
-}
-
-/** A stable key per target, so `AppShell` remounts Preview for each new one. */
-export function previewKey(target: PreviewTarget): string {
-  return `${target.kind}:${target.id}`;
-}
-
-/** Opens Preview for a video (a video tile click). */
-export function openPreview(videoId: number): void {
-  setPreview({ kind: 'video', id: videoId });
-}
-
-/** Closes Preview. */
-export function closePreview(): void {
-  setPreview(null);
-}
-
-/**
- * The Preview modal. Video tiles call `openPreview(videoId)`; `AppShell` renders `PreviewModal`
- * while `target` is set (keyed by `previewKey`, so each opening starts at the poster) and passes
- * `closePreview`.
- */
-export function usePreview(): {
-  target: PreviewTarget | null;
-  openPreview: (videoId: number) => void;
-  closePreview: () => void;
-} {
-  const target = useSyncExternalStore(subscribeUiState, previewTarget, () => null);
-  return { target, openPreview, closePreview };
-}
-
 let jobLog: number | null = null;
 
 /** The job whose log the log viewer shows, or null when it is closed. */

@@ -6,8 +6,9 @@ import { useSyncExternalStore } from 'react';
  * `appendToQueue`; the bar calls the transport actions; `AudioEngine` (the one `<audio>` element,
  * mounted once in the shell) follows the store and reports the position back.
  *
- * Music and video never share a queue: starting either replaces whatever plays. Slice A plays
- * music; `kind: 'video'` is part of the model for the video player that follows.
+ * Music and video never share a queue: starting either replaces whatever plays. `AudioEngine`
+ * plays music items and `VideoEngine` video items; each lets go of its element when the other
+ * kind plays.
  */
 
 export type PlayerKind = 'music' | 'video';
@@ -26,6 +27,10 @@ export interface PlayerItem {
   albumId?: number;
   /** Video: the relative upload date. */
   when?: string;
+  /** Video: the channel page's id (its source), for the channel link in Now Playing. */
+  channelPageId?: number;
+  /** Video: the file's container (`mp4`, `mkv`), for Now Playing's meta line. */
+  container?: string;
   /** Seconds; 0 when unknown (the element's duration replaces it once loaded). */
   dur: number;
   /** The cover or thumbnail, null without art. */
@@ -64,6 +69,10 @@ export interface PlayerState {
   load: number;
   /** Bumps on every seek the element must follow (the scrubber, ±10 s, prev's restart). */
   seekRequest: number;
+  /** The volume of both engines, 0 to 1 (kept while muted). */
+  volume: number;
+  /** Muted (M, the bar's button); the volume is kept for unmuting. */
+  muted: boolean;
 }
 
 /** Previous restarts the current item after this many seconds, else goes back one. */
@@ -74,6 +83,48 @@ export const SEEK_STEP_SECONDS = 10;
 export const ERROR_SKIP_MS = 2000;
 /** The suffix `from` gets once something was added to the queue. */
 export const APPENDED_SUFFIX = ' +';
+/** The volume step of ↑ ↓ and of the slider's ← →. */
+export const VOLUME_STEP = 0.05;
+/** Where this browser keeps the volume and mute (a per-viewer convenience). */
+export const VOLUME_STORAGE_KEY = 'mytube.player.volume';
+
+/** The volume clamped to 0..1 (and rounded to 1/1000, so steps of 5 % stay exact). */
+export function clampVolume(volume: number): number {
+  if (!Number.isFinite(volume)) return 1;
+  return Math.round(Math.min(1, Math.max(0, volume)) * 1000) / 1000;
+}
+
+/** The stored volume and mute, or the defaults (full, not muted) for anything unreadable. */
+export function readVolume(raw: string | null | undefined): { volume: number; muted: boolean } {
+  try {
+    const stored: unknown = raw ? JSON.parse(raw) : null;
+    if (typeof stored !== 'object' || stored === null) return { volume: 1, muted: false };
+    const volume = 'volume' in stored ? stored.volume : undefined;
+    const muted = 'muted' in stored ? stored.muted : undefined;
+    return {
+      volume: typeof volume === 'number' ? clampVolume(volume) : 1,
+      muted: muted === true,
+    };
+  } catch {
+    return { volume: 1, muted: false };
+  }
+}
+
+function storedVolume(): { volume: number; muted: boolean } {
+  try {
+    return readVolume(globalThis.localStorage?.getItem(VOLUME_STORAGE_KEY));
+  } catch {
+    return { volume: 1, muted: false };
+  }
+}
+
+function saveVolume(volume: number, muted: boolean): void {
+  try {
+    globalThis.localStorage?.setItem(VOLUME_STORAGE_KEY, JSON.stringify({ volume, muted }));
+  } catch {
+    // No storage (a private window): the level lasts for the session.
+  }
+}
 
 const INITIAL: PlayerState = {
   player: null,
@@ -83,9 +134,13 @@ const INITIAL: PlayerState = {
   error: null,
   load: 0,
   seekRequest: 0,
+  volume: 1,
+  muted: false,
 };
 
-let state: PlayerState = INITIAL;
+let state: PlayerState = { ...INITIAL, ...storedVolume() };
+/** The last level above 0, which unmuting from 0 goes back to. */
+let audibleVolume = state.volume > 0 ? state.volume : 1;
 const listeners = new Set<() => void>();
 
 function set(nextState: PlayerState): void {
@@ -286,6 +341,15 @@ export function closePlayer(): void {
   set({ ...state, player: null, cardOpen: false, buffering: false, error: null });
 }
 
+/**
+ * Opens the floating card again (Now Playing's Pop out): it shows once Now Playing is left, with
+ * the video playing on in it.
+ */
+export function openCard(): void {
+  if (!state.player || state.cardOpen) return;
+  set({ ...state, cardOpen: true });
+}
+
 /** Dismisses the floating card (its ×); the next `playQueue` opens it again. */
 export function dismissCard(): void {
   if (!state.cardOpen) return;
@@ -327,8 +391,75 @@ export function reportError(error: string | null): void {
   set({ ...state, error, buffering: false });
 }
 
+/**
+ * Sets the volume (the bar's slider, ↑ ↓). Anything above 0 unmutes, so dragging up from 0 or
+ * from muted brings the sound back; 0 shows the muted glyph (`isSilent`).
+ */
+export function setVolume(volume: number): void {
+  const next = clampVolume(volume);
+  const muted = next > 0 ? false : state.muted;
+  if (next > 0) audibleVolume = next;
+  if (next === state.volume && muted === state.muted) return;
+  set({ ...state, volume: next, muted });
+  saveVolume(next, muted);
+}
+
+/**
+ * A drag on the slider ended: when it ended at 0, unmuting goes back to the level it started
+ * from (not to the last level passed on the way down).
+ */
+export function settleVolume(startedAt: number): void {
+  if (state.volume === 0 && startedAt > 0) audibleVolume = clampVolume(startedAt);
+}
+
+/** ↑ ↓ (and the slider's ← →): the volume by `delta`. */
+export function changeVolume(delta: number): void {
+  setVolume((state.muted ? 0 : state.volume) + delta);
+}
+
+/**
+ * M and the bar's button: mute keeps the level; unmute restores it (or the last level above 0
+ * when the slider was dragged to 0).
+ */
+export function toggleMute(): void {
+  if (state.muted || state.volume === 0) {
+    const volume = state.volume > 0 ? state.volume : audibleVolume;
+    set({ ...state, muted: false, volume });
+    saveVolume(volume, false);
+    return;
+  }
+  set({ ...state, muted: true });
+  saveVolume(state.volume, true);
+}
+
+/** Nothing is heard: muted, or the volume at 0 (the muted glyph shows). */
+export function isSilent(value: Pick<PlayerState, 'volume' | 'muted'>): boolean {
+  return value.muted || value.volume === 0;
+}
+
+/** What the slider shows: 0 while muted, else the volume. */
+export function shownVolume(value: Pick<PlayerState, 'volume' | 'muted'>): number {
+  return value.muted ? 0 : value.volume;
+}
+
+/** What an engine sets on its media element. */
+export interface VolumeTarget {
+  volume: number;
+  muted: boolean;
+}
+
+/** Applies the store's volume and mute to a media element (both engines, on change and load). */
+export function applyVolume(
+  element: VolumeTarget,
+  value: Pick<PlayerState, 'volume' | 'muted'>,
+): void {
+  if (element.volume !== value.volume) element.volume = value.volume;
+  if (element.muted !== value.muted) element.muted = value.muted;
+}
+
 /** Back to the initial state (tests). */
 export function resetPlayer(): void {
+  audibleVolume = 1;
   set(INITIAL);
 }
 

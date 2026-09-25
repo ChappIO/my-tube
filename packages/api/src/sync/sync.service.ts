@@ -421,7 +421,8 @@ type VideoStatus = (typeof videos.$inferSelect)['status'];
 /**
  * The status of a known video after a check. Items on disk, downloading or missing are never
  * changed by a check; `unavailable` (a removed video) waits for an explicit retry, and a file
- * deleted in Preview (`deleted_by_user`) is never downloaded again by a check.
+ * the user deleted (`deleted_by_user`, Preview's former Delete file) is never downloaded again
+ * by a check.
  */
 export function nextStatus(
   current: VideoStatus,

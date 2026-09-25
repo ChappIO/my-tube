@@ -1,9 +1,6 @@
 import type { VideoListItem } from '@mytube/shared';
-import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { primeVideo } from '../../api/library';
 import { formatLength, publishedAgo } from '../../format';
-import { openPreview } from '../../ui-state';
 import { Artwork, MediaCard } from '../media';
 
 export interface VideoCardProps {
@@ -15,6 +12,8 @@ export interface VideoCardProps {
   showChannel: boolean;
   /** The clock for the relative date (`useNow()` of the grid). */
   now: number;
+  /** Plays the video in the player (the grid builds the queue). */
+  onPlay: () => void;
 }
 
 /** What a video card shows, without the handlers. */
@@ -53,12 +52,11 @@ export function videoCardText(
 /**
  * A downloaded video as a wide card (Videos tab, channel page): the 16:9 cached thumbnail with
  * the duration badge, the round channel avatar, the title and `NASA · 2 weeks ago`. The card
- * opens Preview; the channel name opens the channel page when the channel was added as a
- * source, and is plain text otherwise. Home keeps the square `VideoTile`.
+ * plays the video (`onPlay`); the channel name opens the channel page when the channel was
+ * added as a source, and is plain text otherwise. Home keeps the square `VideoTile`.
  */
-export function VideoCard({ video, showChannel, now }: VideoCardProps) {
+export function VideoCard({ video, showChannel, now, onPlay }: VideoCardProps) {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const text = videoCardText(video, showChannel, now);
   const sourceId = video.channel.sourceId;
   return (
@@ -79,10 +77,7 @@ export function VideoCard({ video, showChannel, now }: VideoCardProps) {
           : () => void navigate({ to: '/video/channel/$id', params: { id: String(sourceId) } })
       }
       when={text.when}
-      onOpen={() => {
-        primeVideo(queryClient, video);
-        openPreview(video.id);
-      }}
+      onOpen={onPlay}
     />
   );
 }

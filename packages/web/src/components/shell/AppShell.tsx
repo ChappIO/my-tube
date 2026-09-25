@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react';
 import { usePlayerActive } from '../../player-state';
-import { previewKey, useAddModal, useJobLogViewer, usePreview } from '../../ui-state';
+import { useAddModal, useJobLogViewer } from '../../ui-state';
 import { LogViewerModal } from '../activity/LogViewerModal';
-import { PreviewModal } from '../library/PreviewModal';
 import { PlayerLayer } from '../player/PlayerLayer';
 import { AddSourceModal } from '../sources/AddSourceModal';
 import { Sidebar } from './Sidebar';
@@ -19,8 +18,8 @@ import { cx } from '../ui/cx';
  * render their sections as direct children and set no outer padding. While the player bar is up
  * the bottom padding grows by the bar's height plus 40px, so the last row scrolls clear of it.
  *
- * The player (`PlayerLayer`: the audio engine, bar, card, keyboard and Media Session) is mounted
- * here once, so playback survives navigation.
+ * The player (`PlayerLayer`: the audio and video engines, bar, card, keyboard and Media Session)
+ * is mounted here once, so playback survives navigation.
  */
 export function AppShell({
   activityCount,
@@ -34,7 +33,6 @@ export function AppShell({
   children: ReactNode;
 }) {
   const { open: addOpen, openAdd, closeAdd } = useAddModal();
-  const { target: preview, closePreview } = usePreview();
   const { jobId: logJobId, closeJobLog } = useJobLogViewer();
   const playing = usePlayerActive();
   return (
@@ -60,10 +58,6 @@ export function AppShell({
       <PlayerLayer />
       {/* Mounted only while open, so every opening starts empty. */}
       {addOpen && <AddSourceModal onClose={closeAdd} />}
-      {/* Keyed by what it shows, so each opening starts at the poster. */}
-      {preview !== null && (
-        <PreviewModal key={previewKey(preview)} target={preview} onClose={closePreview} />
-      )}
       {/* Keyed by the job, so each opening starts with its own toolbar state. */}
       {logJobId !== null && (
         <LogViewerModal key={logJobId} jobId={logJobId} onClose={closeJobLog} />

@@ -140,7 +140,7 @@ export const VideoSettings = z.object({
   pathTemplate: pathTemplate(VIDEO_PATH_TAGS).default('{channel}/{title} ({date})'),
   /** Highest resolution to download; `best` ("best available") has no cap. */
   quality: z.enum(VIDEO_QUALITIES).default('best'),
-  container: z.enum(VIDEO_CONTAINERS).default('mkv'),
+  container: z.enum(VIDEO_CONTAINERS).default('mp4'),
   /** Subtitle language codes; empty means no subtitles. */
   subtitleLanguages: z
     .array(

@@ -17,6 +17,18 @@ export const focusRingInset = 'focus-ring-inset';
 export const focusRingOnRed = 'focus-ring-on-red';
 
 /**
+ * The ring for keyboard focus only, also after a click followed by a shortcut key (the video
+ * player's control strip and menus; `useInputModality` tracks the last input).
+ */
+export const focusRingVisible = 'focus-ring-visible';
+
+/** `focusRingVisible` drawn inside the element (menu items in a clipping popover). */
+export const focusRingVisibleInset = 'focus-ring-visible-inset';
+
+/** No ring at all (the video frame and its scrubber, which show focus otherwise). */
+export const focusRingNone = 'focus-ring-none';
+
+/**
  * Rings the element when its overlay control (the descendant with `data-overlay`) has keyboard
  * focus. For tiles whose single interactive element is a full-size overlay button.
  */

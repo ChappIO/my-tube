@@ -6,7 +6,7 @@ import { openAdd } from '../../ui-state';
 import { useNow } from '../../use-now';
 import { PlusIcon } from '../icons';
 import { TileGrid } from '../media';
-import { homeQueue, startQueue } from '../player/queues';
+import { homeQueue, homeVideoQueue, startQueue } from '../player/queues';
 import { StatusLine } from '../sources/SourceBits';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
@@ -86,8 +86,9 @@ export function HomeScreen() {
 }
 
 /**
- * One Home item. Videos get the fixed chin with the channel (and open Preview); tracks show only
- * their cover, with the chin sliding up on hover, and play the day group's music from there.
+ * One Home item. Videos get the fixed chin with the channel and play the day group's videos of
+ * that channel; tracks show only their cover, with the chin sliding up on hover, and play that
+ * track alone.
  */
 function HomeTile({
   item,
@@ -101,5 +102,12 @@ function HomeTile({
   if (item.kind === 'music') {
     return <TrackTile track={item} onPlay={() => startQueue(homeQueue(group, item.id))} />;
   }
-  return <VideoTile video={item} meta="channel" now={now} />;
+  return (
+    <VideoTile
+      video={item}
+      meta="channel"
+      now={now}
+      onPlay={() => startQueue(homeVideoQueue(group, item.id, now))}
+    />
+  );
 }

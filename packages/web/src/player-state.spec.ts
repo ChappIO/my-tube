@@ -6,6 +6,7 @@ import {
   currentItem,
   dismissCard,
   jumpTo,
+  openCard,
   next,
   playQueue,
   playerState,
@@ -203,5 +204,54 @@ describe('closing', () => {
     expect(playerState().cardOpen).toBe(false);
     playQueue([item(2)], 0, 'Queue');
     expect(playerState().cardOpen).toBe(true);
+  });
+});
+
+function video(id: number): PlayerItem {
+  return item(id, {
+    kind: 'video',
+    title: `Video ${id}`,
+    sub: 'NASA',
+    album: undefined,
+    fileUrl: `/api/library/videos/${id}/play`,
+  });
+}
+
+describe('one thing plays at a time', () => {
+  it('a video replaces music and music replaces a video', () => {
+    playQueue([item(1), item(2)], 1, 'In Rainbows');
+    reportPosition(80);
+    playQueue([video(10), video(11)], 0, 'NASA');
+    expect(player()).toMatchObject({ kind: 'video', index: 0, pos: 0, from: 'NASA' });
+    expect(player().queue.map((entry) => entry.kind)).toEqual(['video', 'video']);
+    expect(currentItem(player())?.kind).toBe('video');
+
+    playQueue([item(3)], 0, 'Tracks');
+    expect(player()).toMatchObject({ kind: 'music', from: 'Tracks' });
+    expect(player().queue.every((entry) => entry.kind === 'music')).toBe(true);
+  });
+
+  it('adding music while a video plays starts a new music queue', () => {
+    playQueue([video(10)], 0, 'NASA');
+    appendToQueue(item(1));
+    expect(player()).toMatchObject({ kind: 'music', from: 'Queue' });
+    expect(player().queue).toHaveLength(1);
+  });
+});
+
+describe('openCard (Pop out)', () => {
+  it('opens the card again, shown once Now Playing is left', () => {
+    playQueue([item(1)], 0, 'Home');
+    setNowOpen(true);
+    expect(playerState().cardOpen).toBe(false);
+    openCard();
+    expect(playerState().cardOpen).toBe(true);
+    setNowOpen(false);
+    expect(playerState().cardOpen).toBe(true);
+  });
+
+  it('does nothing without a queue', () => {
+    openCard();
+    expect(playerState().cardOpen).toBe(false);
   });
 });

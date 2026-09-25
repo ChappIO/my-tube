@@ -1,11 +1,9 @@
 import { existsSync } from 'node:fs';
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -22,11 +20,10 @@ import {
   type VideoPage,
 } from '@mytube/shared';
 import { type SQL, and, desc, eq, gte, inArray, or, sql } from 'drizzle-orm';
-import { HistoryService } from '../activity/history.service.js';
 import { AppConfig } from '../config/app-config.js';
 import { DATABASE, type Database } from '../database/database.module.js';
 import { channels, history, sources, tracks, videos } from '../database/schema.js';
-import { OutsideLibraryError, libraryPath, removeMediaFiles } from '../files/media-files.js';
+import { OutsideLibraryError, libraryPath } from '../files/media-files.js';
 import { JobsService } from '../jobs/jobs.service.js';
 import { MusicLibraryService } from './music-library.service.js';
 
@@ -35,7 +32,7 @@ const DAY_MS = 86_400_000;
 type VideoRow = typeof videos.$inferSelect;
 type ChannelRow = typeof channels.$inferSelect;
 
-/** A file Preview streams. */
+/** The file of a video on disk (the stream, the player's playback). */
 export interface VideoStream {
   path: string;
   contentType: string | null;
@@ -43,18 +40,15 @@ export interface VideoStream {
 
 /**
  * The library read models over `videos` and `channels`: the videos list, the Home feed (with the
- * music items from `MusicLibraryService`) and stats, the header summaries, and the two file
- * actions of Preview (stream and delete).
+ * music items from `MusicLibraryService`) and stats, the header summaries, and the file of a
+ * video on disk (the stream and the player's playback).
  */
 @Injectable()
 export class LibraryService {
-  private readonly logger = new Logger('Library');
-
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly config: AppConfig,
     private readonly jobs: JobsService,
-    private readonly historyService: HistoryService,
     private readonly music: MusicLibraryService,
   ) {}
 
@@ -185,7 +179,7 @@ export class LibraryService {
     };
   }
 
-  /** The file of an on-disk video for Preview. 404 when there is none; 403 outside the mount. */
+  /** The file of an on-disk video. 404 when there is none; 403 outside the mount. */
   streamTarget(id: number): VideoStream {
     const { video } = this.videoRow(id);
     if (video.status !== 'on_disk' || !video.filePath) {
@@ -194,61 +188,6 @@ export class LibraryService {
     const path = this.insideVideoDir(video.filePath);
     if (!existsSync(path)) throw new NotFoundException(`The file of video ${id} is missing`);
     return { path, contentType: videoMimeType(video.filePath) };
-  }
-
-  /**
-   * Delete file in Preview, the explicit deletion: removes the media file and its sidecars
-   * (and folders left empty), marks the video `skipped` / `deleted_by_user` so nothing
-   * downloads it again, takes its size off its source and records a `removed` history row.
-   * 404 for an unknown video, 409 when it is not on disk.
-   */
-  deleteFile(id: number): void {
-    const { video } = this.videoRow(id);
-    if (video.status !== 'on_disk' || !video.filePath) {
-      throw new ConflictException(`Video ${id} is not on disk`);
-    }
-    this.insideVideoDir(video.filePath);
-    const removed = removeMediaFiles(this.config.videoDir, video.filePath);
-    const now = new Date().toISOString();
-    this.db.transaction((tx) => {
-      tx.update(videos)
-        .set({
-          status: 'skipped',
-          skipReason: 'deleted_by_user',
-          filePath: null,
-          fileSizeBytes: null,
-          updatedAt: now,
-        })
-        .where(eq(videos.id, video.id))
-        .run();
-      if (video.sourceId !== null) {
-        const counted = tx
-          .select({ count: sql<number>`count(*)` })
-          .from(videos)
-          .where(
-            and(
-              eq(videos.sourceId, video.sourceId),
-              inArray(videos.status, ['wanted', 'downloading', 'on_disk']),
-            ),
-          )
-          .get();
-        tx.update(sources)
-          .set({
-            sizeBytes: sql`max(0, ${sources.sizeBytes} - ${video.fileSizeBytes ?? 0})`,
-            itemCount: counted?.count ?? 0,
-            updatedAt: now,
-          })
-          .where(eq(sources.id, video.sourceId))
-          .run();
-      }
-    });
-    this.historyService.record({
-      kind: 'video',
-      title: video.title,
-      result: 'removed',
-      details: 'deleted by user',
-    });
-    this.logger.log(`Deleted ${removed.join(', ')} (video ${video.id}, by the user)`);
   }
 
   private videoRow(id: number): { video: VideoRow; channel: ChannelRow } {

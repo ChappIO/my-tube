@@ -9,14 +9,25 @@ export interface ToggleProps {
   id?: string;
   disabled?: boolean;
   'aria-describedby'?: string;
+  /** `md` 44×26 (settings rows, default); `sm` 38×22 (Now Playing's subtitle style popover). */
+  size?: 'md' | 'sm';
   className?: string;
 }
 
 /**
  * 44×26 switch: red track when on, `surface2` when off, 20px white knob sliding from 3px to
- * 21px. A native button with `role="switch"`, so Space and Enter toggle it.
+ * 21px. `sm` is 38×22 with a 16px knob (3px → 19px). A native button with `role="switch"`, so
+ * Space and Enter toggle it.
  */
-export function Toggle({ checked, onChange, label, className, ...props }: ToggleProps) {
+export function Toggle({
+  checked,
+  onChange,
+  label,
+  size = 'md',
+  className,
+  ...props
+}: ToggleProps) {
+  const small = size === 'sm';
   return (
     <button
       type="button"
@@ -25,7 +36,8 @@ export function Toggle({ checked, onChange, label, className, ...props }: Toggle
       aria-label={label}
       onClick={() => onChange(!checked)}
       className={cx(
-        'h-[26px] w-11 shrink-0 cursor-pointer rounded-pill disabled:cursor-default disabled:opacity-50',
+        'shrink-0 cursor-pointer rounded-pill disabled:cursor-default disabled:opacity-50',
+        small ? 'h-[22px] w-[38px]' : 'h-[26px] w-11',
         hitArea,
         focusRing,
         checked ? 'bg-red' : 'bg-surface2',
@@ -36,8 +48,9 @@ export function Toggle({ checked, onChange, label, className, ...props }: Toggle
       <span
         aria-hidden
         className={cx(
-          'absolute top-[3px] size-5 rounded-full bg-white motion-knob',
-          checked ? 'left-[21px]' : 'left-[3px]',
+          'absolute top-[3px] rounded-full bg-white motion-knob',
+          small ? 'size-4' : 'size-5',
+          checked ? (small ? 'left-[19px]' : 'left-[21px]') : 'left-[3px]',
         )}
       />
     </button>

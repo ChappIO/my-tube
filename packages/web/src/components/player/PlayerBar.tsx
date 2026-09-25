@@ -15,6 +15,7 @@ import { Artwork } from '../media';
 import { cx, focusRingOnRed, hitArea } from '../ui/cx';
 import { Scrubber } from './Scrubber';
 import { TransportButtons } from './TransportButtons';
+import { VolumeControl } from './VolumeControl';
 
 /** The CSS variable the bar sets to its height (the card and the main column's padding use it). */
 export const BAR_HEIGHT_VAR = '--player-bar-height';
@@ -26,6 +27,9 @@ export interface PlayerBarProps {
   error: string | null;
   onOpenNowPlaying: () => void;
   onClose: () => void;
+  /** Both engines' volume and mute (wide only: the mute button and slider left of the label). */
+  volume?: number;
+  muted?: boolean;
 }
 
 /** `artist · album` (music) or the channel (video): the bar's sub line. */
@@ -45,7 +49,15 @@ export function barSubLine(item: PlayerItem): string {
  * It publishes its height as `--player-bar-height` for the card above it and the main column's
  * bottom padding.
  */
-export function PlayerBar({ player, buffering, error, onOpenNowPlaying, onClose }: PlayerBarProps) {
+export function PlayerBar({
+  player,
+  buffering,
+  error,
+  onOpenNowPlaying,
+  onClose,
+  volume = 1,
+  muted = false,
+}: PlayerBarProps) {
   const ref = useBarHeight();
   const item = currentItem(player);
   if (!item) return null;
@@ -84,6 +96,7 @@ export function PlayerBar({ player, buffering, error, onOpenNowPlaying, onClose 
           </NowPlayingLink>
           <TransportButtons size="spacious" {...transport} />
           <div className="flex min-w-0 items-center justify-end gap-2">
+            <VolumeControl volume={volume} muted={muted} />
             <span className="truncate font-mono text-[11px] opacity-90">{label}</span>
             <BarIconButton label="Open Now Playing" onClick={onOpenNowPlaying}>
               <ChevronUpIcon size={18} strokeWidth={2.5} />

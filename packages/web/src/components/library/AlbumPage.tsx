@@ -4,12 +4,11 @@ import { ApiError, apiErrorMessage } from '../../api/client';
 import { useAlbum, useDownloadMissing, useUnpinAlbum } from '../../api/library';
 import { useCheckSource, useSource } from '../../api/sources';
 import { countOf } from '../../format';
-import { appendToQueue } from '../../player-state';
 import { useNow } from '../../use-now';
 import { useState } from 'react';
 import { PlayIcon } from '../icons';
 import { Artwork, PinnedChip } from '../media';
-import { albumQueue, startQueue, trackItem } from '../player/queues';
+import { addToQueue, albumQueue, startQueue, trackItem } from '../player/queues';
 import { StatusLine } from '../sources/SourceBits';
 import { BackLink } from '../ui/BackLink';
 import { Button } from '../ui/Button';
@@ -70,7 +69,7 @@ function AlbumContent({ album }: { album: AlbumDetail }) {
             totalDurationSeconds={album.totalDurationSeconds}
             now={now}
             onPlay={(track) => startQueue(albumQueue(album, track.id))}
-            onAdd={(track) => appendToQueue(trackItem(track))}
+            onAdd={(track) => addToQueue(trackItem(track))}
           />
         </div>
         <aside aria-label="About this album" className="grid min-w-0 flex-[1_1_260px] gap-5">
