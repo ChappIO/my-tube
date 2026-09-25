@@ -294,6 +294,9 @@ export class SyncService {
               thumbnailUrl: fields.thumbnailUrl ?? existing.thumbnailUrl,
               isShort: fields.isShort,
               liveStatus: fields.liveStatus ?? existing.liveStatus,
+              // The listing's badge is current: members-only videos are often made public
+              // later, and then the flat entry no longer says `subscriber_only`.
+              availability: fields.availability,
               sourceId: existing.sourceId ?? source.id,
               status: next.status,
               skipReason: next.skipReason,
@@ -444,6 +447,7 @@ function entryFields(entry: SourceEntry) {
     thumbnailUrl: bestThumbnail(entry),
     isShort: entry.isShort,
     liveStatus: entry.liveStatus,
+    availability: entry.availability,
   };
 }
 

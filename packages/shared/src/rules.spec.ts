@@ -57,7 +57,7 @@ describe('SourceOptions', () => {
         matcher: DEFAULT_VIDEO_MATCHER,
         options: { embedCoverArt: true, syncOrder: true },
       }),
-    ).toEqual(['no shorts', 'not older than 90 days', 'sync order']);
+    ).toEqual(['no shorts', 'not older than 90 days', 'not members only', 'sync order']);
   });
 });
 
@@ -118,9 +118,9 @@ describe('Source', () => {
 describe('convertLegacyRules', () => {
   const now = new Date('2026-09-24T12:00:00Z');
 
-  it('maps the old video defaults to the new video default', () => {
+  it('maps the old video defaults to what they meant (no members-only condition then)', () => {
     expect(convertLegacyRules({ library: 'video' })).toEqual({
-      matcher: DEFAULT_VIDEO_MATCHER,
+      matcher: and(not({ type: 'is_short' }), not({ type: 'older_than_days', days: 90 })),
       options: { embedCoverArt: true, syncOrder: false },
     });
   });
@@ -186,6 +186,7 @@ describe('convertLegacyRules', () => {
         publishedAt: null,
         durationSeconds: null,
         liveStatus: null,
+        availability: null,
         channelName: null,
         channelId: null,
         playlistPosition: null,

@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import {
   DEFAULT_MUSIC_MATCHER,
   DEFAULT_SOURCE_OPTIONS,
+  DEFAULT_VIDEO_MATCHER,
   and,
   not,
   type Matcher,
@@ -63,6 +64,40 @@ function setup() {
   return { ...harness, sync, addSource, video, downloadJobs };
 }
 
+/** A flat channel listing of NASA with these entries and their availability. */
+const listing = (entries: { id: string; availability: string | null }[]) => ({
+  kind: 'channel' as const,
+  id: NASA,
+  title: 'NASA',
+  url: '',
+  channel: 'NASA',
+  channelId: NASA,
+  channelUrl: null,
+  uploaderUrl: null,
+  thumbnailUrl: null,
+  thumbnails: [],
+  playlistCount: null,
+  skippedEntries: 0,
+  entries: entries.map(({ id, availability }) => ({
+    kind: 'video' as const,
+    id,
+    title: id,
+    url: `https://www.youtube.com/watch?v=${id}`,
+    duration: 600,
+    uploadDate: '2026-09-20',
+    timestamp: null,
+    liveStatus: null,
+    availability,
+    isShort: false,
+    tab: 'videos' as const,
+    channelId: null,
+    channel: null,
+    thumbnails: [],
+    expectedStreams: [],
+    expectedBytes: null,
+  })),
+});
+
 describe('SyncService', () => {
   afterEach(() => {
     delete process.env.FAKE_YTDLP_FAIL;
@@ -97,7 +132,7 @@ describe('SyncService', () => {
     ]);
     expect(downloadJobs()[0]).toMatchObject({
       dedupeKey: 'video:IwZVXmQdX1E',
-      payload: { subtitle: 'NASA', historyKind: 'video', detail: '1080p' },
+      payload: { subtitle: 'NASA', historyKind: 'video', detail: 'best' },
     });
 
     const checked = db.select().from(sources).where(eq(sources.id, source.id)).get();
@@ -223,6 +258,7 @@ describe('SyncService', () => {
         uploadDate: date,
         timestamp: null,
         liveStatus: null,
+        availability: null,
         isShort: false,
         tab: 'videos' as const,
         channelId: null,
@@ -235,6 +271,55 @@ describe('SyncService', () => {
     const result = sync.applyListing(source, channel, NOW);
     expect(result.added).toBe(2);
     expect(result.wantedIds).toHaveLength(1);
+  });
+
+  it('skips members-only entries under the default video rules and keeps unavailable ones', () => {
+    const { sync, addSource, video, db } = setup();
+    const source = addSource('channel', DEFAULT_VIDEO_MATCHER);
+    const first = sync.applyListing(
+      source,
+      listing([
+        { id: 'public', availability: null },
+        { id: 'members', availability: 'subscriber_only' },
+        { id: 'early', availability: null },
+        { id: 'refused', availability: null },
+      ]),
+      NOW,
+    );
+    expect(first.added).toBe(4);
+    expect(video('public')).toMatchObject({ status: 'wanted', availability: null });
+    expect(video('members')).toMatchObject({
+      status: 'skipped',
+      skipReason: 'no_match',
+      availability: 'subscriber_only',
+    });
+    expect(first.wantedIds).toHaveLength(3);
+    // A download that yt-dlp refused as members-only is unavailable for good.
+    db.update(videos)
+      .set({ status: 'skipped', skipReason: 'unavailable' })
+      .where(eq(videos.youtubeId, 'refused'))
+      .run();
+
+    // Next check: "early" got its members badge, "members" was made public, "refused" is
+    // listed as members-only now.
+    const second = sync.applyListing(
+      source,
+      listing([
+        { id: 'public', availability: null },
+        { id: 'members', availability: null },
+        { id: 'early', availability: 'subscriber_only' },
+        { id: 'refused', availability: 'subscriber_only' },
+      ]),
+      NOW,
+    );
+    expect(video('early')).toMatchObject({ status: 'skipped', skipReason: 'no_match' });
+    expect(video('members')).toMatchObject({ status: 'wanted', availability: null });
+    expect(video('refused')).toMatchObject({
+      status: 'skipped',
+      skipReason: 'unavailable',
+      availability: 'subscriber_only',
+    });
+    expect(second.wantedIds).toHaveLength(2);
   });
 
   it('syncs a music artist source through its releases (music-sync.spec.ts has the rest)', async () => {

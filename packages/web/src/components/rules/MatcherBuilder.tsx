@@ -275,7 +275,7 @@ function isMissing(leaf: DraftLeaf): boolean {
   return false;
 }
 
-/** The value control of a condition; nothing for "Is a short". */
+/** The value control of a condition; nothing for "Is a short" and "Is members-only". */
 function LeafValue({
   leaf,
   set,

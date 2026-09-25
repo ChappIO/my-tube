@@ -34,6 +34,7 @@ function entry(overrides: Partial<SourceEntry>): SourceEntry {
     uploadDate: null,
     timestamp: null,
     liveStatus: null,
+    availability: null,
     isShort: false,
     tab: null,
     channelId: null,

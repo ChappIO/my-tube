@@ -156,6 +156,8 @@ export const videos = sqliteTable(
     thumbnailUrl: text('thumbnail_url'),
     isShort: integer('is_short', { mode: 'boolean' }).notNull().default(false),
     liveStatus: text('live_status'),
+    /** yt-dlp's `availability` (`subscriber_only` = members only); migration 20260928090000. */
+    availability: text('availability'),
     status: text('status').$type<ItemStatus>().notNull().default('wanted'),
     skipReason: text('skip_reason').$type<SkipReason>(),
     filePath: text('file_path'),
@@ -205,6 +207,7 @@ export const tracks = sqliteTable(
     durationSeconds: integer('duration_seconds'),
     publishedAt: text('published_at'),
     thumbnailUrl: text('thumbnail_url'),
+    availability: text('availability'),
     status: text('status').$type<ItemStatus>().notNull().default('wanted'),
     skipReason: text('skip_reason').$type<SkipReason>(),
     filePath: text('file_path'),

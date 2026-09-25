@@ -74,7 +74,7 @@ MyTube has no login. Anyone who can reach the port can add sources, change rules
 
 1. Open the app. On first start it downloads the latest yt-dlp into `/config/bin`; the sidebar footer shows its version once that is done.
 2. Click **Add to library** and paste a YouTube link: a channel (`https://www.youtube.com/@NASA`), an artist on YouTube Music (`https://music.youtube.com/channel/…`) or a playlist. A single video link resolves to its channel. Choose Video or Music.
-3. Set the rules before you subscribe. They are an AND/OR/NOT tree of conditions (no shorts, not older than 90 days, title contains …). New sources start from the defaults in Settings → Video and Settings → Music. The same rules decide what is kept: tighten them later and files that no longer match are removed (Edit rules shows what would go before you save).
+3. Set the rules before you subscribe. They are an AND/OR/NOT tree of conditions (no shorts, not older than 90 days, no members-only videos, title contains …). New sources start from the defaults in Settings → Video and Settings → Music. The same rules decide what is kept: tighten them later and files that no longer match are removed (Edit rules shows what would go before you save).
 4. Subscribe. The source is checked at once and then every 2 hours (Settings → General). Downloads show up in Activity.
 5. Point Plex (or Jellyfin, or a music player) at the two library folders.
 

@@ -151,6 +151,22 @@ describe('validation', () => {
     expect(leafOptions(true).map((o) => o.value)).toContain('in_playlist_position_under');
   });
 
+  it('offers "Is members-only" everywhere, a condition without a value', () => {
+    for (const playlist of [false, true]) {
+      expect(leafOptions(playlist)).toContainEqual({
+        value: 'is_members_only',
+        label: 'Is members-only',
+      });
+    }
+    const root = draftFromMatcher(and(not({ type: 'is_members_only' })));
+    expect(firstLeaf(root)).toMatchObject({ type: 'is_members_only', negated: true });
+    expect(nodeError(firstLeaf(root))).toBeUndefined();
+    expect(matcherFromDraft(root)).toEqual({
+      ok: true,
+      matcher: and(not({ type: 'is_members_only' })),
+    });
+  });
+
   it('stops offering groups before the depth limit', () => {
     let root = draftFromMatcher(and());
     let groupId = root.id;

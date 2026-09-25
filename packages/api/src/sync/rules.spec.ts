@@ -21,6 +21,7 @@ function entry(overrides: Partial<SourceEntry> = {}): SourceEntry {
     uploadDate: '2026-09-20',
     timestamp: null,
     liveStatus: null,
+    availability: null,
     isShort: false,
     tab: 'videos',
     channelId: null,
@@ -55,6 +56,30 @@ describe('evaluateItem', () => {
     expect(
       evaluateItem(entry({ uploadDate: '2026-01-01' }), DEFAULT_VIDEO_MATCHER, CHANNEL),
     ).toMatchObject({ reason: 'no_match', failing: ['not older than 90 days'] });
+  });
+
+  it('skips members-only entries under the default video rules; no badge is a match', () => {
+    expect(
+      evaluateItem(entry({ availability: 'subscriber_only' }), DEFAULT_VIDEO_MATCHER, CHANNEL),
+    ).toEqual({
+      accept: false,
+      reason: 'no_match',
+      transient: false,
+      failing: ['not members only'],
+    });
+    expect(evaluateItem(entry({ availability: null }), DEFAULT_VIDEO_MATCHER, CHANNEL)).toEqual(
+      accept,
+    );
+    expect(evaluateItem(entry({ availability: 'public' }), DEFAULT_VIDEO_MATCHER, CHANNEL)).toEqual(
+      accept,
+    );
+    // Only the rules exclude them: a tree without the condition downloads them.
+    expect(evaluateItem(entry({ availability: 'subscriber_only' }), and(), CHANNEL)).toEqual(
+      accept,
+    );
+    expect(entryContext(entry({ availability: 'subscriber_only' }), CHANNEL)).toMatchObject({
+      availability: 'subscriber_only',
+    });
   });
 
   it('never downloads an ongoing or upcoming stream, whatever the rules (transient)', () => {

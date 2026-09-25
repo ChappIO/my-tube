@@ -47,6 +47,7 @@ function entry(id: string, album: string | null, title = id): SourceEntry {
     uploadDate: null,
     timestamp: null,
     liveStatus: null,
+    availability: null,
     isShort: false,
     tab: null,
     channelId: null,

@@ -65,6 +65,7 @@ export function entryContext(entry: SourceEntry, ctx: EntryContext): MatcherCont
     publishedAt: entryDate(entry),
     durationSeconds: entry.duration === null ? null : Math.round(entry.duration),
     liveStatus: entry.liveStatus,
+    availability: entry.availability,
     channelName: entry.channel ?? ctx.channelName,
     channelId: entry.channelId ?? ctx.channelId,
     playlistPosition: ctx.playlistPosition,

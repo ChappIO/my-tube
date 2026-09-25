@@ -399,6 +399,8 @@ export class MusicSync {
         durationSeconds: entry.duration === null ? null : Math.round(entry.duration),
         publishedAt: entry.uploadDate,
         thumbnailUrl: trackThumbnail(entry),
+        // The listing's badge is current: a members-only upload made public loses it.
+        availability: entry.availability,
       };
       const existing = tx.select().from(tracks).where(eq(tracks.youtubeId, entry.id)).get();
       let id: number;
@@ -447,6 +449,7 @@ export class MusicSync {
             durationSeconds: fields.durationSeconds ?? existing.durationSeconds,
             publishedAt: existing.publishedAt ?? fields.publishedAt,
             thumbnailUrl: existing.thumbnailUrl ?? fields.thumbnailUrl,
+            availability: fields.availability,
             albumId: existing.albumId ?? input.albumId,
             trackNumber:
               sameAlbum && input.trackNumber !== null ? input.trackNumber : existing.trackNumber,

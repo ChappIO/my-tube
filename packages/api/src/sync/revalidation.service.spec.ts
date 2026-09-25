@@ -96,6 +96,7 @@ describe('RevalidationService', () => {
         publishedAt?: string | null;
         status?: ItemStatus;
         skipReason?: SkipReason | null;
+        availability?: string | null;
         file?: boolean;
       } = {},
     ) => {
@@ -117,6 +118,7 @@ describe('RevalidationService', () => {
           publishedAt: 'publishedAt' in fields ? (fields.publishedAt ?? null) : daysAgo(1),
           status,
           skipReason: fields.skipReason ?? null,
+          availability: fields.availability ?? null,
           filePath,
           fileSizeBytes: filePath ? 100 : null,
         })
@@ -191,6 +193,30 @@ describe('RevalidationService', () => {
       expect(existsSync(join(config.videoDir, item.filePath ?? ''))).toBe(true);
     }
     expect(history.recent(5)).toEqual([]);
+  });
+
+  it('evaluates members-only from the stored availability, so skipped ones stay skipped', () => {
+    const { service, addSource, addVideo, video } = setup();
+    const owner = addSource(and(not({ type: 'is_members_only' })));
+    const members = addVideo(owner, {
+      status: 'skipped',
+      skipReason: 'no_match',
+      availability: 'subscriber_only',
+    });
+    const wantedMembers = addVideo(owner, { status: 'wanted', availability: 'subscriber_only' });
+    const unavailable = addVideo(owner, {
+      status: 'skipped',
+      skipReason: 'unavailable',
+      availability: 'subscriber_only',
+    });
+    // No badge in the listing any more (made public): wanted again.
+    const madePublic = addVideo(owner, { status: 'skipped', skipReason: 'no_match' });
+
+    expect(service.revalidate(owner.source.id)).toMatchObject({ unwanted: 1, rewanted: 1 });
+    expect(video(members.id)).toMatchObject({ status: 'skipped', skipReason: 'no_match' });
+    expect(video(wantedMembers.id)).toMatchObject({ status: 'skipped', skipReason: 'no_match' });
+    expect(video(unavailable.id)).toMatchObject({ status: 'skipped', skipReason: 'unavailable' });
+    expect(video(madePublic.id)).toMatchObject({ status: 'wanted', skipReason: null });
   });
 
   it('moves wanted items out and rule-skipped items back in, queueing their download', () => {

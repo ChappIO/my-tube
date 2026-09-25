@@ -57,6 +57,7 @@ export const LEAF_TYPES = [
   'title_contains',
   'title_matches',
   'is_short',
+  'is_members_only',
   'published_before',
   'published_after',
   'older_than_days',
@@ -81,6 +82,8 @@ export type MatcherLeaf =
   | { type: 'title_matches'; pattern: string }
   /** A YouTube short (`/shorts/` URL or the Shorts shelf). */
   | { type: 'is_short' }
+  /** For the channel's members only (yt-dlp's `availability` is `subscriber_only`). */
+  | { type: 'is_members_only' }
   /** Published strictly before the day (`YYYY-MM-DD`, UTC). */
   | { type: 'published_before'; date: string }
   /** Published on or after the day (`YYYY-MM-DD`, UTC). */
@@ -117,6 +120,7 @@ const LeafSchemas = [
   z.strictObject({ type: z.literal('title_contains'), text: Text }),
   z.strictObject({ type: z.literal('title_matches'), pattern: Pattern }),
   z.strictObject({ type: z.literal('is_short') }),
+  z.strictObject({ type: z.literal('is_members_only') }),
   z.strictObject({ type: z.literal('published_before'), date: Day }),
   z.strictObject({ type: z.literal('published_after'), date: Day }),
   z.strictObject({
@@ -249,10 +253,14 @@ export const and = (...items: Matcher[]): Matcher => ({ type: 'and', items });
 export const or = (...items: Matcher[]): Matcher => ({ type: 'or', items });
 export const not = (item: Matcher): Matcher => ({ type: 'not', item });
 
-/** Video default: no shorts, and nothing older than 90 days (older files are removed). */
+/**
+ * Video default: no shorts, nothing older than 90 days (older files are removed), and no
+ * members-only videos (yt-dlp cannot download them without a membership).
+ */
 export const DEFAULT_VIDEO_MATCHER: Matcher = and(
   not({ type: 'is_short' }),
   not({ type: 'older_than_days', days: 90 }),
+  not({ type: 'is_members_only' }),
 );
 /** Music default: the empty `and`, which matches everything (an artist's every release). */
 export const DEFAULT_MUSIC_MATCHER: Matcher = and();
@@ -270,6 +278,12 @@ export interface MatcherContext {
   durationSeconds: number | null;
   /** yt-dlp's `live_status`; null counts as `not_live`. */
   liveStatus: string | null;
+  /**
+   * yt-dlp's `availability` (`public`, `unlisted`, `subscriber_only`, `premium_only`,
+   * `needs_auth`, ...). Flat listings set it only for badged entries (members only), so null
+   * is unknown.
+   */
+  availability: string | null;
   /** The uploader. For a channel's own listing, the channel itself. */
   channelName: string | null;
   channelId: string | null;
@@ -296,6 +310,9 @@ interface Outcome {
 }
 
 const DAY_MS = 86_400_000;
+
+/** yt-dlp's `availability` for a video only the channel's members (a paid level) can watch. */
+export const MEMBERS_ONLY_AVAILABILITY = 'subscriber_only';
 
 /**
  * Evaluates a tree against one item. Pure: the clock is `ctx.now`. See the file comment for
@@ -342,6 +359,9 @@ function leafValue(leaf: MatcherLeaf, ctx: MatcherContext): Truth {
     }
     case 'is_short':
       return truth(ctx.isShort);
+    case 'is_members_only':
+      if (ctx.availability === null) return 'U';
+      return truth(ctx.availability === MEMBERS_ONLY_AVAILABILITY);
     case 'published_before':
     case 'published_after':
     case 'older_than_days': {
@@ -450,6 +470,8 @@ export function describeLeaf(leaf: MatcherLeaf, negated = false): string {
       return negated ? `not /${leaf.pattern}/` : `regex /${leaf.pattern}/`;
     case 'is_short':
       return negated ? 'no shorts' : 'only shorts';
+    case 'is_members_only':
+      return negated ? 'not members only' : 'members only';
     case 'published_before':
       return negated ? `since ${leaf.date}` : `before ${leaf.date}`;
     case 'published_after':
