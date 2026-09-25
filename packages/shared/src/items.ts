@@ -92,6 +92,14 @@ export const Job = z.object({
 });
 export type Job = z.infer<typeof Job>;
 
+/** `POST /api/jobs/retry-failed`: only failed jobs of `type` when given, else every failed job. */
+export const RetryFailedRequest = z.object({ type: JobType.optional() }).default({});
+export type RetryFailedRequest = z.infer<typeof RetryFailedRequest>;
+
+/** The answer of `POST /api/jobs/retry-failed` (202): how many failed jobs were queued again. */
+export const RetryFailedResult = z.object({ retried: z.number().int().nonnegative() });
+export type RetryFailedResult = z.infer<typeof RetryFailedResult>;
+
 const itemFields = {
   id: z.number().int().positive(),
   sourceId: z.number().int().positive().nullable(),

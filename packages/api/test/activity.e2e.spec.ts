@@ -4,11 +4,23 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { ActivitySummary, HistoryEntry, Job, RulesPreview, Source, and, not } from '@mytube/shared';
+import {
+  ActivitySummary,
+  HistoryEntry,
+  Job,
+  RetryFailedResult,
+  RulesPreview,
+  Source,
+  and,
+  not,
+} from '@mytube/shared';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { eq } from 'drizzle-orm';
 import { AppModule } from '../src/app.module.js';
+import { DATABASE, type Database } from '../src/database/database.module.js';
+import { jobs as jobsTable } from '../src/database/schema.js';
 import { JOB_RUNNERS } from '../src/jobs/job-runner.js';
 import { JobsService } from '../src/jobs/jobs.service.js';
 import { CheckSourceRunner } from '../src/sync/check-source.runner.js';
@@ -146,6 +158,52 @@ describe('Activity (e2e)', () => {
     await request(server()).get('/api/jobs/9999/log').expect(404);
     await request(server()).get('/api/jobs/9999').expect(404);
     await request(server()).get('/api/jobs/nope').expect(400);
+  });
+
+  it('POST /api/jobs/retry-failed queues the failed jobs of the queue view again, once', async () => {
+    const jobs = app.get(JobsService);
+    // `rescan` has no runner in this app, so the retried jobs stay queued.
+    const failed = [1, 2, 3].map((n) => {
+      const { job } = jobs.enqueue({ type: 'rescan', payload: { title: `Rescan ${n}` } });
+      jobs.claimNext(['rescan']);
+      jobs.fail(job.id, `boom ${n}`, { retryable: false });
+      return job.id;
+    });
+    // Failed two days ago: no longer in the queue view, so Retry all leaves it alone.
+    const { job: stale } = jobs.enqueue({ type: 'rescan', payload: { title: 'Rescan stale' } });
+    jobs.claimNext(['rescan']);
+    jobs.fail(stale.id, 'old boom', { retryable: false });
+    const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000).toISOString();
+    app
+      .get<Database>(DATABASE)
+      .update(jobsTable)
+      .set({ finishedAt: twoDaysAgo })
+      .where(eq(jobsTable.id, stale.id))
+      .run();
+    const { job: done } = jobs.enqueue({ type: 'rescan', payload: { title: 'Rescan done' } });
+    jobs.claimNext(['rescan']);
+    jobs.complete(done.id, null);
+
+    // A type filter that matches none of them retries nothing.
+    const none = await request(server())
+      .post('/api/jobs/retry-failed')
+      .send({ type: 'download' })
+      .expect(202);
+    expect(RetryFailedResult.parse(none.body)).toEqual({ retried: 0 });
+    await request(server()).post('/api/jobs/retry-failed').send({ type: 'nope' }).expect(400);
+
+    const first = await request(server()).post('/api/jobs/retry-failed').expect(202);
+    expect(RetryFailedResult.parse(first.body)).toEqual({ retried: 3 });
+    for (const id of failed) {
+      expect(jobs.get(id)).toMatchObject({ status: 'queued', attempts: 0, error: null });
+    }
+    expect(jobs.get(done.id)?.status).toBe('done');
+    expect(jobs.get(stale.id)?.status).toBe('failed');
+
+    const second = await request(server()).post('/api/jobs/retry-failed').expect(202);
+    expect(RetryFailedResult.parse(second.body)).toEqual({ retried: 0 });
+
+    for (const id of [...failed, stale.id]) jobs.cancel(id);
   });
 
   it('POST /api/sources/:id/check and /api/sync/check-all enqueue checks', async () => {

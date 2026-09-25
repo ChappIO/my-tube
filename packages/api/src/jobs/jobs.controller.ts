@@ -1,5 +1,6 @@
 import { createReadStream, statSync } from 'node:fs';
 import {
+  Body,
   ConflictException,
   Controller,
   Get,
@@ -11,7 +12,8 @@ import {
   Query,
   StreamableFile,
 } from '@nestjs/common';
-import type { Job } from '@mytube/shared';
+import { RetryFailedRequest, type Job, type RetryFailedResult } from '@mytube/shared';
+import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { JobLogsService } from './job-logs.service.js';
 import { JobsService, toJobDto } from './jobs.service.js';
 
@@ -21,6 +23,18 @@ export class JobsController {
     private readonly jobs: JobsService,
     private readonly logs: JobLogsService,
   ) {}
+
+  /**
+   * Retry all failed: every failed job (only `type` when given) goes back in the queue as
+   * `:id/retry` puts one back. 202 `{ retried }`, 0 when there was nothing to retry.
+   */
+  @Post('retry-failed')
+  @HttpCode(202)
+  retryFailed(
+    @Body(new ZodValidationPipe(RetryFailedRequest)) body: RetryFailedRequest,
+  ): RetryFailedResult {
+    return { retried: this.jobs.retryFailed(body.type) };
+  }
 
   /** Any job, queued, running or long finished (the log viewer's header). 404 when unknown. */
   @Get(':id')

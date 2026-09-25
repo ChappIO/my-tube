@@ -331,4 +331,59 @@ describe('JobsService', () => {
     expect(jobs.get(first.id)?.status).toBe('cancelled');
     expect(jobs.retry(999)).toBeUndefined();
   });
+
+  it('retries the failed jobs the queue shows, skipping superseded ones and active keys', () => {
+    const { jobs, advance } = createJobsHarness();
+    const notified: number[] = [];
+    jobs.onEnqueue(() => notified.push(1));
+    const failWith = (type: 'download' | 'rescan', key: string | null, title: string) => {
+      const job = jobs.enqueue({ type, key, payload: { title } }).job;
+      expect(jobs.claimNext([type])?.id).toBe(job.id);
+      jobs.fail(job.id, `${title} broke`, { retryable: false });
+      return job;
+    };
+    // Failed more than a day ago: out of the queue view, so Retry all leaves it too.
+    const stale = failWith('download', 'video:old', 'Old');
+    advance(25 * 3_600_000);
+    const a = failWith('download', 'video:a', 'A');
+    const b = failWith('download', 'video:b', 'B');
+    const check = failWith('rescan', null, 'Rescan');
+    // Superseded: a newer job with the same key failed after it (only the newer one counts).
+    const oldC = failWith('download', 'video:c', 'C');
+    const newC = failWith('download', 'video:c', 'C');
+    const done = jobs.enqueue({ type: 'download', key: 'video:e', payload: { title: 'E' } }).job;
+    jobs.claimNext(['download']);
+    jobs.complete(done.id, null);
+    // A key that is already queued again (an older cancelled job, retried) is left alone.
+    const cancelled = jobs.enqueue({ type: 'download', key: 'video:d', payload: { title: 'D' } });
+    jobs.cancel(cancelled.job.id);
+    const d = failWith('download', 'video:d', 'D');
+    expect(jobs.retry(cancelled.job.id)?.status).toBe('queued');
+    notified.length = 0;
+
+    expect(jobs.retryFailed('download')).toBe(3);
+    for (const id of [a.id, b.id, newC.id]) {
+      expect(jobs.get(id)).toMatchObject({
+        status: 'queued',
+        attempts: 0,
+        error: null,
+        runAfter: null,
+        finishedAt: null,
+        startedAt: null,
+      });
+    }
+    expect(jobs.get(oldC.id)?.status).toBe('failed');
+    expect(jobs.get(stale.id)?.status).toBe('failed');
+    expect(jobs.get(d.id)?.status).toBe('failed');
+    expect(jobs.get(cancelled.job.id)?.status).toBe('queued');
+    expect(jobs.get(done.id)?.status).toBe('done');
+    expect(jobs.get(check.id)?.status).toBe('failed');
+    expect(notified).toHaveLength(1);
+
+    // Without a type every type goes; the superseded and blocked ones still stay.
+    expect(jobs.retryFailed()).toBe(1);
+    expect(jobs.get(check.id)?.status).toBe('queued');
+    expect(jobs.retryFailed()).toBe(0);
+    expect(notified).toHaveLength(2);
+  });
 });

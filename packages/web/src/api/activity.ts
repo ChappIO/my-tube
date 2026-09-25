@@ -1,4 +1,10 @@
-import { ActivitySummary, HistoryEntry, Job } from '@mytube/shared';
+import {
+  ActivitySummary,
+  HistoryEntry,
+  Job,
+  RetryFailedResult,
+  type RetryFailedRequest,
+} from '@mytube/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { z } from 'zod';
@@ -79,6 +85,21 @@ export function useRetryJob() {
   return useMutation({
     mutationKey: ['activity', 'retry'],
     mutationFn: (id: number) => apiPost(`/api/jobs/${id}/retry`, undefined, Job),
+    onSettled: invalidate,
+  });
+}
+
+/** `POST /api/jobs/retry-failed` (202 `{ retried }`): queues failed jobs again, `type` only. */
+export function retryFailedJobs(request: RetryFailedRequest): Promise<RetryFailedResult> {
+  return apiPost('/api/jobs/retry-failed', request, RetryFailedResult);
+}
+
+/** Retry all failed: `retryFailedJobs`, then refetches the queue and the badge. */
+export function useRetryFailed() {
+  const invalidate = useInvalidateActivity();
+  return useMutation({
+    mutationKey: ['activity', 'retry-failed'],
+    mutationFn: retryFailedJobs,
     onSettled: invalidate,
   });
 }

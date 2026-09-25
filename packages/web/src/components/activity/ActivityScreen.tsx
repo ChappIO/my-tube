@@ -9,11 +9,13 @@ import { Body, Meta } from '../ui/typography';
 import { ActivityList, ActivitySection } from './ActivitySection';
 import { HistoryTable } from './HistoryTable';
 import { QueueRow } from './QueueRow';
+import { RetryAllButton } from './RetryAllButton';
 
 /**
  * Activity: what is downloading now (the queue, polled every 2 s) and what landed recently
  * (the history, polled every 5 s). The outlined Check now button checks every subscribed
- * source without waiting for the interval.
+ * source without waiting for the interval; Retry all failed in the queue header queues every
+ * failed download again.
  */
 export function ActivityScreen() {
   const queue = useQueue();
@@ -61,7 +63,10 @@ export function ActivityScreen() {
           </div>
         }
       />
-      <ActivitySection label={queue.data ? `Queue · ${jobs.length}` : 'Queue'}>
+      <ActivitySection
+        label={queue.data ? `Queue · ${jobs.length}` : 'Queue'}
+        action={<RetryAllButton jobs={jobs} />}
+      >
         {loadFailed(queue) ? (
           <ErrorState what="the queue" {...fromQuery(queue)} />
         ) : queue.data === undefined ? (

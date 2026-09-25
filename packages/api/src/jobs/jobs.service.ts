@@ -10,6 +10,9 @@ import type { JobOutcome, JobProgress, JobRow } from './job-runner.js';
 export const JOBS_CLOCK = Symbol('JOBS_CLOCK');
 export type Clock = () => Date;
 
+/** How long a job that failed for good stays in the Activity queue (and in Retry all failed). */
+export const FAILED_VIEW_MS = 86_400_000;
+
 /** Delay before retry n (1-based): 1 min, 5 min, 25 min, then 25 min. */
 export function retryDelayMs(failedAttempts: number): number {
   const step = Math.min(Math.max(failedAttempts, 1), 3) - 1;
@@ -270,29 +273,11 @@ export class JobsService {
       if (!job || (job.status !== 'failed' && job.status !== 'cancelled')) {
         return { job, requeued: false };
       }
-      if (job.dedupeKey !== null) {
-        const active = tx
-          .select()
-          .from(jobs)
-          .where(
-            and(
-              eq(jobs.type, job.type),
-              eq(jobs.dedupeKey, job.dedupeKey),
-              inArray(jobs.status, ['queued', 'running']),
-            ),
-          )
-          .get();
-        if (active) return { job: active, requeued: false };
-      }
+      const active = activeWithKey(tx, job);
+      if (active) return { job: active, requeued: false };
       const row = tx
         .update(jobs)
-        .set({
-          ...requeued(this.now()),
-          attempts: 0,
-          error: null,
-          runAfter: null,
-          finishedAt: null,
-        })
+        .set(freshRetry(this.now()))
         .where(eq(jobs.id, id))
         .returning()
         .get();
@@ -300,6 +285,51 @@ export class JobsService {
     });
     if (result.requeued) for (const listener of this.enqueueListeners) listener();
     return result.job;
+  }
+
+  /**
+   * Retry all failed (Activity): the failed jobs the queue view shows (`failedInView`: within
+   * `failedWithinMs`, default a day, not superseded by a newer job with the same key), of one
+   * type when given, go back in the queue exactly as `retry` puts one back, in one transaction.
+   * One whose key already has a queued or running job is left alone. Returns how many were
+   * requeued, so it matches the count the queue showed.
+   */
+  retryFailed(type?: JobType, failedWithinMs = FAILED_VIEW_MS): number {
+    const retried = this.db.transaction((tx) => {
+      const now = this.now();
+      let count = 0;
+      for (const job of this.failedInView(tx, failedWithinMs, type)) {
+        if (activeWithKey(tx, job)) continue;
+        tx.update(jobs).set(freshRetry(now)).where(eq(jobs.id, job.id)).run();
+        count += 1;
+      }
+      return count;
+    });
+    if (retried > 0) for (const listener of this.enqueueListeners) listener();
+    return retried;
+  }
+
+  /**
+   * Jobs that failed for good within `failedWithinMs` and were not superseded by a newer job
+   * with the same key (a retry reuses the row, a dismissal cancels it), newest first: the
+   * failed rows of the Activity queue.
+   */
+  private failedInView(db: Database | Transaction, failedWithinMs: number, type?: JobType) {
+    const since = new Date(this.clock().getTime() - failedWithinMs).toISOString();
+    return db
+      .select()
+      .from(jobs)
+      .where(
+        and(
+          eq(jobs.status, 'failed'),
+          type === undefined ? undefined : eq(jobs.type, type),
+          sql`${jobs.finishedAt} >= ${since}`,
+          sql`NOT EXISTS (SELECT 1 FROM jobs newer WHERE newer.type = ${jobs.type}
+            AND newer.dedupe_key = ${jobs.dedupeKey} AND newer.id > ${jobs.id})`,
+        ),
+      )
+      .orderBy(desc(jobs.finishedAt), desc(jobs.id))
+      .all();
   }
 
   /** The newest job of a type and key, whatever its status (the sync's "was it given up?"). */
@@ -337,22 +367,8 @@ export class JobsService {
    * for good within `failedWithinMs` (default a day) and were not retried or superseded by a
    * newer job with the same key, newest first. Failed rows stay until retried or dismissed.
    */
-  queueView(failedWithinMs = 86_400_000): Job[] {
-    const since = new Date(this.clock().getTime() - failedWithinMs).toISOString();
-    const failed = this.db
-      .select()
-      .from(jobs)
-      .where(
-        and(
-          eq(jobs.status, 'failed'),
-          sql`${jobs.finishedAt} >= ${since}`,
-          sql`NOT EXISTS (SELECT 1 FROM jobs newer WHERE newer.type = ${jobs.type}
-            AND newer.dedupe_key = ${jobs.dedupeKey} AND newer.id > ${jobs.id})`,
-        ),
-      )
-      .orderBy(desc(jobs.finishedAt), desc(jobs.id))
-      .all()
-      .map(toJobDto);
+  queueView(failedWithinMs = FAILED_VIEW_MS): Job[] {
+    const failed = this.failedInView(this.db, failedWithinMs).map(toJobDto);
     return [...this.listQueue(), ...failed];
   }
 
@@ -440,6 +456,29 @@ function requeued(now: string) {
     totalBytes: null,
     stage: null,
   };
+}
+
+/** A failed or cancelled job put back as a fresh one: attempts, error and timestamps reset. */
+function freshRetry(now: string) {
+  return { ...requeued(now), attempts: 0, error: null, runAfter: null, finishedAt: null };
+}
+
+type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
+
+/** The queued or running job with the same type and key as `job`, if any (keyless: none). */
+function activeWithKey(tx: Transaction, job: JobRow): JobRow | undefined {
+  if (job.dedupeKey === null) return undefined;
+  return tx
+    .select()
+    .from(jobs)
+    .where(
+      and(
+        eq(jobs.type, job.type),
+        eq(jobs.dedupeKey, job.dedupeKey),
+        inArray(jobs.status, ['queued', 'running']),
+      ),
+    )
+    .get();
 }
 
 function wholeOrNull(value: number | null): number | null {
