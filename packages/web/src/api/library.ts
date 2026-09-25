@@ -1,6 +1,7 @@
 import {
   AlbumDetail,
   AlbumListItem,
+  ArtistDetail,
   ArtistListItem,
   type ArtworkKind,
   DownloadMissingResult,
@@ -45,6 +46,7 @@ export const libraryKeys = {
   home: ['library', 'home'] as const,
   summary: ['library', 'summary'] as const,
   artists: ['library', 'artists'] as const,
+  artist: (id: number) => ['library', 'artist', id] as const,
   albums: (artistId: number | undefined) => ['library', 'albums', artistId ?? 'all'] as const,
   album: (id: number) => ['library', 'album', id] as const,
   playlists: ['library', 'playlists'] as const,
@@ -194,6 +196,71 @@ export function useDownloadMissing() {
   return useMutation({
     mutationFn: (albumId: number) =>
       apiPost(`/api/library/albums/${albumId}/download-missing`, undefined, DownloadMissingResult),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: libraryKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ['activity'] });
+    },
+  });
+}
+
+/**
+ * The artist page (`GET /api/library/artists/:id`). A 404 is not retried; ids below 1 never
+ * fetch. It refreshes with the rest of `['library']` when a download finishes.
+ */
+export function useArtist(id: number) {
+  return useQuery({
+    queryKey: libraryKeys.artist(id),
+    enabled: id > 0,
+    queryFn: () => apiGet(`/api/library/artists/${id}`, ArtistDetail),
+    retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 2,
+  });
+}
+
+/**
+ * Download missing on the artist page (`POST /api/library/artists/:id/download-missing`, 202
+ * `{ queued }`): every track of the artist in the library that is not on disk.
+ */
+export function useArtistDownloadMissing() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (artistId: number) =>
+      apiPost(
+        `/api/library/artists/${artistId}/download-missing`,
+        undefined,
+        DownloadMissingResult,
+      ),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: libraryKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ['activity'] });
+    },
+  });
+}
+
+/**
+ * Download of a whole release the rules skip (`POST /api/library/albums/:id/download`, 202
+ * `{ queued }`): pins the album and queues its tracks, so the artist page moves it to "In your
+ * library".
+ */
+export function useDownloadAlbum() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (albumId: number) =>
+      apiPost(`/api/library/albums/${albumId}/download`, undefined, DownloadMissingResult),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: libraryKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ['activity'] });
+    },
+  });
+}
+
+/**
+ * Unpin (`DELETE /api/library/albums/:id/pin`, 204): the album's tracks follow the rules again
+ * and a revalidation of their source is queued.
+ */
+export function useUnpinAlbum() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (albumId: number) => apiDelete(`/api/library/albums/${albumId}/pin`),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: libraryKeys.all });
       void queryClient.invalidateQueries({ queryKey: ['activity'] });

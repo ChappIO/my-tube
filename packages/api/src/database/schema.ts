@@ -185,6 +185,8 @@ export const albums = sqliteTable(
     year: integer('year'),
     coverUrl: text('cover_url'),
     trackCount: integer('track_count'),
+    /** The user asked for the whole album: its tracks count as matching the rules. */
+    pinned: integer('pinned', { mode: 'boolean' }).notNull().default(false),
     ...timestamps,
   },
   (table) => [index('albums_artist_id').on(table.artistId)],

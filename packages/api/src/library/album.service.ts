@@ -1,18 +1,29 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { type AlbumDetail, type DownloadMissingResult, artworkPath } from '@mytube/shared';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { type SQL, and, asc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.module.js';
 import { albums, artists, sources, tracks } from '../database/schema.js';
 import { albumUrl } from '../sync/music-sync.js';
+import { RevalidationService } from '../sync/revalidation.service.js';
 import { SyncService } from '../sync/sync.service.js';
 import { LIBRARY_TRACK_STATUSES, toTrackItem } from './music-library.service.js';
 
 const IN_LIBRARY = sql.raw(`('${LIBRARY_TRACK_STATUSES.join("','")}')`);
 
+/** Album order: disc, then track number (unnumbered last), then id. */
+const ALBUM_ORDER = [
+  sql`coalesce(${tracks.discNumber}, 1)`,
+  sql`${tracks.trackNumber} IS NULL`,
+  asc(tracks.trackNumber),
+  asc(tracks.id),
+];
+
 /**
  * The album page: one album with its artist and its tracks in the library
- * (`GET /api/library/albums/:id`), and Download missing
- * (`POST /api/library/albums/:id/download-missing`).
+ * (`GET /api/library/albums/:id`), Download missing
+ * (`POST /api/library/albums/:id/download-missing`), and the pin: Download of a whole release
+ * (`POST /api/library/albums/:id/download`, the artist page's "Not in library") and Unpin
+ * (`DELETE /api/library/albums/:id/pin`).
  */
 @Injectable()
 export class AlbumService {
@@ -21,6 +32,7 @@ export class AlbumService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly sync: SyncService,
+    private readonly revalidation: RevalidationService,
   ) {}
 
   /**
@@ -38,12 +50,7 @@ export class AlbumService {
       .from(tracks)
       .innerJoin(artists, eq(artists.id, tracks.artistId))
       .where(and(eq(tracks.albumId, id), inArray(tracks.status, [...LIBRARY_TRACK_STATUSES])))
-      .orderBy(
-        sql`coalesce(${tracks.discNumber}, 1)`,
-        sql`${tracks.trackNumber} IS NULL`,
-        asc(tracks.trackNumber),
-        asc(tracks.id),
-      )
+      .orderBy(...ALBUM_ORDER)
       .all();
     const items = rows.map((row) => toTrackItem(row.track, row.artist, album));
 
@@ -76,6 +83,7 @@ export class AlbumService {
         coverUrl: artworkPath('album', album.id),
         youtubeId: album.youtubeId,
         youtubeUrl: album.youtubeId === null ? null : albumUrl(album.youtubeId),
+        pinned: album.pinned,
       },
       artist: {
         id: artist.id,
@@ -102,27 +110,83 @@ export class AlbumService {
   }
 
   /**
-   * Download missing: every track of the album in the library that is not on disk (`wanted`, or
-   * `missing` set back to `wanted`) gets a download job, also when its last one failed for good
-   * or was cancelled, since the user asked. Rule-skipped, unavailable and deleted tracks are left
+   * Download missing: every track of the album in the library that is not on disk gets a
+   * download job (`queueNotOnDisk`). Rule-skipped, unavailable and deleted tracks are left
    * alone: they are not in the library, and a track the rules skip would be removed again by the
    * next revalidation. Returns the jobs created (a track already queued adds none). 404 unknown.
    */
   downloadMissing(id: number): DownloadMissingResult {
-    const album = this.db.select({ id: albums.id }).from(albums).where(eq(albums.id, id)).get();
-    if (!album) throw new NotFoundException(`Album ${id} not found`);
+    this.requireAlbum(id);
+    const queued = this.queueNotOnDisk(eq(tracks.albumId, id));
+    this.logger.log(`Download missing for album ${id}: ${queued} queued`);
+    return { queued };
+  }
+
+  /**
+   * Download a whole release (the artist page's "Not in library"): pins the album, so its tracks
+   * count as matching whatever the source's rules say (in the sync and in revalidation), turns
+   * the tracks the rules skipped or the user deleted into `wanted`, and queues every track not
+   * on disk as Download missing does. `unavailable` tracks stay skipped: YouTube refuses them.
+   * Returns the jobs created. 404 unknown.
+   */
+  download(id: number): DownloadMissingResult {
+    this.requireAlbum(id);
+    const stamp = new Date().toISOString();
+    this.db.transaction((tx) => {
+      tx.update(albums).set({ pinned: true, updatedAt: stamp }).where(eq(albums.id, id)).run();
+      tx.update(tracks)
+        .set({ status: 'wanted', skipReason: null, updatedAt: stamp })
+        .where(
+          and(
+            eq(tracks.albumId, id),
+            eq(tracks.status, 'skipped'),
+            inArray(tracks.skipReason, ['no_match', 'no_longer_matches', 'deleted_by_user']),
+          ),
+        )
+        .run();
+    });
+    const queued = this.queueNotOnDisk(eq(tracks.albumId, id));
+    this.logger.log(`Pinned album ${id}: ${queued} queued`);
+    return { queued };
+  }
+
+  /**
+   * Unpin: the album's tracks follow their sources' rules again. A revalidation of each source
+   * that owns one of its tracks is queued at once, so the files those rules do not match are
+   * removed now rather than at the next scheduled revalidation. 404 unknown.
+   */
+  unpin(id: number): void {
+    this.requireAlbum(id);
+    this.db
+      .update(albums)
+      .set({ pinned: false, updatedAt: new Date().toISOString() })
+      .where(eq(albums.id, id))
+      .run();
+    const owners = this.db
+      .selectDistinct({ sourceId: tracks.sourceId })
+      .from(tracks)
+      .where(and(eq(tracks.albumId, id), isNotNull(tracks.sourceId)))
+      .all();
+    for (const { sourceId } of owners) this.revalidation.enqueue(sourceId!);
+    this.logger.log(`Unpinned album ${id}: ${owners.length} revalidation(s) queued`);
+  }
+
+  /**
+   * Queues a download for every track in `scope` (a condition on `tracks`: one album's, one
+   * artist's) in the library that is not on disk (`wanted`, or `missing` set back to `wanted`,
+   * since the track runner leaves `missing` alone), also when its last one failed for good or
+   * was cancelled: the user asked. Grouped by the tracks' own source (null for a removed one),
+   * since a sync-ordered playlist numbers its files by position. Returns the jobs created (a
+   * track already queued adds none).
+   */
+  queueNotOnDisk(scope: SQL | undefined): number {
     const candidates = this.db
       .select({ id: tracks.id, sourceId: tracks.sourceId, status: tracks.status })
       .from(tracks)
-      .where(and(eq(tracks.albumId, id), inArray(tracks.status, ['wanted', 'missing'])))
-      .orderBy(
-        sql`coalesce(${tracks.discNumber}, 1)`,
-        sql`${tracks.trackNumber} IS NULL`,
-        asc(tracks.trackNumber),
-        asc(tracks.id),
-      )
+      .where(and(scope, inArray(tracks.status, ['wanted', 'missing'])))
+      .orderBy(...ALBUM_ORDER)
       .all();
-    if (candidates.length === 0) return { queued: 0 };
+    if (candidates.length === 0) return 0;
 
     const missing = candidates.filter((track) => track.status === 'missing').map((t) => t.id);
     if (missing.length > 0) {
@@ -133,7 +197,6 @@ export class AlbumService {
         .run();
     }
 
-    // Grouped by the tracks' own source: a sync-ordered playlist numbers its files by position.
     const bySource = new Map<number | null, number[]>();
     for (const track of candidates) {
       bySource.set(track.sourceId, [...(bySource.get(track.sourceId) ?? []), track.id]);
@@ -146,12 +209,11 @@ export class AlbumService {
           : (this.db.select().from(sources).where(eq(sources.id, sourceId)).get() ?? null);
       queued += this.sync.music.enqueueDownloads(source, ids, { explicit: true });
     }
-    this.logger.log(`Download missing for album ${id}: ${queued} queued`);
-    return { queued };
+    return queued;
   }
 
   /** The tracks among `rows` with a download job queued or running. */
-  private queuedTrackIds(rows: readonly { id: number; youtubeId: string }[]): Set<number> {
+  queuedTrackIds(rows: readonly { id: number; youtubeId: string }[]): Set<number> {
     if (rows.length === 0) return new Set();
     const keys = rows.map((row) => `track:${row.youtubeId}`);
     const active = this.db.all<{ key: string }>(sql`
@@ -164,6 +226,11 @@ export class AlbumService {
     `);
     const activeKeys = new Set(active.map((row) => row.key));
     return new Set(rows.filter((row) => activeKeys.has(`track:${row.youtubeId}`)).map((r) => r.id));
+  }
+
+  private requireAlbum(id: number): void {
+    const album = this.db.select({ id: albums.id }).from(albums).where(eq(albums.id, id)).get();
+    if (!album) throw new NotFoundException(`Album ${id} not found`);
   }
 }
 

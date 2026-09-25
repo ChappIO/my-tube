@@ -12,6 +12,7 @@ import {
 import {
   AlbumListQuery,
   type AlbumDetail,
+  type ArtistDetail,
   type DownloadMissingResult,
   PlaylistListQuery,
   TrackListQuery,
@@ -25,20 +26,38 @@ import type { Response } from 'express';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { sendFile } from '../files/send-file.js';
 import { AlbumService } from './album.service.js';
+import { ArtistService } from './artist.service.js';
 import { MusicLibraryService } from './music-library.service.js';
 
-/** The Music tabs (artists, albums, playlists), the album page and Preview's track endpoints. */
+/**
+ * The Music tabs (artists, albums, playlists), the artist and album pages (with Download missing
+ * and the pin) and Preview's track endpoints.
+ */
 @Controller('library')
 export class MusicLibraryController {
   constructor(
     private readonly music: MusicLibraryService,
     private readonly albumPage: AlbumService,
+    private readonly artistPage: ArtistService,
   ) {}
 
   /** Artists with tracks in the library or added as sources, by name. */
   @Get('artists')
   artists(): ArtistListItem[] {
     return this.music.listArtists();
+  }
+
+  /** The artist page: the artist, its subscription, its albums in the library and the others. */
+  @Get('artists/:id')
+  artist(@Param('id', ParseIntPipe) id: number): ArtistDetail {
+    return this.artistPage.getArtist(id);
+  }
+
+  /** Download missing on the artist page: a download job per track of it not on disk. 202. */
+  @Post('artists/:id/download-missing')
+  @HttpCode(202)
+  downloadArtistMissing(@Param('id', ParseIntPipe) id: number): DownloadMissingResult {
+    return this.artistPage.downloadMissing(id);
   }
 
   /** Albums with tracks in the library, optionally of one artist. */
@@ -58,6 +77,20 @@ export class MusicLibraryController {
   @HttpCode(202)
   downloadMissing(@Param('id', ParseIntPipe) id: number): DownloadMissingResult {
     return this.albumPage.downloadMissing(id);
+  }
+
+  /** Download a whole release the rules skip: pins the album and queues its tracks. 202. */
+  @Post('albums/:id/download')
+  @HttpCode(202)
+  downloadAlbum(@Param('id', ParseIntPipe) id: number): DownloadMissingResult {
+    return this.albumPage.download(id);
+  }
+
+  /** Unpin: the album's tracks follow the rules again; a revalidation is queued. 204. */
+  @Delete('albums/:id/pin')
+  @HttpCode(204)
+  unpinAlbum(@Param('id', ParseIntPipe) id: number): void {
+    this.albumPage.unpin(id);
   }
 
   /** The Music library's synced playlists (`?library=music`, the default and only value). */

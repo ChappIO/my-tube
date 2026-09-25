@@ -17,6 +17,10 @@ export interface MusicTileProps {
   incomplete?: boolean;
   /** Artist subscription: shows the bell badge on the avatar. Ignored for albums and playlists. */
   subscribed?: boolean;
+  /** A red count on the art's top right, for example `1 missing` (the artist page's albums). */
+  badge?: string;
+  /** The album is pinned (the user asked for all of it): a `pinned` chip on the art's top left. */
+  pinned?: boolean;
   /** Cover or avatar URL (albums, artists). */
   src?: string;
   /** Track cover URLs for the playlist stack. */
@@ -45,6 +49,8 @@ export function MusicTile({
   meta,
   incomplete = false,
   subscribed = false,
+  badge,
+  pinned = false,
   src,
   covers,
   seed,
@@ -79,6 +85,8 @@ export function MusicTile({
           <Artwork src={src} seed={seed} shape={artist ? 'circle' : 'square'} />
         )}
         {artist && subscribed && <BellBadge />}
+        {pinned && <PinnedChip className="absolute top-2.5 left-2.5" />}
+        {badge && <MissingBadge text={badge} />}
       </div>
       <div className="min-w-0">
         <div className="text-tile-title text-pretty">{title}</div>
@@ -103,7 +111,7 @@ export function MusicTile({
     );
   }
 
-  // Without `onOpen` (artists: there is no artist page) the tile is plain content, not a button.
+  // Without `onOpen` or `link` the tile is plain content, not a button.
   const interactive = onOpen !== undefined;
   return (
     <div
@@ -130,6 +138,30 @@ function BellBadge() {
       className="absolute top-[calc(14.6%-14px)] right-[calc(14.6%-14px)] grid size-7 place-items-center rounded-full bg-red text-white shadow-[0_0_0_3px_var(--color-bg)]"
     >
       <BellIcon size={14} />
+    </span>
+  );
+}
+
+/** The red count on an album's art, top right: Space Mono 700 11, white on red, a pill. */
+function MissingBadge({ text }: { text: string }) {
+  return (
+    <span className="absolute top-2.5 right-2.5 rounded-pill bg-red px-2 py-[3px] text-nav-badge text-white">
+      {text}
+    </span>
+  );
+}
+
+/**
+ * The `pinned` chip: Space Mono 11 on a `surface` pill, like a rule chip. On a pinned album's
+ * tile (the artist page) and in the album page header.
+ */
+export function PinnedChip({ className }: { className?: string }) {
+  return (
+    <span
+      title="Kept whatever the rules say"
+      className={cx('rounded-pill bg-surface px-2 py-[3px] text-meta-sm text-ink', className)}
+    >
+      pinned
     </span>
   );
 }

@@ -5,6 +5,7 @@ import {
   type ItemStatus,
   type Matcher,
   type MatcherContext,
+  type MatcherResult,
   type RulesPreview,
   type SkipReason,
 } from '@mytube/shared';
@@ -24,7 +25,7 @@ import {
 import { removeMediaFiles } from '../files/media-files.js';
 import type { JobRow } from '../jobs/job-runner.js';
 import { JobsService } from '../jobs/jobs.service.js';
-import { wantedElsewhere } from './claims.js';
+import { pinnedAlbumIds, wantedElsewhere } from './claims.js';
 import { SourceGoneError, SyncService } from './sync.service.js';
 
 /** How often each subscribed source's files are compared with its rules. */
@@ -41,6 +42,8 @@ interface Item {
   skipReason: SkipReason | null;
   filePath: string | null;
   fileSizeBytes: number | null;
+  /** A track on a pinned album: it counts as matching whatever the tree says. */
+  pinned: boolean;
   ctx: MatcherContext;
 }
 
@@ -87,6 +90,8 @@ export interface RevalidationContext {
  *   of another source (items belong to the source that first listed them, `source_id`).
  * - An item another source still wants (a playlist listing it, or the source that owns it,
  *   whose tree matches) is neither removed nor unwanted: a match wins (`wantedElsewhere`).
+ * - A track on a pinned album counts as matching (`onPinnedAlbum` in `claims.ts`): kept, never
+ *   unwanted, and wanted again when the rules skipped it.
  *
  * `preview` runs the same evaluation against a candidate tree without touching anything.
  */
@@ -285,18 +290,21 @@ export class RevalidationService {
         ...item.ctx,
         playlistPosition: null,
       });
+    // A track on a pinned album counts as matching: the user asked for the whole album.
+    const evaluate = (item: Item): MatcherResult =>
+      item.pinned ? { matches: true } : evaluateMatcher(matcher, item.ctx);
     for (const item of this.items(source, now)) {
       if (item.status === 'on_disk') {
-        const result = evaluateMatcher(matcher, item.ctx);
+        const result = evaluate(item);
         if (result.matches || elsewhere(item)) plan.keep++;
         else plan.remove.push({ item, failing: result.failing ?? [] });
       } else if (item.status === 'wanted') {
-        if (!evaluateMatcher(matcher, item.ctx).matches && !elsewhere(item)) plan.unwant.push(item);
+        if (!evaluate(item).matches && !elsewhere(item)) plan.unwant.push(item);
       } else if (
         item.status === 'skipped' &&
         (item.skipReason === 'no_match' || item.skipReason === 'no_longer_matches')
       ) {
-        if (evaluateMatcher(matcher, item.ctx).matches) plan.rewant.push(item);
+        if (evaluate(item).matches) plan.rewant.push(item);
       }
     }
     return plan;
@@ -306,6 +314,7 @@ export class RevalidationService {
   private items(source: SourceRow, now: Date): Item[] {
     const positions = this.positions(source);
     if (source.library === 'music') {
+      const pinned = pinnedAlbumIds(this.db);
       return this.db
         .select({ track: tracks, artistName: artists.name, artistId: artists.youtubeId })
         .from(tracks)
@@ -321,6 +330,7 @@ export class RevalidationService {
           skipReason: track.skipReason,
           filePath: track.filePath,
           fileSizeBytes: track.fileSizeBytes,
+          pinned: track.albumId !== null && pinned.has(track.albumId),
           ctx: {
             title: track.title,
             isShort: false,
@@ -351,6 +361,7 @@ export class RevalidationService {
         skipReason: video.skipReason,
         filePath: video.filePath,
         fileSizeBytes: video.fileSizeBytes,
+        pinned: false,
         ctx: {
           title: video.title,
           isShort: video.isShort,

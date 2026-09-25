@@ -219,6 +219,27 @@ function MediaDemo() {
         </TileGrid>
       </Section>
 
+      <Section label="Artist page · albums (missing badge, pinned chip)">
+        <TileGrid>
+          <MusicTile
+            kind="album"
+            title="In Rainbows"
+            meta="2007 · 10 tracks"
+            badge="1 missing"
+            seed="In Rainbows"
+            onOpen={() => log('onOpen: In Rainbows')}
+          />
+          <MusicTile
+            kind="album"
+            title="Pablo Honey"
+            meta="1993 · 12 tracks"
+            pinned
+            seed="Pablo Honey"
+            onOpen={() => log('onOpen: Pablo Honey')}
+          />
+        </TileGrid>
+      </Section>
+
       <Section label="Music · Artists">
         <TileGrid>
           {artists.map(([name, meta, isSubscribed]) => (

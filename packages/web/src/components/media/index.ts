@@ -4,7 +4,7 @@ export { CardGrid, type CardGridProps } from './CardGrid';
 export { DurationBadge, type DurationBadgeProps } from './DurationBadge';
 export { MediaCard, type MediaCardProps } from './MediaCard';
 export { MediaTile, type MediaTileProps } from './MediaTile';
-export { MusicTile, type MusicTileProps } from './MusicTile';
+export { MusicTile, type MusicTileProps, PinnedChip } from './MusicTile';
 export { placeholderFill } from './placeholder';
 export { PlaylistStack, type PlaylistStackProps } from './PlaylistStack';
 export { TileGrid, type TileGridProps } from './TileGrid';

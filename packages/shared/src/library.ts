@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ArtworkPath } from './artwork.js';
 import { Track, Video } from './items.js';
+import { Matcher } from './matchers.js';
 
 /*
  * The library read models (`/api/library/*`): the Videos tab and channel page grid, the Music
@@ -259,6 +260,11 @@ export const AlbumDetail = z.object({
     youtubeId: z.string().nullable(),
     /** `https://music.youtube.com/playlist?list=<youtubeId>`, null without an id. */
     youtubeUrl: z.url().nullable(),
+    /**
+     * The user asked for the whole album (`POST /api/library/albums/:id/download`): its tracks
+     * count as matching whatever the source's rules say, in the sync and in revalidation.
+     */
+    pinned: z.boolean(),
   }),
   artist: z.object({
     id: z.number().int().positive(),
@@ -295,6 +301,77 @@ export const DownloadMissingResult = z.object({
   queued: z.number().int().nonnegative(),
 });
 export type DownloadMissingResult = z.infer<typeof DownloadMissingResult>;
+
+// ---------------------------------------------------------------------------------------
+// Artist page.
+// ---------------------------------------------------------------------------------------
+
+/**
+ * An album of the artist page's "In your library": the Albums tab item plus the album page's
+ * counts and the pin. Listed when a track is in the library or the album is pinned.
+ */
+export const ArtistAlbum = AlbumListItem.extend({
+  /** Tracks the rules (or the pin) want that are not on disk yet (`wanted`, `downloading`). */
+  wantedCount: z.number().int().nonnegative(),
+  /** Tracks in the library not on disk (`trackCount − onDiskCount`): the tile's red badge. */
+  missingCount: z.number().int().nonnegative(),
+  pinned: z.boolean(),
+});
+export type ArtistAlbum = z.infer<typeof ArtistAlbum>;
+
+/**
+ * A release of the artist with nothing in the library ("Not in library"): the sync listed it and
+ * stored its tracks, but the rules skip every one of them. `trackCount` is YouTube's count for
+ * the release (the tracks stored when YouTube gave none). Releases whose tracks all sit on
+ * another album (a single of an album track) are not listed.
+ */
+export const OtherRelease = z.object({
+  id: z.number().int().positive(),
+  title: z.string(),
+  year: z.number().int().nullable(),
+  coverUrl: ArtworkPath.nullable(),
+  trackCount: z.number().int().nonnegative(),
+  /** The release on YouTube Music, null for albums grouped from uploads. */
+  youtubeUrl: z.url().nullable(),
+});
+export type OtherRelease = z.infer<typeof OtherRelease>;
+
+/**
+ * The artist page (`GET /api/library/artists/:id`): the artist with its source's subscription,
+ * the header counts, its albums in the library and its other releases.
+ */
+export const ArtistDetail = z.object({
+  artist: z.object({
+    id: z.number().int().positive(),
+    name: z.string(),
+    avatarUrl: ArtworkPath.nullable(),
+    /** The artist on YouTube Music (`https://music.youtube.com/channel/<id>`), null without an id. */
+    youtubeUrl: z.url().nullable(),
+    /** The artist's source (the bell, the rules, Check for new releases), null when not one. */
+    sourceId: z.number().int().positive().nullable(),
+    subscribed: z.boolean(),
+    /** When the source was added (the Subscription card's Since), null without a source. */
+    since: z.iso.datetime().nullable(),
+    lastCheckedAt: z.iso.datetime().nullable(),
+    /** The source's rules, null without a source. */
+    matcher: Matcher.nullable(),
+  }),
+  /** Albums in the library (`inLibrary.length`). */
+  albumCount: z.number().int().nonnegative(),
+  /** The artist's tracks in the library that are on disk. */
+  onDiskTracks: z.number().int().nonnegative(),
+  /** The artist's tracks in the library that are not on disk (wanted, downloading, missing). */
+  missingTracks: z.number().int().nonnegative(),
+  /** Of those, the ones the rules want that were never downloaded (`wanted`, `downloading`). */
+  wantedTracks: z.number().int().nonnegative(),
+  /** Tracks not on disk with a download job queued or running. */
+  queuedTracks: z.number().int().nonnegative(),
+  /** Newest year first, then title. */
+  inLibrary: z.array(ArtistAlbum),
+  /** Newest year first, then the order the sync listed them (the Releases tab's, newest first). */
+  notInLibrary: z.array(OtherRelease),
+});
+export type ArtistDetail = z.infer<typeof ArtistDetail>;
 
 /**
  * `GET /api/library/playlists` query. Only the Music library has a Playlists tab; the Video
