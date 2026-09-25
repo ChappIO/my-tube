@@ -7,9 +7,7 @@ import {
   jobLogTarget,
   openAdd,
   openJobLog,
-  openEmptyPreview,
   openPreview,
-  openTrackPreview,
   previewKey,
   previewTarget,
   subscribeUiState,
@@ -55,22 +53,17 @@ describe('Preview state', () => {
     openPreview(4);
     openPreview(4);
     expect(previewTarget()).toEqual({ kind: 'video', id: 4 });
-    openTrackPreview(4);
-    expect(previewTarget()).toEqual({ kind: 'track', id: 4 });
-    openEmptyPreview('First Light');
-    openEmptyPreview('First Light');
-    expect(previewTarget()).toEqual({ kind: 'empty', title: 'First Light' });
+    openPreview(5);
+    expect(previewTarget()).toEqual({ kind: 'video', id: 5 });
     closePreview();
     closePreview();
     expect(previewTarget()).toBeNull();
-    expect(listener).toHaveBeenCalledTimes(4);
+    expect(listener).toHaveBeenCalledTimes(3);
     unsubscribe();
   });
 
   it('keys each target', () => {
     expect(previewKey({ kind: 'video', id: 4 })).toBe('video:4');
-    expect(previewKey({ kind: 'track', id: 4 })).toBe('track:4');
-    expect(previewKey({ kind: 'empty', title: 'X' })).toBe('empty:X');
   });
 });
 

@@ -32,8 +32,6 @@ import {
   type LucideIcon,
   type LucideProps,
   Music,
-  Pause,
-  Play,
   Plus,
   RefreshCw,
   Search,
@@ -55,9 +53,26 @@ export type IconProps = Omit<LucideProps, 'ref'>;
 export const ICON_SIZE = 16;
 const STROKE_WIDTH = 2;
 
+/**
+ * A filled glyph drawn from its own path (24×24 viewBox, `currentColor`) instead of Lucide: the
+ * player's transport glyphs, whose shapes the design gives as paths.
+ */
+export interface OwnGlyph {
+  kind: 'own';
+  path: string;
+}
+
+function ownGlyph(path: string): OwnGlyph {
+  return { kind: 'own', path };
+}
+
+function isOwnGlyph(base: LucideIcon | OwnGlyph): base is OwnGlyph {
+  return 'kind' in base && base.kind === 'own';
+}
+
 export interface IconEntry {
-  /** The Lucide glyph. Unique across the registry. */
-  base: LucideIcon;
+  /** The Lucide glyph or an own path. Unique across the registry. */
+  base: LucideIcon | OwnGlyph;
   /** The one thing this icon means. */
   meaning: string;
   /** Where it appears. */
@@ -122,8 +137,6 @@ export const ICON_REGISTRY = {
     usedIn: 'rule builder "+ group"',
   },
   SearchIcon: { base: Search, meaning: 'Search', usedIn: 'search inputs (demo only so far)' },
-  PlayIcon: { base: Play, meaning: 'Play (preview)', usedIn: 'preview player' },
-  PauseIcon: { base: Pause, meaning: 'Pause (preview)', usedIn: 'preview player' },
   TrashIcon: { base: Trash2, meaning: 'Delete files', usedIn: 'explicit delete actions' },
   UnlinkIcon: {
     base: Unlink,
@@ -155,12 +168,42 @@ export const ICON_REGISTRY = {
     usedIn: 'log viewer Auto-scroll',
   },
 
+  // The player's transport (own filled paths from the design, 24×24).
+  PlayIcon: {
+    base: ownGlyph('M8 5v14l11-7z'),
+    meaning: 'Play',
+    usedIn: 'player bar, album page Play, artist page Play all, video Preview play circle',
+  },
+  PauseIcon: {
+    base: ownGlyph('M6 5h4v14H6zM14 5h4v14h-4z'),
+    meaning: 'Pause',
+    usedIn: 'player bar',
+  },
+  PreviousIcon: {
+    base: ownGlyph('M6 6h2v12H6zm3.5 6 8.5 6V6z'),
+    meaning: 'Previous item in the player queue (or restart it)',
+    usedIn: 'player bar',
+  },
+  NextIcon: {
+    base: ownGlyph('M16 6h2v12h-2zM6 18l8.5-6L6 6z'),
+    meaning: 'Next item in the player queue',
+    usedIn: 'player bar, floating card Up next',
+  },
+
   // Direction.
   BackIcon: { base: ArrowLeft, meaning: 'Back to parent page', usedIn: 'BackLink ("← Video")' },
-  ChevronLeftIcon: { base: ChevronLeft, meaning: 'Previous', usedIn: 'pagers (not used yet)' },
-  ChevronRightIcon: { base: ChevronRight, meaning: 'Next', usedIn: 'pagers (not used yet)' },
+  ChevronLeftIcon: {
+    base: ChevronLeft,
+    meaning: 'Previous page',
+    usedIn: 'pagers (not used yet)',
+  },
+  ChevronRightIcon: { base: ChevronRight, meaning: 'Next page', usedIn: 'pagers (not used yet)' },
   // The Tracks sort direction is text arrows (↑/↓), not an icon.
-  ChevronUpIcon: { base: ChevronUp, meaning: 'Collapse', usedIn: 'not used yet' },
+  ChevronUpIcon: {
+    base: ChevronUp,
+    meaning: 'Open Now Playing (expand the player)',
+    usedIn: 'player bar (stroke 2.5)',
+  },
   ChevronDownIcon: {
     base: ChevronDown,
     meaning: 'Expand / open a list',
@@ -176,7 +219,24 @@ function AppIcon({
   strokeWidth = STROKE_WIDTH,
   style,
   ...props
-}: IconProps & { base: LucideIcon }) {
+}: IconProps & { base: LucideIcon | OwnGlyph }) {
+  if (isOwnGlyph(Base)) {
+    const { absoluteStrokeWidth: _absolute, ...rest } = props;
+    return (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        aria-hidden
+        style={{ flexShrink: 0, ...style }}
+        {...rest}
+      >
+        <path d={Base.path} />
+      </svg>
+    );
+  }
   return (
     <Base
       size={size}
@@ -244,10 +304,6 @@ export const AddConditionIcon = icon('AddConditionIcon');
 export const AddGroupIcon = icon('AddGroupIcon');
 /** Search: search inputs. */
 export const SearchIcon = icon('SearchIcon');
-/** Play (preview): preview player. */
-export const PlayIcon = icon('PlayIcon');
-/** Pause (preview): preview player. */
-export const PauseIcon = icon('PauseIcon');
 /** Delete files: explicit delete actions. */
 export const TrashIcon = icon('TrashIcon');
 /** Remove a source from the library (files stay): channel page "Remove from library". */
@@ -269,13 +325,22 @@ export const RefreshIcon = icon('RefreshIcon');
 /** More actions menu: row menus. */
 export const MoreIcon = icon('MoreIcon');
 
+/** Play: player bar, album page Play, artist page Play all, video Preview. Own filled path. */
+export const PlayIcon = icon('PlayIcon');
+/** Pause: player bar. Own filled path. */
+export const PauseIcon = icon('PauseIcon');
+/** Previous item in the player queue (or restart it): player bar. Own filled path. */
+export const PreviousIcon = icon('PreviousIcon');
+/** Next item in the player queue: player bar, floating card Up next. Own filled path. */
+export const NextIcon = icon('NextIcon');
+
 /** Back to parent page: BackLink ("← Video"). */
 export const BackIcon = icon('BackIcon');
-/** Previous: pagers. */
+/** Previous page: pagers. */
 export const ChevronLeftIcon = icon('ChevronLeftIcon');
-/** Next: pagers. */
+/** Next page: pagers. */
 export const ChevronRightIcon = icon('ChevronRightIcon');
-/** Collapse / sort ascending: Tracks table sort. */
+/** Open Now Playing (expand the player): the player bar's chevron. */
 export const ChevronUpIcon = icon('ChevronUpIcon');
 /** Expand / sort descending: Tracks table sort, selects. */
 export const ChevronDownIcon = icon('ChevronDownIcon');

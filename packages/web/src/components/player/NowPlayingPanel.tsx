@@ -1,0 +1,65 @@
+import { Link } from '@tanstack/react-router';
+import type { PlayerItem } from '../../player-state';
+import { Artwork } from '../media';
+import { cx, focusRing } from '../ui/cx';
+import { Meta } from '../ui/typography';
+import { barSubLine } from './PlayerBar';
+import { VisualizerCanvas } from './VisualizerCanvas';
+
+/** The caption under the panel. */
+export const VISUALIZER_CAPTION = 'Visualizer · colours picked from the cover';
+
+/**
+ * Now Playing's music panel: 16/10 (1/1 narrow), radius 18, `player` black. Layers, bottom to
+ * top: the cover blurred and darkened as the background (inset −40px and scaled so the blur's
+ * soft edges stay outside), the visualizer canvas, and the overlay along the bottom (the 72px
+ * cover, a link to the album page, beside the title and `artist · album` in white over a dark
+ * fade). The caption sits under the panel.
+ */
+export function NowPlayingPanel({ item }: { item: PlayerItem }) {
+  return (
+    <div className="grid gap-3">
+      <div className="relative aspect-square overflow-hidden rounded-modal bg-player wide:aspect-[16/10]">
+        {item.artUrl && (
+          <img
+            src={item.artUrl}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            className="absolute -inset-10 size-[calc(100%+80px)] scale-110 object-cover blur-[40px] brightness-[0.45] saturate-[1.2]"
+          />
+        )}
+        <VisualizerCanvas className="absolute inset-0" />
+        <div className="absolute inset-x-0 bottom-0 flex items-end gap-[18px] bg-linear-to-t from-player-fade-panel to-transparent px-5 pt-16 pb-5 text-white wide:px-7 wide:pb-6">
+          <CoverLink item={item} />
+          <div className="grid min-w-0 gap-1">
+            <h1 className="font-sans text-[22px] leading-[1.1] font-extrabold tracking-[-0.02em] text-balance wide:text-[30px]">
+              {item.title}
+            </h1>
+            <p className="truncate font-sans text-[14px] opacity-85">{barSubLine(item)}</p>
+          </div>
+        </div>
+      </div>
+      <Meta as="p">{VISUALIZER_CAPTION}</Meta>
+    </div>
+  );
+}
+
+/** The 72px cover: a link to the album page (plain art for a track without an album). */
+function CoverLink({ item }: { item: PlayerItem }) {
+  const art = (
+    <Artwork size="flush" src={item.artUrl ?? undefined} seed={item.album ?? item.title} />
+  );
+  const box = 'block size-[72px] shrink-0 overflow-hidden rounded-[10px] shadow-player-cover';
+  if (item.albumId === undefined) return <span className={box}>{art}</span>;
+  return (
+    <Link
+      to="/music/album/$id"
+      params={{ id: String(item.albumId) }}
+      aria-label={`Open the album ${item.album ?? ''}`.trim()}
+      className={cx(box, focusRing)}
+    >
+      {art}
+    </Link>
+  );
+}

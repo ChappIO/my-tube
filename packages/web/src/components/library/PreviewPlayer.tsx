@@ -1,5 +1,5 @@
 import type { VideoListItem } from '@mytube/shared';
-import { type ReactNode, useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { videoStreamUrl } from '../../api/library';
 import { PlayIcon } from '../icons';
 import { cx, focusRing } from '../ui/cx';
@@ -84,20 +84,7 @@ export function PreviewPlayer({ video, playable, onUnplayable }: PreviewPlayerPr
 }
 
 /**
- * A plain line in the empty 16/9 player area, such as "Nothing on disk yet." for an album or
- * playlist tile with no track on disk (`text-meta` in `player-note`).
- */
-export function PreviewNote({ children }: { children: ReactNode }) {
-  return (
-    <div className="grid aspect-video w-full place-items-center bg-player px-6 text-center text-meta text-player-note">
-      {children}
-    </div>
-  );
-}
-
-/**
- * The 72px translucent play circle over the player area until playback starts (video and audio
- * Preview share it).
+ * The 72px translucent play circle over the player area until playback starts.
  */
 export function PlayCircle({ label, onPlay }: { label: string; onPlay: () => void }) {
   return (
@@ -110,7 +97,7 @@ export function PlayCircle({ label, onPlay }: { label: string; onPlay: () => voi
         focusRing,
       )}
     >
-      <PlayIcon size={28} fill="currentColor" strokeWidth={0} className="ml-1" />
+      <PlayIcon size={28} className="ml-0.5" />
     </button>
   );
 }

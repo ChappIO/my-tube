@@ -1,11 +1,9 @@
-import type { TrackListItem } from '@mytube/shared';
-import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
-import { primeTrack, useTracks } from '../../api/library';
-import { openTrackPreview } from '../../ui-state';
+import { useTracks } from '../../api/library';
 import { useDebounced } from '../../use-debounced';
 import { useNow } from '../../use-now';
+import { startQueue, tracksTableQueue } from '../player/queues';
 import { StatusLine } from '../sources/SourceBits';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
@@ -25,7 +23,7 @@ const FILTER_DEBOUNCE_MS = 300;
 
 /**
  * Music → Tracks: the toolbar, the narrow sort pills, the table and **Load
- * more** (60 per page). Filtering and sorting are server-side (`GET /api/library/tracks`); the
+ * more** (60 per page). A row plays the table from there down. Filtering and sorting are server-side (`GET /api/library/tracks`); the
  * filter text, the filter and the sort are the URL search params of `/music/tracks`.
  */
 export function TracksTab() {
@@ -42,14 +40,12 @@ export function TracksTab() {
   const [text, setText] = useFilterText(state.q, (q) => update({ q }, true));
   const tracks = useTracks(state);
   const now = useNow();
-  const queryClient = useQueryClient();
-  const open = (track: TrackListItem) => {
-    primeTrack(queryClient, track);
-    openTrackPreview(track.id);
-  };
 
   const first = tracks.data?.pages[0];
   const items = tracks.data?.pages.flatMap((page) => page.items) ?? [];
+  // The queue is the table as filtered and sorted, as far as it is loaded (Load more adds pages
+  // to the table, not to a queue that is already playing).
+  const play = (track: { id: number }) => startQueue(tracksTableQueue(items, track.id));
   const onSort = (column: TrackListState['sort']) => update(nextSort(state, column));
 
   return (
@@ -76,7 +72,7 @@ export function TracksTab() {
           sort={state.sort}
           dir={state.dir}
           onSort={onSort}
-          onOpen={open}
+          onPlay={play}
           now={now}
         />
       )}

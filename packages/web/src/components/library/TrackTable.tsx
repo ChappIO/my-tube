@@ -2,6 +2,7 @@ import type { SortDir, TrackListItem, TrackSort } from '@mytube/shared';
 import type { ReactNode } from 'react';
 import { formatLength, relativeTime } from '../../format';
 import { Artwork } from '../media';
+import { playable } from '../player/queues';
 import { cx, focusRingInset } from '../ui/cx';
 import { TableHeaderLabel } from '../ui/typography';
 import { ArtistLink } from './ArtistLink';
@@ -16,7 +17,8 @@ export interface TrackTableProps {
   sort: TrackSort;
   dir: SortDir;
   onSort: (column: TrackSort) => void;
-  onOpen: (track: TrackListItem) => void;
+  /** A row click: plays the table from that row (rows of tracks not on disk do nothing). */
+  onPlay: (track: TrackListItem) => void;
   /** The clock for the Added column. */
   now: number;
 }
@@ -24,10 +26,10 @@ export interface TrackTableProps {
 /**
  * The Tracks table: a bordered radius-12 list with a `surface` header row of
  * sortable column labels (every column but # and Status; the active one in `ink` with ↑/↓)
- * over rows that open Preview. Below 760px the header is hidden (`TrackSortPills` sorts
+ * over rows that play (the table from that row down, in the player). Below 760px the header is hidden (`TrackSortPills` sorts
  * instead) and each row collapses to a list item.
  */
-export function TrackTable({ tracks, sort, dir, onSort, onOpen, now }: TrackTableProps) {
+export function TrackTable({ tracks, sort, dir, onSort, onPlay, now }: TrackTableProps) {
   return (
     <div className="overflow-hidden rounded-tile border border-line">
       <TrackTableHeader sort={sort} dir={dir} onSort={onSort} />
@@ -38,7 +40,7 @@ export function TrackTable({ tracks, sort, dir, onSort, onOpen, now }: TrackTabl
             track={track}
             number={index + 1}
             now={now}
-            onOpen={() => onOpen(track)}
+            onPlay={playable(track) ? () => onPlay(track) : undefined}
           />
         ))}
       </ul>
@@ -91,7 +93,8 @@ interface TrackRowProps {
   track: TrackListItem;
   number: number;
   now: number;
-  onOpen: () => void;
+  /** Plays from this row; undefined for a track not on disk (no row action). */
+  onPlay: (() => void) | undefined;
 }
 
 /**
@@ -100,23 +103,30 @@ interface TrackRowProps {
  * title over `artist · album`, the length over the status on the right.
  *
  * Overlay pattern (as on media tiles), so no control is nested in another: a transparent
- * full-size button opens Preview, the cells let clicks through to it, and the wide artist name
- * is a link to the artist page above it.
+ * full-size button plays, the cells let clicks through to it, and the wide artist name is a link
+ * to the artist page above it.
  */
-function TrackRow({ track, number, now, onOpen }: TrackRowProps) {
+function TrackRow({ track, number, now, onPlay }: TrackRowProps) {
   const status = trackStatus(track.status);
   const cover = track.coverUrl ?? undefined;
   const album = track.album?.title ?? null;
   const length = track.durationSeconds === null ? '—' : formatLength(track.durationSeconds);
   const added = track.downloadedAt ? relativeTime(track.downloadedAt, now) : '—';
   return (
-    <li className="relative border-t border-line first:border-t-0 hover:bg-surface wide:first:border-t">
-      <button
-        type="button"
-        aria-label={track.title}
-        onClick={onOpen}
-        className={cx('absolute inset-0 z-0 cursor-pointer', focusRingInset)}
-      />
+    <li
+      className={cx(
+        'relative border-t border-line first:border-t-0 wide:first:border-t',
+        onPlay && 'hover:bg-surface',
+      )}
+    >
+      {onPlay && (
+        <button
+          type="button"
+          aria-label={`Play ${track.title}`}
+          onClick={onPlay}
+          className={cx('absolute inset-0 z-0 cursor-pointer', focusRingInset)}
+        />
+      )}
       <div
         className={cx(
           'pointer-events-none relative z-[1] flex w-full items-center gap-3 px-3 py-[10px] text-left font-sans text-[14px] font-normal text-ink',

@@ -6,6 +6,7 @@ import { openAdd } from '../../ui-state';
 import { useNow } from '../../use-now';
 import { PlusIcon } from '../icons';
 import { TileGrid } from '../media';
+import { homeQueue, startQueue } from '../player/queues';
 import { StatusLine } from '../sources/SourceBits';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
@@ -53,7 +54,7 @@ export function HomeScreen() {
       <DayGroup key={group.day} label={dayLabel(group.day, today)}>
         <TileGrid>
           {group.items.map((item) => (
-            <HomeTile key={`${item.kind}:${item.id}`} item={item} now={now} />
+            <HomeTile key={`${item.kind}:${item.id}`} item={item} group={group.items} now={now} />
           ))}
         </TileGrid>
       </DayGroup>
@@ -85,10 +86,20 @@ export function HomeScreen() {
 }
 
 /**
- * One Home item. Videos get the fixed chin with the channel; tracks show only their cover, with
- * the chin sliding up on hover.
+ * One Home item. Videos get the fixed chin with the channel (and open Preview); tracks show only
+ * their cover, with the chin sliding up on hover, and play the day group's music from there.
  */
-function HomeTile({ item, now }: { item: HomeItem; now: number }) {
-  if (item.kind === 'music') return <TrackTile track={item} />;
+function HomeTile({
+  item,
+  group,
+  now,
+}: {
+  item: HomeItem;
+  group: readonly HomeItem[];
+  now: number;
+}) {
+  if (item.kind === 'music') {
+    return <TrackTile track={item} onPlay={() => startQueue(homeQueue(group, item.id))} />;
+  }
   return <VideoTile video={item} meta="channel" now={now} />;
 }

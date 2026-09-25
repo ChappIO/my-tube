@@ -47,22 +47,15 @@ export function useAddModal(): { open: boolean; openAdd: () => void; closeAdd: (
 }
 
 /**
- * What Preview shows: a video, a track, or the title of an album or playlist that has nothing
- * on disk yet (the player area says so).
+ * What Preview shows: a video. Music plays in the player instead (`player-state.ts`); video tiles
+ * keep Preview until the video player replaces it.
  */
-export type PreviewTarget =
-  | { kind: 'video'; id: number }
-  | { kind: 'track'; id: number }
-  | { kind: 'empty'; title: string };
+export type PreviewTarget = { kind: 'video'; id: number };
 
 let preview: PreviewTarget | null = null;
 
-function samePreview(a: PreviewTarget | null, b: PreviewTarget | null): boolean {
-  return a === b || (a !== null && b !== null && previewKey(a) === previewKey(b));
-}
-
 function setPreview(next: PreviewTarget | null): void {
-  if (samePreview(preview, next)) return;
+  if (preview?.id === next?.id) return;
   preview = next;
   notify();
 }
@@ -74,22 +67,12 @@ export function previewTarget(): PreviewTarget | null {
 
 /** A stable key per target, so `AppShell` remounts Preview for each new one. */
 export function previewKey(target: PreviewTarget): string {
-  return target.kind === 'empty' ? `empty:${target.title}` : `${target.kind}:${target.id}`;
+  return `${target.kind}:${target.id}`;
 }
 
 /** Opens Preview for a video (a video tile click). */
 export function openPreview(videoId: number): void {
   setPreview({ kind: 'video', id: videoId });
-}
-
-/** Opens Preview for a track (a music tile click). */
-export function openTrackPreview(trackId: number): void {
-  setPreview({ kind: 'track', id: trackId });
-}
-
-/** Opens Preview for an album or playlist with nothing on disk: "Nothing on disk yet." */
-export function openEmptyPreview(title: string): void {
-  setPreview({ kind: 'empty', title });
 }
 
 /** Closes Preview. */
@@ -98,19 +81,17 @@ export function closePreview(): void {
 }
 
 /**
- * The Preview modal. Tiles call `openPreview(videoId)`, `openTrackPreview(trackId)` or
- * `openEmptyPreview(title)`; `AppShell` renders `PreviewModal` while `target` is set (keyed by
- * `previewKey`, so each opening starts at the poster) and passes `closePreview`.
+ * The Preview modal. Video tiles call `openPreview(videoId)`; `AppShell` renders `PreviewModal`
+ * while `target` is set (keyed by `previewKey`, so each opening starts at the poster) and passes
+ * `closePreview`.
  */
 export function usePreview(): {
   target: PreviewTarget | null;
   openPreview: (videoId: number) => void;
-  openTrackPreview: (trackId: number) => void;
-  openEmptyPreview: (title: string) => void;
   closePreview: () => void;
 } {
   const target = useSyncExternalStore(subscribeUiState, previewTarget, () => null);
-  return { target, openPreview, openTrackPreview, openEmptyPreview, closePreview };
+  return { target, openPreview, closePreview };
 }
 
 let jobLog: number | null = null;

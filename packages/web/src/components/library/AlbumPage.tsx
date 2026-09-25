@@ -1,14 +1,15 @@
 import type { AlbumDetail } from '@mytube/shared';
-import { useQueryClient } from '@tanstack/react-query';
 import { linkOptions } from '@tanstack/react-router';
 import { ApiError, apiErrorMessage } from '../../api/client';
-import { primeTrack, useAlbum, useDownloadMissing, useUnpinAlbum } from '../../api/library';
+import { useAlbum, useDownloadMissing, useUnpinAlbum } from '../../api/library';
 import { useCheckSource, useSource } from '../../api/sources';
 import { countOf } from '../../format';
-import { openTrackPreview } from '../../ui-state';
+import { appendToQueue } from '../../player-state';
 import { useNow } from '../../use-now';
 import { useState } from 'react';
+import { PlayIcon } from '../icons';
 import { Artwork, PinnedChip } from '../media';
+import { albumQueue, startQueue, trackItem } from '../player/queues';
 import { StatusLine } from '../sources/SourceBits';
 import { BackLink } from '../ui/BackLink';
 import { Button } from '../ui/Button';
@@ -55,7 +56,6 @@ export function AlbumPage({ id }: { id: string }) {
 }
 
 function AlbumContent({ album }: { album: AlbumDetail }) {
-  const queryClient = useQueryClient();
   const now = useNow();
   const sourceId = album.artist.sourceId;
   const source = useSource(sourceId ?? 0);
@@ -69,10 +69,8 @@ function AlbumContent({ album }: { album: AlbumDetail }) {
             tracks={album.tracks}
             totalDurationSeconds={album.totalDurationSeconds}
             now={now}
-            onOpen={(track) => {
-              primeTrack(queryClient, track);
-              openTrackPreview(track.id);
-            }}
+            onPlay={(track) => startQueue(albumQueue(album, track.id))}
+            onAdd={(track) => appendToQueue(trackItem(track))}
           />
         </div>
         <aside aria-label="About this album" className="grid min-w-0 flex-[1_1_260px] gap-5">
@@ -112,7 +110,8 @@ export function AlbumHeader({ album }: { album: AlbumDetail }) {
 }
 
 /**
- * The row of pills under the meta line: the on-disk status, **Download N missing** (primary;
+ * The row of pills under the meta line: the on-disk status, **Play** (ink; the album's tracks on
+ * disk from the first, absent while none is), **Download N missing** (primary;
  * `N queued` and disabled while every missing track is queued; absent when complete) and
  * **Check for changes** (outlined; checks the artist's source, disabled without one) and, on a
  * pinned album, **Unpin** (outlined, confirmed first). A status line under the row reports what
@@ -124,6 +123,7 @@ export function AlbumActions({ album, className }: { album: AlbumDetail; classNa
   const [unpinning, setUnpinning] = useState(false);
   const action = downloadAction(album);
   const sourceId = album.artist.sourceId;
+  const queue = albumQueue(album);
 
   let status: string | undefined;
   if (download.isError) status = apiErrorMessage(download.error, 'Could not queue the downloads.');
@@ -140,6 +140,11 @@ export function AlbumActions({ album, className }: { album: AlbumDetail; classNa
     <div className={cx('grid gap-2', className)}>
       <div className="flex flex-wrap items-center gap-2">
         <AlbumStatusPill album={album} />
+        {queue && (
+          <Button variant="ink" icon={<PlayIcon size={12} />} onClick={() => startQueue(queue)}>
+            Play
+          </Button>
+        )}
         {action && (
           <Button
             variant="primary"

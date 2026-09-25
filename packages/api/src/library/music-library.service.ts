@@ -1,11 +1,9 @@
 import { existsSync } from 'node:fs';
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -24,11 +22,10 @@ import {
   type TrackSort,
 } from '@mytube/shared';
 import { type SQL, and, desc, eq, gte, inArray, ne, sql } from 'drizzle-orm';
-import { HistoryService } from '../activity/history.service.js';
 import { AppConfig } from '../config/app-config.js';
 import { DATABASE, type Database, foldText } from '../database/database.module.js';
-import { albums, artists, sources, tracks } from '../database/schema.js';
-import { OutsideLibraryError, libraryPath, removeMediaFiles } from '../files/media-files.js';
+import { albums, artists, playlistItems, playlists, sources, tracks } from '../database/schema.js';
+import { OutsideLibraryError, libraryPath } from '../files/media-files.js';
 
 type TrackRow = typeof tracks.$inferSelect;
 type ArtistRow = typeof artists.$inferSelect;
@@ -41,25 +38,22 @@ type AlbumRow = typeof albums.$inferSelect;
 export const LIBRARY_TRACK_STATUSES = ['wanted', 'downloading', 'on_disk', 'missing'] as const;
 const IN_LIBRARY = sql.raw(`('${LIBRARY_TRACK_STATUSES.join("','")}')`);
 
-/** A file Preview streams. */
+/** A file the player streams. */
 export interface TrackStream {
   path: string;
   contentType: string | null;
 }
 
 /**
- * The music read models: the Artists, Albums and Playlists tabs, one track for Preview (with its
- * stream and Delete file), the filterable Tracks tab, the music items of Home and the Music
- * header sub.
+ * The music read models: the Artists, Albums and Playlists tabs, one track and its stream (the
+ * player), the queues of a playlist and of an artist's Play all, the filterable Tracks tab, the
+ * music items of Home and the Music header sub.
  */
 @Injectable()
 export class MusicLibraryService {
-  private readonly logger = new Logger('MusicLibrary');
-
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly config: AppConfig,
-    private readonly historyService: HistoryService,
   ) {}
 
   /**
@@ -295,7 +289,59 @@ export class MusicLibraryService {
     };
   }
 
-  /** The file of an on-disk track for Preview. 404 when there is none; 403 outside the mount. */
+  /**
+   * The playlist's tracks on disk in playlist order: the player's queue for a playlist tile.
+   * 404 for an unknown playlist or one of the Video library.
+   */
+  playlistTracks(id: number): TrackListItem[] {
+    const playlist = this.db
+      .select({ id: playlists.id })
+      .from(playlists)
+      .where(and(eq(playlists.id, id), eq(playlists.library, 'music')))
+      .get();
+    if (!playlist) throw new NotFoundException(`Playlist ${id} not found`);
+    return this.db
+      .select({ track: tracks, artist: artists, album: albums })
+      .from(playlistItems)
+      .innerJoin(tracks, eq(tracks.id, playlistItems.trackId))
+      .innerJoin(artists, eq(artists.id, tracks.artistId))
+      .leftJoin(albums, eq(albums.id, tracks.albumId))
+      .where(and(eq(playlistItems.playlistId, id), eq(tracks.status, 'on_disk')))
+      .orderBy(playlistItems.position, playlistItems.id)
+      .all()
+      .map((row) => toTrackItem(row.track, row.artist, row.album));
+  }
+
+  /**
+   * The artist's tracks on disk in library order, the player's queue for **Play all**: albums as
+   * the artist page lists them (newest year first, then title), each by disc and track number;
+   * tracks without an album last. 404 for an unknown artist.
+   */
+  artistTracks(id: number): TrackListItem[] {
+    const artist = this.db.select({ id: artists.id }).from(artists).where(eq(artists.id, id)).get();
+    if (!artist) throw new NotFoundException(`Artist ${id} not found`);
+    return this.db
+      .select({ track: tracks, artist: artists, album: albums })
+      .from(tracks)
+      .innerJoin(artists, eq(artists.id, tracks.artistId))
+      .leftJoin(albums, eq(albums.id, tracks.albumId))
+      .where(and(eq(tracks.artistId, id), eq(tracks.status, 'on_disk')))
+      .orderBy(
+        sql`${albums.id} IS NULL`,
+        sql`${albums.year} IS NULL`,
+        sql`${albums.year} DESC`,
+        sql`${albums.title} COLLATE NOCASE`,
+        albums.id,
+        sql`coalesce(${tracks.discNumber}, 1)`,
+        sql`${tracks.trackNumber} IS NULL`,
+        tracks.trackNumber,
+        tracks.id,
+      )
+      .all()
+      .map((row) => toTrackItem(row.track, row.artist, row.album));
+  }
+
+  /** The file of an on-disk track for the player. 404 when there is none; 403 outside the mount. */
   streamTarget(id: number): TrackStream {
     const { track } = this.trackRow(id);
     if (track.status !== 'on_disk' || !track.filePath) {
@@ -304,60 +350,6 @@ export class MusicLibraryService {
     const path = this.insideMusicDir(track.filePath);
     if (!existsSync(path)) throw new NotFoundException(`The file of track ${id} is missing`);
     return { path, contentType: audioMimeType(track.filePath) };
-  }
-
-  /**
-   * Delete file in Preview for a track: as for videos, the file and its sidecars go (and folders
-   * left empty), the track becomes `skipped` / `deleted_by_user`, its source loses the size and
-   * history records a `removed` row. 404 for an unknown track, 409 when it is not on disk.
-   */
-  deleteFile(id: number): void {
-    const { track } = this.trackRow(id);
-    if (track.status !== 'on_disk' || !track.filePath) {
-      throw new ConflictException(`Track ${id} is not on disk`);
-    }
-    this.insideMusicDir(track.filePath);
-    const removed = removeMediaFiles(this.config.musicDir, track.filePath);
-    const now = new Date().toISOString();
-    this.db.transaction((tx) => {
-      tx.update(tracks)
-        .set({
-          status: 'skipped',
-          skipReason: 'deleted_by_user',
-          filePath: null,
-          fileSizeBytes: null,
-          updatedAt: now,
-        })
-        .where(eq(tracks.id, track.id))
-        .run();
-      if (track.sourceId !== null) {
-        const counted = tx
-          .select({ count: sql<number>`count(*)` })
-          .from(tracks)
-          .where(
-            and(
-              eq(tracks.sourceId, track.sourceId),
-              inArray(tracks.status, ['wanted', 'downloading', 'on_disk']),
-            ),
-          )
-          .get();
-        tx.update(sources)
-          .set({
-            sizeBytes: sql`max(0, ${sources.sizeBytes} - ${track.fileSizeBytes ?? 0})`,
-            itemCount: counted?.count ?? 0,
-            updatedAt: now,
-          })
-          .where(eq(sources.id, track.sourceId))
-          .run();
-      }
-    });
-    this.historyService.record({
-      kind: 'music',
-      title: track.title,
-      result: 'removed',
-      details: 'deleted by user',
-    });
-    this.logger.log(`Deleted ${removed.join(', ')} (track ${track.id}, by the user)`);
   }
 
   private trackRow(id: number): { track: TrackRow; artist: ArtistRow; album: AlbumRow | null } {

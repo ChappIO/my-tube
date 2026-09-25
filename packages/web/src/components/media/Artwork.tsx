@@ -13,9 +13,10 @@ export interface ArtworkProps {
   shape?: 'square' | 'circle';
   /**
    * Corner radius of a square: `tile` 12px (tiles), `thumb` 6px (32px row covers), `list` 8px
-   * (the 44px covers of the narrow Tracks list).
+   * (the 44px covers of the narrow Tracks list), `flush` none (the parent clips it to its own
+   * radius: the player's bar, card and Now Playing art).
    */
-  size?: 'tile' | 'thumb' | 'list';
+  size?: 'tile' | 'thumb' | 'list' | 'flush';
   /** Fill the positioned parent instead of sizing itself as a square. */
   fill?: boolean;
   /** Overlays drawn on the art, such as a duration badge. */
@@ -28,6 +29,7 @@ const SQUARE_RADII = {
   tile: 'rounded-tile',
   thumb: 'rounded-chip',
   list: 'rounded-[8px]',
+  flush: '',
 } as const;
 
 /** Square or round artwork with a `surface` background while loading and a placeholder fallback. */
