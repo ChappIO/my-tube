@@ -1,5 +1,5 @@
 import type { VideoSettings } from '@mytube/shared';
-import type { ExpectedStream } from '../ytdlp/metadata.js';
+import type { CaptionLanguages, ExpectedStream } from '../ytdlp/metadata.js';
 import type { DownloadProgress } from '../ytdlp/progress.js';
 import type { JobProgress } from '../jobs/job-runner.js';
 
@@ -20,30 +20,63 @@ export function videoFormat(quality: Quality, container: Container): string {
   return any;
 }
 
+/** Skips YouTube's machine-translated captions (yt-dlp README, youtube extractor `skip`). */
+export const AUTO_SUBTITLES_EXTRACTOR_ARGS = 'youtube:skip=translated_subs';
+
 /**
  * Extra yt-dlp flags from Settings → Video:
  * - `--remux-video <container>` so a single-file download also ends up in the chosen container
  *   (not for webm: H.264 cannot be remuxed into webm, so a fallback file keeps its own type).
  *   Merged downloads use `--merge-output-format`, which the caller passes separately.
  * - Subtitles: `--embed-subs --sub-langs en,nl` when embedded (no files are left next to the
- *   video), `--write-subs --sub-langs en,nl` for sidecar files. No languages, no subtitles.
+ *   video), `--write-subs --sub-langs en,nl` for sidecar files. With generated subtitles on,
+ *   `--write-auto-subs --extractor-args youtube:skip=translated_subs` as well: YouTube's
+ *   automatic captions for a language without uploaded subtitles (uploaded ones win). With the
+ *   video's `captions` known, `--sub-langs` keeps only the languages it really has (see
+ *   `subtitleLanguages`), so machine translations are never fetched. No languages, no subtitles.
  * - Thumbnails: `--write-thumbnail --convert-thumbnails jpg`, a `<name>.jpg` sidecar next to
  *   the video, which Plex picks up as the poster.
  */
-export function videoExtraArgs(video: VideoSettings): string[] {
+export function videoExtraArgs(video: VideoSettings, captions?: CaptionLanguages | null): string[] {
   const args: string[] = [];
   if (video.container !== 'webm') args.push('--remux-video', video.container);
-  if (video.subtitleLanguages.length > 0) {
+  const { languages } = subtitleLanguages(video, captions);
+  if (languages.length > 0) {
     // `--embed-subs` alone fetches the subtitles, embeds them and deletes the files; adding
     // `--write-subs` would keep the sidecar files as well.
-    args.push(
-      video.subtitlesEmbedded ? '--embed-subs' : '--write-subs',
-      '--sub-langs',
-      video.subtitleLanguages.join(','),
-    );
+    args.push(video.subtitlesEmbedded ? '--embed-subs' : '--write-subs');
+    // `--write-auto-subs` only adds automatic captions to what is fetched; embedding still
+    // removes the files afterwards. `skip=translated_subs` drops yt-dlp's translations of
+    // uploaded subtitles (`nl-en`); machine translations of the automatic captions are listed
+    // under plain codes and are left out by `subtitleLanguages` instead. A separate
+    // `--extractor-args` per extractor combines with others, such as the metadata calls'
+    // `youtubetab:approximate_date`.
+    if (video.autoSubtitles) {
+      args.push('--write-auto-subs', '--extractor-args', AUTO_SUBTITLES_EXTRACTOR_ARGS);
+    }
+    args.push('--sub-langs', languages.join(','));
   }
   if (video.saveThumbnails) args.push('--write-thumbnail', '--convert-thumbnails', 'jpg');
   return args;
+}
+
+/**
+ * The languages to ask yt-dlp for. Without generated subtitles, or when the video's captions
+ * are unknown, the setting as it is. With them, only languages the video has uploaded
+ * subtitles or automatic captions in (its spoken language): yt-dlp would otherwise take
+ * YouTube's machine translation of the automatic captions for every other language, which is
+ * poor and often refused with HTTP 429, failing the whole download. `skipped` lists the
+ * languages left out.
+ */
+export function subtitleLanguages(
+  video: VideoSettings,
+  captions?: CaptionLanguages | null,
+): { languages: string[]; skipped: string[] } {
+  if (!video.autoSubtitles || !captions) return { languages: video.subtitleLanguages, skipped: [] };
+  const available = new Set([...captions.uploaded, ...captions.generated]);
+  const languages = video.subtitleLanguages.filter((lang) => available.has(lang));
+  const skipped = video.subtitleLanguages.filter((lang) => !available.has(lang));
+  return { languages, skipped };
 }
 
 // yt-dlp prints these (after `ERROR: [youtube] <id>: `) when a video is gone for good. Bot

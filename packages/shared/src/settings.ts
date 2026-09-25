@@ -43,6 +43,71 @@ export const VIDEO_CONTAINERS = ['mkv', 'mp4', 'webm'] as const;
 export const LOG_LEVELS = ['error', 'warn', 'info', 'debug'] as const;
 
 /**
+ * The languages Settings → Video → Subtitles offers to pick from: common YouTube subtitle codes
+ * (ISO 639-1, plus the script and region variants YouTube uses) with their English names. Not a
+ * limit: any code that passes `SubtitleLanguageCode` can be added, since yt-dlp takes any code.
+ */
+export const SUBTITLE_LANGUAGES = [
+  { code: 'en', name: 'English' },
+  { code: 'nl', name: 'Dutch' },
+  { code: 'de', name: 'German' },
+  { code: 'fr', name: 'French' },
+  { code: 'es', name: 'Spanish' },
+  { code: 'it', name: 'Italian' },
+  { code: 'pt', name: 'Portuguese' },
+  { code: 'pt-BR', name: 'Portuguese (Brazil)' },
+  { code: 'ja', name: 'Japanese' },
+  { code: 'ko', name: 'Korean' },
+  { code: 'zh-Hans', name: 'Chinese (Simplified)' },
+  { code: 'zh-Hant', name: 'Chinese (Traditional)' },
+  { code: 'ru', name: 'Russian' },
+  { code: 'uk', name: 'Ukrainian' },
+  { code: 'pl', name: 'Polish' },
+  { code: 'cs', name: 'Czech' },
+  { code: 'sk', name: 'Slovak' },
+  { code: 'hu', name: 'Hungarian' },
+  { code: 'ro', name: 'Romanian' },
+  { code: 'bg', name: 'Bulgarian' },
+  { code: 'el', name: 'Greek' },
+  { code: 'sv', name: 'Swedish' },
+  { code: 'no', name: 'Norwegian' },
+  { code: 'da', name: 'Danish' },
+  { code: 'fi', name: 'Finnish' },
+  { code: 'is', name: 'Icelandic' },
+  { code: 'et', name: 'Estonian' },
+  { code: 'lv', name: 'Latvian' },
+  { code: 'lt', name: 'Lithuanian' },
+  { code: 'hr', name: 'Croatian' },
+  { code: 'sr', name: 'Serbian' },
+  { code: 'sl', name: 'Slovenian' },
+  { code: 'tr', name: 'Turkish' },
+  { code: 'ar', name: 'Arabic' },
+  { code: 'he', name: 'Hebrew' },
+  { code: 'fa', name: 'Persian' },
+  { code: 'hi', name: 'Hindi' },
+  { code: 'bn', name: 'Bengali' },
+  { code: 'ur', name: 'Urdu' },
+  { code: 'id', name: 'Indonesian' },
+  { code: 'ms', name: 'Malay' },
+  { code: 'th', name: 'Thai' },
+  { code: 'vi', name: 'Vietnamese' },
+  { code: 'fil', name: 'Filipino' },
+  { code: 'sw', name: 'Swahili' },
+  { code: 'af', name: 'Afrikaans' },
+  { code: 'ca', name: 'Catalan' },
+  { code: 'eu', name: 'Basque' },
+] as const satisfies readonly { code: string; name: string }[];
+
+/** Most subtitle languages one can pick. */
+export const SUBTITLE_LANGUAGES_MAX = 20;
+
+/** One subtitle language code: `en`, `pt-BR`, `zh-Hans`. What `--sub-langs` gets. */
+export const SubtitleLanguageCode = z
+  .string()
+  .trim()
+  .regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/, 'Use a language code such as en or pt-BR');
+
+/**
  * A folder structure template: `{tag}` placeholders from `tags`, `/` separates folders,
  * relative to the library mount. See `path-templates.ts`; unknown tags are a 400 whose message
  * lists them.
@@ -141,18 +206,19 @@ export const VideoSettings = z.object({
   /** Highest resolution to download; `best` ("best available") has no cap. */
   quality: z.enum(VIDEO_QUALITIES).default('best'),
   container: z.enum(VIDEO_CONTAINERS).default('mp4'),
-  /** Subtitle language codes; empty means no subtitles. */
+  /** Subtitle language codes in the order picked (`--sub-langs`); empty means no subtitles. */
   subtitleLanguages: z
-    .array(
-      z
-        .string()
-        .trim()
-        .regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/, 'Use a language code such as en or pt-BR'),
-    )
-    .max(20)
+    .array(SubtitleLanguageCode)
+    .max(SUBTITLE_LANGUAGES_MAX)
     .default(['en', 'nl']),
   /** Embed subtitles in the container instead of writing sidecar files. */
   subtitlesEmbedded: z.boolean().default(true),
+  /**
+   * "Download generated subtitles": also take YouTube's automatic captions
+   * (`--write-auto-subs`) for languages without uploaded subtitles. Existing installs get the
+   * default, since a field without a stored row reads its default.
+   */
+  autoSubtitles: z.boolean().default(true),
   /** Rules new video sources start with. Default: no shorts, nothing older than 90 days. */
   defaultRules: defaultRules(DEFAULT_VIDEO_MATCHER),
   /** Sidecar thumbnail, for Plex. */

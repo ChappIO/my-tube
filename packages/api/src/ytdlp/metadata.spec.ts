@@ -9,6 +9,11 @@ const fixture = (name: string): unknown =>
     readFileSync(join(import.meta.dirname, '../../test/fixtures/ytdlp', name), 'utf8'),
   ) as unknown;
 
+/** A caption track list as yt-dlp writes it (one format). */
+const track = (query: string) => [
+  { ext: 'vtt', url: `https://www.youtube.com/api/timedtext?v=v1${query}` },
+];
+
 describe('parseSourceMetadata', () => {
   it('parses a channel root and flattens its tabs', () => {
     const source = parseSourceMetadata(fixture('channel.json'));
@@ -149,6 +154,32 @@ describe('parseSourceMetadata', () => {
     // Flat listing entries carry no sizes.
     const channel = parseSourceMetadata(fixture('channel.json'));
     expect(channel.entries.every((entry) => entry.expectedBytes === null)).toBe(true);
+  });
+
+  it('tells automatic captions from their machine translations', () => {
+    // video.json: automatic English captions (also as en-orig) and translations to de and nl,
+    // whose URLs carry `tlang` (trimmed from yt-dlp 2026.08.19 on qauPUNkEglQ).
+    expect(parseSourceMetadata(fixture('video.json')).entries[0]?.captions).toEqual({
+      uploaded: [],
+      generated: ['en-orig', 'en'],
+    });
+    const video = { _type: 'video', id: 'v1', title: 'One' };
+    const captions = (info: object) =>
+      parseSourceMetadata({ ...video, ...info }).entries[0]?.captions;
+    expect(
+      captions({
+        subtitles: { en: track('&lang=en'), live_chat: [{ url: 'https://x' }] },
+        automatic_captions: {
+          fr: track('&lang=fr&kind=asr'),
+          en: track('&lang=fr&tlang=en'),
+          bad: [{}],
+        },
+      }),
+    ).toEqual({ uploaded: ['en'], generated: ['fr'] });
+    // Flat listings and videos without the fields: unknown.
+    expect(captions({})).toBeNull();
+    const channel = parseSourceMetadata(fixture('channel.json'));
+    expect(channel.entries.every((entry) => entry.captions === null)).toBe(true);
   });
 
   it("reads the members-only badge from a flat entry's availability", () => {

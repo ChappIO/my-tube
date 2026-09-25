@@ -2,9 +2,11 @@ import { DEFAULT_SETTINGS } from '@mytube/shared';
 import { describe, expect, it } from 'vitest';
 import type { ExpectedStream } from '../ytdlp/metadata.js';
 import type { DownloadProgress } from '../ytdlp/progress.js';
+import { buildArgs } from '../ytdlp/args.js';
 import {
   DownloadProgressTracker,
   isUnavailableReason,
+  subtitleLanguages,
   videoExtraArgs,
   videoFormat,
 } from './video-options.js';
@@ -31,11 +33,14 @@ describe('videoFormat', () => {
 describe('videoExtraArgs', () => {
   const video = DEFAULT_SETTINGS.video;
 
-  it('maps the defaults: remux, embedded en/nl subtitles, jpg thumbnail sidecar', () => {
+  it('maps the defaults: remux, embedded en/nl subtitles with generated ones, jpg thumbnail', () => {
     expect(videoExtraArgs(video)).toEqual([
       '--remux-video',
       'mp4',
       '--embed-subs',
+      '--write-auto-subs',
+      '--extractor-args',
+      'youtube:skip=translated_subs',
       '--sub-langs',
       'en,nl',
       '--write-thumbnail',
@@ -49,12 +54,74 @@ describe('videoExtraArgs', () => {
       '--remux-video',
       'mp4',
       '--write-subs',
+      '--write-auto-subs',
+      '--extractor-args',
+      'youtube:skip=translated_subs',
       '--sub-langs',
       'en,nl',
     ]);
     expect(
       videoExtraArgs({ ...video, container: 'webm', subtitleLanguages: [], saveThumbnails: false }),
     ).toEqual([]);
+  });
+
+  it('leaves generated subtitles out when they are off, embedded or as sidecars', () => {
+    const off = { ...video, autoSubtitles: false, saveThumbnails: false };
+    expect(videoExtraArgs(off)).toEqual([
+      '--remux-video',
+      'mp4',
+      '--embed-subs',
+      '--sub-langs',
+      'en,nl',
+    ]);
+    expect(
+      videoExtraArgs({ ...off, subtitlesEmbedded: false, subtitleLanguages: ['pt-BR'] }),
+    ).toEqual(['--remux-video', 'mp4', '--write-subs', '--sub-langs', 'pt-BR']);
+  });
+
+  it('asks for no subtitles at all without languages, even with generated ones on', () => {
+    const args = videoExtraArgs({ ...video, subtitleLanguages: [], autoSubtitles: true });
+    expect(args).not.toContain('--write-auto-subs');
+    expect(args).not.toContain('--sub-langs');
+    expect(args).not.toContain('--embed-subs');
+    expect(args).not.toContain('--extractor-args');
+  });
+
+  it('asks only for languages the video has, leaving machine translations out', () => {
+    const captions = { uploaded: ['de'], generated: ['en-orig', 'en'] };
+    const video4 = { ...video, subtitleLanguages: ['en', 'nl', 'de'] };
+    expect(subtitleLanguages(video4, captions)).toEqual({
+      languages: ['en', 'de'],
+      skipped: ['nl'],
+    });
+    const args = videoExtraArgs(video4, captions);
+    expect(args[args.indexOf('--sub-langs') + 1]).toBe('en,de');
+    // Nothing left: no subtitle flags at all.
+    const none = videoExtraArgs({ ...video4, subtitleLanguages: ['nl'] }, captions);
+    expect(none).not.toContain('--sub-langs');
+    expect(none).not.toContain('--write-auto-subs');
+    // Unknown captions, or generated subtitles off (no translations are asked for): as set.
+    expect(subtitleLanguages(video4, null).languages).toEqual(['en', 'nl', 'de']);
+    expect(subtitleLanguages({ ...video4, autoSubtitles: false }, captions).languages).toEqual([
+      'en',
+      'nl',
+      'de',
+    ]);
+  });
+
+  it('passes the skip as its own --extractor-args pair through the download call', () => {
+    const args = buildArgs({
+      kind: 'download',
+      url: 'https://www.youtube.com/watch?v=abc',
+      output: '/media/video/x.%(ext)s',
+      extraArgs: videoExtraArgs(video),
+    });
+    const at = args.indexOf('--extractor-args');
+    expect(args[at + 1]).toBe('youtube:skip=translated_subs');
+    expect(args.filter((arg) => arg === '--extractor-args')).toHaveLength(1);
+    // A metadata call keeps its own, for another extractor; yt-dlp takes one flag per extractor.
+    const metadata = buildArgs({ kind: 'metadata', url: 'https://www.youtube.com/@x' });
+    expect(metadata[metadata.indexOf('--extractor-args') + 1]).toBe('youtubetab:approximate_date');
   });
 });
 
