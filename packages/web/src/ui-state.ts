@@ -4,7 +4,6 @@ import { useSyncExternalStore } from 'react';
 // dialogs are open. A tiny external store, same pattern as theme.ts.
 
 let addOpen = false;
-let previewId: number | null = null;
 const listeners = new Set<() => void>();
 
 function notify(): void {
@@ -47,34 +46,69 @@ export function useAddModal(): { open: boolean; openAdd: () => void; closeAdd: (
   return { open, openAdd, closeAdd };
 }
 
-/** The video Preview shows, or null when it is closed. */
-export function previewVideoId(): number | null {
-  return previewId;
+/**
+ * What Preview shows: a video, a track, or the title of an album or playlist that has nothing
+ * on disk yet (the player area says so).
+ */
+export type PreviewTarget =
+  | { kind: 'video'; id: number }
+  | { kind: 'track'; id: number }
+  | { kind: 'empty'; title: string };
+
+let preview: PreviewTarget | null = null;
+
+function samePreview(a: PreviewTarget | null, b: PreviewTarget | null): boolean {
+  return a === b || (a !== null && b !== null && previewKey(a) === previewKey(b));
 }
 
-/** Opens Preview for a video (a tile click). */
-export function openPreview(videoId: number): void {
-  if (previewId === videoId) return;
-  previewId = videoId;
+function setPreview(next: PreviewTarget | null): void {
+  if (samePreview(preview, next)) return;
+  preview = next;
   notify();
+}
+
+/** What Preview shows, or null when it is closed. */
+export function previewTarget(): PreviewTarget | null {
+  return preview;
+}
+
+/** A stable key per target, so `AppShell` remounts Preview for each new one. */
+export function previewKey(target: PreviewTarget): string {
+  return target.kind === 'empty' ? `empty:${target.title}` : `${target.kind}:${target.id}`;
+}
+
+/** Opens Preview for a video (a video tile click). */
+export function openPreview(videoId: number): void {
+  setPreview({ kind: 'video', id: videoId });
+}
+
+/** Opens Preview for a track (a music tile click). */
+export function openTrackPreview(trackId: number): void {
+  setPreview({ kind: 'track', id: trackId });
+}
+
+/** Opens Preview for an album or playlist with nothing on disk: "Nothing on disk yet." */
+export function openEmptyPreview(title: string): void {
+  setPreview({ kind: 'empty', title });
 }
 
 /** Closes Preview. */
 export function closePreview(): void {
-  if (previewId === null) return;
-  previewId = null;
-  notify();
+  setPreview(null);
 }
 
 /**
- * The Preview modal. Tiles call `openPreview(id)`; `AppShell` renders `PreviewModal` while
- * `videoId` is set (so each opening starts at the poster) and passes `closePreview`.
+ * The Preview modal. Tiles call `openPreview(videoId)`, `openTrackPreview(trackId)` or
+ * `openEmptyPreview(title)`; `AppShell` renders `PreviewModal` while `target` is set (keyed by
+ * `previewKey`, so each opening starts at the poster) and passes `closePreview`.
  */
 export function usePreview(): {
-  videoId: number | null;
+  target: PreviewTarget | null;
   openPreview: (videoId: number) => void;
+  openTrackPreview: (trackId: number) => void;
+  openEmptyPreview: (title: string) => void;
   closePreview: () => void;
 } {
-  const videoId = useSyncExternalStore(subscribeUiState, previewVideoId, () => null);
-  return { videoId, openPreview, closePreview };
+  const target = useSyncExternalStore(subscribeUiState, previewTarget, () => null);
+  return { target, openPreview, openTrackPreview, openEmptyPreview, closePreview };
 }

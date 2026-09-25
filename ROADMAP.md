@@ -89,9 +89,9 @@ Skills: frontend, backend. Handoff: Screen 1 Home, Screen 3 Videos tab, Screen 7
 
 Skills: frontend, backend, database. Handoff: Screen 2 Music, Components open music tile and playlist stack.
 
-- [ ] **Music sync and download.** Artist and playlist sources in the music library, album grouping from yt-dlp metadata, audio format and container from settings, track paths from the music template. Done when an artist source downloads an album into the music mount.
+- [x] **Music sync and download.** Artist and playlist sources in the music library, album grouping from yt-dlp metadata, audio format and container from settings, track paths from the music template. Done when an artist source downloads an album into the music mount.
 - [ ] **Metadata provider chain.** Provider interface, yt-dlp provider always on, MusicBrainz and Discogs providers off by default with Settings toggles and a Discogs token, tag and cover embedding after download. Done when enabling a provider changes tags on the next download and disabling it is the default.
-- [ ] **Artists, Albums and Playlists tabs.** Open music tiles, artist circles with the bell badge, incomplete counts in red, playlist stack art. Done when the summary line and meta lines match the handoff formats.
+- [x] **Artists, Albums and Playlists tabs.** Open music tiles, artist circles with the bell badge, incomplete counts in red, playlist stack art. Done when the summary line and meta lines match the handoff formats.
 - [ ] **Tracks tab.** Filter input, All, Missing and Recent filters, sortable columns with the Added-descending default, the narrow list collapse with sort pills. Done when filtering and sorting are server-backed and covered by tests.
 
 ## Stage 7: Maintenance

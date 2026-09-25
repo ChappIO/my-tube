@@ -1,7 +1,11 @@
 import {
+  AlbumListItem,
+  ArtistListItem,
   type ArtworkKind,
   HomeFeed,
   LibrarySummary,
+  PlaylistListItem,
+  TrackListItem,
   type VideoListQuery,
   VideoListItem,
   VideoPage,
@@ -15,13 +19,15 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
+import { z } from 'zod';
 import { useActivitySummary } from './activity';
 import { ApiError, apiDelete, apiGet } from './client';
 
 /*
- * The library read models (`/api/library/*`, backend skill "Library"): the videos grid, Home,
- * the Video header summary, one video for Preview and Delete file. Everything starts with
- * `['library']`, so a finished download or a deletion refreshes all of it at once.
+ * The library read models (`/api/library/*`, backend skill "Library"): the videos grid, the
+ * Music tabs (artists, albums, playlists), Home, the header summaries, one video or track for
+ * Preview and Delete file. Everything starts with `['library']`, so a finished download or a
+ * deletion refreshes all of it at once.
  */
 
 /** The filter of a videos grid (`GET /api/library/videos`); the cursor is the page param. */
@@ -33,6 +39,10 @@ export const libraryKeys = {
   video: (id: number) => ['library', 'video', id] as const,
   home: ['library', 'home'] as const,
   summary: ['library', 'summary'] as const,
+  artists: ['library', 'artists'] as const,
+  albums: (artistId: number | undefined) => ['library', 'albums', artistId ?? 'all'] as const,
+  playlists: ['library', 'playlists'] as const,
+  track: (id: number) => ['library', 'track', id] as const,
 };
 
 function videosUrl(filter: VideoFilter, cursor: string | null): string {
@@ -133,6 +143,71 @@ export function useLibraryFollowsDownloads(): void {
     }
     previous.current = active;
   }, [active, queryClient]);
+}
+
+/** The Artists tab (`GET /api/library/artists`), by name. */
+export function useArtists() {
+  return useQuery({
+    queryKey: libraryKeys.artists,
+    queryFn: () => apiGet('/api/library/artists', z.array(ArtistListItem)),
+  });
+}
+
+/** The Albums tab (`GET /api/library/albums[?artistId=]`). */
+export function useAlbums(artistId?: number) {
+  return useQuery({
+    queryKey: libraryKeys.albums(artistId),
+    queryFn: () =>
+      apiGet(
+        artistId === undefined ? '/api/library/albums' : `/api/library/albums?artistId=${artistId}`,
+        z.array(AlbumListItem),
+      ),
+  });
+}
+
+/** The Playlists tab (`GET /api/library/playlists?library=music`), by name. */
+export function usePlaylists() {
+  return useQuery({
+    queryKey: libraryKeys.playlists,
+    queryFn: () => apiGet('/api/library/playlists?library=music', z.array(PlaylistListItem)),
+  });
+}
+
+/**
+ * One track (`GET /api/library/tracks/:id`), for Preview. A 404 is not retried; ids below 1
+ * never fetch.
+ */
+export function useTrack(id: number) {
+  return useQuery({
+    queryKey: libraryKeys.track(id),
+    enabled: id > 0,
+    queryFn: () => apiGet(`/api/library/tracks/${id}`, TrackListItem),
+    retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 2,
+  });
+}
+
+/** Seeds the single-track cache from a Home tile, so Preview renders without a request. */
+export function primeTrack(queryClient: QueryClient, track: TrackListItem): void {
+  queryClient.setQueryData(libraryKeys.track(track.id), track);
+}
+
+/** Delete file in Preview for a track (`DELETE /api/library/tracks/:id/file`). */
+export function useDeleteTrackFile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: ['library', 'delete-file'],
+    mutationFn: (id: number) => apiDelete(`/api/library/tracks/${id}/file`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: libraryKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ['sources'] });
+      void queryClient.invalidateQueries({ queryKey: ['activity'] });
+    },
+  });
+}
+
+/** Preview's `<audio>` source for a track, with HTTP Range support. */
+export function trackStreamUrl(id: number): string {
+  return `/api/library/tracks/${id}/stream`;
 }
 
 /** Preview's `<video>` source: the file with HTTP Range support. */

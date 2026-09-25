@@ -1,4 +1,10 @@
-import { type DynamicModule, Module, type ModuleMetadata, type Type } from '@nestjs/common';
+import {
+  type DynamicModule,
+  Module,
+  type ModuleMetadata,
+  type Provider,
+  type Type,
+} from '@nestjs/common';
 import { ActivityController } from '../activity/activity.controller.js';
 import { SettingsModule } from '../settings/settings.module.js';
 import { JobLogsService } from './job-logs.service.js';
@@ -12,6 +18,11 @@ export interface JobsModuleOptions {
   imports?: ModuleMetadata['imports'];
   /** Runner classes, one per job type. They are providers here and may inject JobsService. */
   runners?: Type<JobRunner>[];
+  /**
+   * Further providers the runners use but that are not runners themselves (the video and track
+   * download runners behind the `download` dispatcher).
+   */
+  providers?: Provider[];
 }
 
 /**
@@ -40,6 +51,7 @@ export class JobsModule {
         JobsService,
         JobsWorker,
         JobLogsService,
+        ...(options.providers ?? []),
         ...runners,
         {
           provide: JOB_RUNNERS,

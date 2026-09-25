@@ -4,6 +4,7 @@ import { ActivityModule } from './activity/activity.module.js';
 import { ArtworkModule } from './artwork/artwork.module.js';
 import { ConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './database/database.module.js';
+import { DownloadDispatchRunner } from './downloads/download-dispatch.runner.js';
 import { DownloadRunner } from './downloads/download.runner.js';
 import { HealthModule } from './health/health.module.js';
 import { JobsModule } from './jobs/jobs.module.js';
@@ -15,6 +16,7 @@ import { CheckSourceRunner } from './sync/check-source.runner.js';
 import { RevalidateRunner } from './sync/revalidate.runner.js';
 import { SyncModule } from './sync/sync.module.js';
 import { SystemModule } from './system/system.module.js';
+import { TrackDownloadRunner } from './downloads/track-download.runner.js';
 import { WebModule } from './web/web.module.js';
 import { YtdlpModule } from './ytdlp/ytdlp.module.js';
 
@@ -27,10 +29,12 @@ import { YtdlpModule } from './ytdlp/ytdlp.module.js';
     ActivityModule,
     ArtworkModule,
     HealthModule,
-    // Queue and worker with the sync, revalidation and download runners.
+    // Queue and worker with the sync, revalidation and download runners. `download` jobs go to
+    // the dispatcher, which hands videos to DownloadRunner and tracks to TrackDownloadRunner.
     JobsModule.forRoot({
       imports: [YtdlpModule, SyncModule],
-      runners: [CheckSourceRunner, RevalidateRunner, DownloadRunner],
+      runners: [CheckSourceRunner, RevalidateRunner, DownloadDispatchRunner],
+      providers: [DownloadRunner, TrackDownloadRunner],
     }),
     LibraryModule,
     SettingsModule,

@@ -2,14 +2,16 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { SkipReason } from '@mytube/shared';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.module.js';
-import { channels, playlistItems, playlists, sources, videos } from '../database/schema.js';
+import { channels, playlistItems, playlists, sources, tracks, videos } from '../database/schema.js';
 import type { JobRow } from '../jobs/job-runner.js';
 import { JobsService } from '../jobs/jobs.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import type { SourceEntry, SourceMetadata } from '../ytdlp/metadata.js';
 import { networkOptions } from '../ytdlp/network.js';
 import { YtdlpRunner, type YtdlpLogSink } from '../ytdlp/ytdlp-runner.js';
-import { evaluateItem } from './rules.js';
+import { wantedElsewhere } from './claims.js';
+import { MusicSync } from './music-sync.js';
+import { entryContext, evaluateItem } from './rules.js';
 
 /** Entries fetched per channel tab (or playlist) on a source's first check. */
 export const FIRST_CHECK_LIMIT = 200;
@@ -42,7 +44,7 @@ export interface CheckResult {
   wanted: number;
   /** Download jobs enqueued by this check. */
   queued: number;
-  /** False for Music sources until Stage 6: marked checked, nothing fetched. */
+  /** True once the listing was fetched and applied. */
   synced: boolean;
 }
 
@@ -70,12 +72,17 @@ export interface ListingResult {
 export class SyncService {
   private readonly logger = new Logger('Sync');
 
+  /** The music half: artists (releases, albums) and music playlists. */
+  readonly music: MusicSync;
+
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly runner: YtdlpRunner,
     private readonly settings: SettingsService,
     private readonly jobs: JobsService,
-  ) {}
+  ) {
+    this.music = new MusicSync(db, runner, settings, jobs, this.logger, nextStatus);
+  }
 
   /**
    * Enqueues a `check_source` job for the source (de-duplicated by `source:<id>`). Undefined
@@ -137,14 +144,26 @@ export class SyncService {
     const source = this.db.select().from(sources).where(eq(sources.id, sourceId)).get();
     if (!source) throw new SourceGoneError(`Source ${sourceId} no longer exists`);
 
+    const settings = this.settings.get();
     if (source.library === 'music') {
-      this.logger.log(`Skipping ${source.name}: music sync arrives in Stage 6`);
-      ctx.log?.('Music sources are not synced yet (Stage 6). Marked as checked.');
-      this.markChecked(source.id, new Date());
-      return { entries: 0, added: 0, wanted: 0, queued: 0, synced: false };
+      const limit = source.lastCheckedAt === null ? FIRST_CHECK_LIMIT : CHECK_LIMIT;
+      const listing = await this.music.check(source, networkOptions(settings.network), limit, ctx);
+      ctx.signal?.throwIfAborted();
+      const queued = this.music.enqueueDownloads(source, listing.wantedIds);
+      const now = new Date();
+      this.markChecked(source, now);
+      const summary = `${listing.entries} tracks, ${listing.added} new, ${listing.wantedIds.length} wanted, ${queued} queued`;
+      this.logger.log(`Checked ${source.name}: ${summary}`);
+      ctx.log?.(`Checked ${source.name}: ${summary}`);
+      return {
+        entries: listing.entries,
+        added: listing.added,
+        wanted: listing.wantedIds.length,
+        queued,
+        synced: true,
+      };
     }
 
-    const settings = this.settings.get();
     const metadata = await this.runner.metadata(source.url, {
       limit: source.lastCheckedAt === null ? FIRST_CHECK_LIMIT : CHECK_LIMIT,
       network: networkOptions(settings.network),
@@ -156,7 +175,7 @@ export class SyncService {
     const now = new Date();
     const listing = this.applyListing(source, metadata, now);
     const queued = this.enqueueDownloads(source, listing.wantedIds);
-    this.markChecked(source.id, now);
+    this.markChecked(source, now);
     const summary = `${listing.entries} entries, ${listing.added} new, ${listing.wantedIds.length} wanted, ${queued} queued`;
     this.logger.log(`Checked ${source.name}: ${summary}`);
     ctx.log?.(`Checked ${source.name}: ${summary}`);
@@ -248,7 +267,23 @@ export class SyncService {
           added++;
         } else {
           id = existing.id;
-          const next = nextStatus(existing.status, existing.skipReason, verdict);
+          let next = nextStatus(existing.status, existing.skipReason, verdict);
+          // Another source (a playlist, the channel) that still wants the video keeps it wanted.
+          if (
+            existing.status === 'wanted' &&
+            next.status === 'skipped' &&
+            wantedElsewhere(tx, 'videos', id, source.id, {
+              ...entryContext(entry, {
+                now,
+                channelName: playlist ? null : source.name,
+                channelId: playlist ? null : source.youtubeId,
+                playlistPosition: null,
+              }),
+              playlistPosition: null,
+            })
+          ) {
+            next = { status: 'wanted', skipReason: null };
+          }
           status = next.status;
           tx.update(videos)
             .set({
@@ -352,14 +387,16 @@ export class SyncService {
     }
   }
 
-  private markChecked(sourceId: number, now: Date): void {
+  private markChecked(source: SourceRow, now: Date): void {
+    const sourceId = source.id;
+    const table = source.library === 'music' ? tracks : videos;
     const counted = this.db
       .select({ count: sql<number>`count(*)` })
-      .from(videos)
+      .from(table)
       .where(
         and(
-          eq(videos.sourceId, sourceId),
-          inArray(videos.status, ['wanted', 'downloading', 'on_disk']),
+          eq(table.sourceId, sourceId),
+          inArray(table.status, ['wanted', 'downloading', 'on_disk']),
         ),
       )
       .get();

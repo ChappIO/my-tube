@@ -6,7 +6,11 @@
 //   --version                   prints FAKE_YTDLP_VERSION (default 2026.08.19)
 //   --dump-single-json <url>    prints a fixture from ./ytdlp: playlist.json for list= URLs,
 //                               video.json for watch?v= URLs, channel.json otherwise;
-//                               FAKE_YTDLP_FIXTURE overrides with a path
+//                               FAKE_YTDLP_FIXTURE overrides with a path. Music (./ytdlp/music):
+//                               releases.json for /releases, uploads.json for /channel/<id>/videos,
+//                               list-<id>.json for a list= URL when it exists, track.json for
+//                               music.youtube.com/watch?v= URLs
+//   -x --audio-format <ext>     a download writes <output>.<ext> instead of .mp4
 //   anything else               a download: progress lines on stdout, post-processor lines
 //                               on stderr, then the final file path; creates the file
 //
@@ -18,7 +22,8 @@
 //   FAKE_YTDLP_ARGS_FILE=<path> write the received argv as JSON to this file
 //   FAKE_YTDLP_STREAMS=split    a download as a merged video: subtitles, thumbnail conversion,
 //                               a video and an audio stream, then four post-processors
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+//   FAKE_YTDLP_NO_RELEASES=1    a /releases URL fails like a channel without that tab
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 const args = process.argv.slice(2);
@@ -26,6 +31,7 @@ const env = process.env;
 const delay = Number(env.FAKE_YTDLP_DELAY_MS ?? 0);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const fixtures = join(import.meta.dirname, 'ytdlp');
+const musicFixtures = join(fixtures, 'music');
 
 if (env.FAKE_YTDLP_ARGS_FILE) writeFileSync(env.FAKE_YTDLP_ARGS_FILE, JSON.stringify(args));
 
@@ -47,8 +53,22 @@ if (env.FAKE_YTDLP_FAIL) {
   process.exit(Number(env.FAKE_YTDLP_EXIT ?? 1));
 }
 
+/** A music fixture for the URL, or undefined for the video ones. */
+function musicFixture() {
+  if (url.includes('/releases')) return join(musicFixtures, 'releases.json');
+  if (/\/channel\/[^/]+\/videos$/.test(url)) return join(musicFixtures, 'uploads.json');
+  if (url.includes('music.youtube.com/watch?v=')) return join(musicFixtures, 'track.json');
+  const list = /[?&]list=([^&]+)/.exec(url)?.[1];
+  const listFile = list && join(musicFixtures, `list-${list}.json`);
+  return listFile && existsSync(listFile) ? listFile : undefined;
+}
+
 if (args.includes('--dump-single-json')) {
   await sleep(delay);
+  if (env.FAKE_YTDLP_NO_RELEASES && url.includes('/releases')) {
+    process.stderr.write(`ERROR: [youtube:tab] ${url}: This channel does not have a releases tab\n`);
+    process.exit(1);
+  }
   if (env.FAKE_YTDLP_STDOUT !== undefined) {
     process.stdout.write(env.FAKE_YTDLP_STDOUT);
   } else {
@@ -57,25 +77,36 @@ if (args.includes('--dump-single-json')) {
       : url.includes('watch?v=')
         ? 'video.json'
         : 'channel.json';
-    process.stdout.write(readFileSync(env.FAKE_YTDLP_FIXTURE ?? join(fixtures, name)));
+    process.stdout.write(
+      readFileSync(env.FAKE_YTDLP_FIXTURE ?? musicFixture() ?? join(fixtures, name)),
+    );
   }
   process.exit(0);
 }
 
 // Download. The same line shapes the real binary prints with the runner's templates.
 const id = url.split('=').pop() || 'fake';
+const ext = args.includes('-x') ? (option('--audio-format') ?? 'm4a') : 'mp4';
 const output = (option('-o') ?? '%(id)s.%(ext)s')
   .replaceAll('%(id)s', id)
   .replaceAll('%(title)s', 'Fake video')
-  .replaceAll('%(ext)s', 'mp4');
+  .replaceAll('%(ext)s', ext)
+  .replaceAll('%%', '%');
 const progress = (formatId, fields) =>
   process.stdout.write(
     `[mytube-progress] ${JSON.stringify({ format_id: formatId, progress: fields })}\n`,
   );
-const postprocess = (name) => {
+// Post-processor lines go to stderr and progress lines to stdout, as with the real binary. The
+// runner reads the two pipes separately, so a short pause on either side of a post-processor
+// keeps the order the test expects on a busy machine (without it a later stdout line can be
+// read before the stderr line written first).
+const PIPE_SETTLE_MS = 15;
+const postprocess = async (name) => {
+  await sleep(PIPE_SETTLE_MS);
   for (const status of ['started', 'finished']) {
     process.stderr.write(`[mytube-progress] {"status": "${status}", "postprocessor": "${name}"}\n`);
   }
+  await sleep(PIPE_SETTLE_MS);
 };
 // One stream: its total is known from the first line. yt-dlp learns a stream's size only when
 // that stream starts, so a second stream's total is not in the first stream's lines.
@@ -103,16 +134,16 @@ if (env.FAKE_YTDLP_STREAMS === 'split') {
   // subtitle track (no format id), the thumbnail conversion, the video stream, the audio
   // stream, then the post-processors. Sizes match requested_formats in video.json.
   progress('', { status: 'finished', downloaded_bytes: 1642, total_bytes: 1642 });
-  postprocess('ThumbnailsConvertor');
+  await postprocess('ThumbnailsConvertor');
   await stream('248', 2400000, [1024, 600000, 1200000, 1800000, 2400000]);
   await stream('251', 600000, [1024, 150000, 300000, 450000, 600000]);
   for (const name of ['Merger', 'VideoRemuxer', 'EmbedSubtitle', 'MoveFiles']) {
     await sleep(delay);
-    postprocess(name);
+    await postprocess(name);
   }
 } else {
   await stream('18', 3000000, [1024, 750000, 1500000, 3000000]);
-  postprocess('MoveFiles');
+  await postprocess('MoveFiles');
 }
 mkdirSync(dirname(output), { recursive: true });
 writeFileSync(output, 'fake media');

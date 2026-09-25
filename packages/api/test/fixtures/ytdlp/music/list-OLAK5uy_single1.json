@@ -1,0 +1,53 @@
+{
+  "id": "OLAK5uy_single1",
+  "title": "Heatwave",
+  "availability": "public",
+  "playlist_count": 1,
+  "channel": null,
+  "channel_id": null,
+  "_type": "playlist",
+  "extractor": "youtube:tab",
+  "extractor_key": "YoutubeTab",
+  "webpage_url": "https://www.youtube.com/playlist?list=OLAK5uy_single1",
+  "original_url": "https://music.youtube.com/playlist?list=OLAK5uy_single1",
+  "thumbnails": [
+    {
+      "url": "https://i9.ytimg.com/s_p/OLAK5uy_single1/mqdefault.jpg?sqp=small",
+      "height": 180,
+      "width": 180,
+      "id": "0"
+    },
+    {
+      "url": "https://i9.ytimg.com/s_p/OLAK5uy_single1/sddefault.jpg?sqp=signed",
+      "height": 640,
+      "width": 640,
+      "id": "1"
+    },
+    {
+      "url": "https://i9.ytimg.com/s_p/OLAK5uy_single1/maxresdefault.jpg",
+      "height": 1200,
+      "width": 1200,
+      "id": "2"
+    }
+  ],
+  "entries": [
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "trk00000001",
+      "url": "https://music.youtube.com/watch?v=trk00000001",
+      "title": "Heatwave",
+      "duration": 201,
+      "channel": "Test Artist",
+      "channel_id": "UCartist000000000000001",
+      "uploader": "Test Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/trk00000001/hqdefault.jpg",
+          "height": 270,
+          "width": 480
+        }
+      ]
+    }
+  ]
+}

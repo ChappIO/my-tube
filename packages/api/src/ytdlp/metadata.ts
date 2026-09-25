@@ -68,6 +68,16 @@ export const RawInfo = z.object({
   release_timestamp: num,
   live_status: LiveStatus.nullish().catch(null),
   playlist_count: num,
+  // YouTube Music fields (a track's full metadata; flat listings leave them out).
+  track: str,
+  artist: str,
+  artists: z.array(z.string()).nullish().catch(null),
+  album: str,
+  album_artist: str,
+  release_year: num,
+  release_date: str,
+  track_number: num,
+  disc_number: num,
   thumbnails,
   // Sizes of what a download would fetch: the selected streams of a merged download, or the
   // single file. Present for a single video only (flat entries carry no formats).
@@ -121,6 +131,11 @@ export interface SourceEntry {
    * stream's size is unknown, and for flat listing entries.
    */
   expectedBytes: number | null;
+  /**
+   * YouTube Music tags from a track's full metadata (the watch page of a track); null in flat
+   * listings. `artist` is yt-dlp's `artist`, else its `artists` joined with `, `.
+   */
+  music?: MusicTags;
 }
 
 /** One stream yt-dlp selected for download. */
@@ -128,6 +143,19 @@ export interface ExpectedStream {
   formatId: string | null;
   /** Exact size, else yt-dlp's estimate, else bitrate × duration; null when none is known. */
   bytes: number | null;
+}
+
+/** What yt-dlp's YouTube Music extraction says about a track. Every field may be null. */
+export interface MusicTags {
+  track: string | null;
+  artist: string | null;
+  album: string | null;
+  albumArtist: string | null;
+  releaseYear: number | null;
+  /** `YYYY-MM-DD`. */
+  releaseDate: string | null;
+  trackNumber: number | null;
+  discNumber: number | null;
 }
 
 export interface SourceMetadata {
@@ -255,6 +283,25 @@ function toEntry(node: RawInfo, tab: ChannelTab | null): SourceEntry {
     channel: node.channel ?? node.uploader ?? null,
     thumbnails: node.thumbnails,
     ...expected(node),
+    music: musicTags(node),
+  };
+}
+
+/** A positive whole number, else null (yt-dlp sometimes reports 0 or floats). */
+function whole(value: number | null | undefined): number | null {
+  return value != null && Number.isInteger(value) && value > 0 ? value : null;
+}
+
+function musicTags(node: RawInfo): MusicTags {
+  return {
+    track: node.track ?? null,
+    artist: node.artist ?? (node.artists?.length ? node.artists.join(', ') : null),
+    album: node.album ?? null,
+    albumArtist: node.album_artist ?? null,
+    releaseYear: whole(node.release_year),
+    releaseDate: formatDate(node.release_date, null),
+    trackNumber: whole(node.track_number),
+    discNumber: whole(node.disc_number),
   };
 }
 

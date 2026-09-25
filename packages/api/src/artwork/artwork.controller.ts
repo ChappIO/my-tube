@@ -21,8 +21,8 @@ export class ArtworkController {
   constructor(private readonly artwork: ArtworkService) {}
 
   /**
-   * A cached avatar or thumbnail (`kind` = `channel`, `artist`, `video`, `playlist`; `id` = the
-   * row id). 404 without one; 503 with `Retry-After: 5` while the remote host refuses.
+   * A cached avatar, thumbnail or cover (`kind` = `channel`, `artist`, `video`, `playlist`,
+   * `album`, `track`; `id` = the row id). 404 without one; 503 with `Retry-After: 5` while the remote host refuses.
    */
   @Get(':kind/:id')
   async serve(

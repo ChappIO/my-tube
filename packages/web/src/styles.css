@@ -28,10 +28,12 @@
   --color-scrim-strong: rgba(21, 22, 24, 0.7);
   /*
    * The Preview player (handoff Screen 7): the black 16/9 area and its translucent white play
-   * circle. Picture content, the same in both themes.
+   * circle. Picture content, the same in both themes. `player-note` is the dark theme's muted,
+   * for a plain line in the player area ("Nothing on disk yet.").
    */
   --color-player: #0f1012;
   --color-player-glyph: rgba(255, 255, 255, 0.12);
+  --color-player-note: #8b9098;
 
   --font-sans:
     'Archivo Variable', 'Archivo', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,

@@ -1,0 +1,71 @@
+{
+  "id": "PLmusic0001",
+  "title": "Road Trip",
+  "playlist_count": 3,
+  "channel": "Some Curator",
+  "channel_id": "UCcurator00000000000001",
+  "uploader": "Some Curator",
+  "_type": "playlist",
+  "extractor": "youtube:tab",
+  "webpage_url": "https://www.youtube.com/playlist?list=PLmusic0001",
+  "thumbnails": [
+    {
+      "url": "https://i.ytimg.com/pl_c/PLmusic0001/studio_square_thumbnail.jpg",
+      "height": 480,
+      "width": 480
+    }
+  ],
+  "entries": [
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "pls00000001",
+      "url": "https://music.youtube.com/watch?v=pls00000001",
+      "title": "Open Road",
+      "duration": 180,
+      "channel": "Band One - Topic",
+      "channel_id": "UCbandone0000000000001",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/pls00000001/hqdefault.jpg",
+          "height": 270,
+          "width": 480
+        }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "trk00000002",
+      "url": "https://music.youtube.com/watch?v=trk00000002",
+      "title": "Low Tide",
+      "duration": 254,
+      "channel": "Test Artist",
+      "channel_id": "UCartist000000000000001",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/trk00000002/hqdefault.jpg",
+          "height": 270,
+          "width": 480
+        }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "pls00000003",
+      "url": "https://music.youtube.com/watch?v=pls00000003",
+      "title": "Night Drive",
+      "duration": 301,
+      "channel": "Band One - Topic",
+      "channel_id": "UCbandone0000000000001",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/pls00000003/hqdefault.jpg",
+          "height": 270,
+          "width": 480
+        }
+      ]
+    }
+  ]
+}

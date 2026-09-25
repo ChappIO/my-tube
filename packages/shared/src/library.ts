@@ -1,10 +1,11 @@
 import { z } from 'zod';
 import { ArtworkPath } from './artwork.js';
-import { Video } from './items.js';
+import { Track, Video } from './items.js';
 
 /*
- * The library read models (`/api/library/*`): the Videos tab and channel page grid, the Home
- * feed with its stats, the Video header summary, and what Preview needs to play a file.
+ * The library read models (`/api/library/*`): the Videos tab and channel page grid, the Music
+ * tabs (artists, albums, playlists), the Home feed with its stats, the header summaries, and
+ * what Preview needs to play a file.
  */
 
 // ---------------------------------------------------------------------------------------
@@ -24,6 +25,22 @@ export const VIDEO_MIME_TYPES: Readonly<Record<string, string>> = {
 export function videoMimeType(path: string): string | null {
   const match = /\.([a-z0-9]+)$/i.exec(path);
   return (match && VIDEO_MIME_TYPES[match[1]!.toLowerCase()]) ?? null;
+}
+
+/** Content type per audio container. Browsers play m4a, mp3, opus (ogg) and flac. */
+export const AUDIO_MIME_TYPES: Readonly<Record<string, string>> = {
+  m4a: 'audio/mp4',
+  mp3: 'audio/mpeg',
+  opus: 'audio/ogg; codecs=opus',
+  ogg: 'audio/ogg',
+  flac: 'audio/flac',
+  webm: 'audio/webm',
+};
+
+/** The content type of an audio file by its extension, or null for an unknown one. */
+export function audioMimeType(path: string): string | null {
+  const match = /\.([a-z0-9]+)$/i.exec(path);
+  return (match && AUDIO_MIME_TYPES[match[1]!.toLowerCase()]) ?? null;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -86,6 +103,114 @@ export const VideoPage = z.object({
 export type VideoPage = z.infer<typeof VideoPage>;
 
 // ---------------------------------------------------------------------------------------
+// Music: tracks, artists, albums, playlists.
+// ---------------------------------------------------------------------------------------
+
+/** The artist of a listed track or album. */
+export const TrackArtist = z.object({
+  /** The `artists` row id. */
+  id: z.number().int().positive(),
+  name: z.string(),
+  avatarUrl: ArtworkPath.nullable(),
+  /** The source that added this artist, when it was added as one. */
+  sourceId: z.number().int().positive().nullable(),
+});
+export type TrackArtist = z.infer<typeof TrackArtist>;
+
+/** The album of a listed track. */
+export const TrackAlbum = z.object({
+  /** The `albums` row id. */
+  id: z.number().int().positive(),
+  title: z.string(),
+  year: z.number().int().nullable(),
+  coverUrl: ArtworkPath.nullable(),
+});
+export type TrackAlbum = z.infer<typeof TrackAlbum>;
+
+/** One track with its artist, album and what Preview needs (`GET /api/library/tracks/:id`). */
+export const TrackListItem = Track.extend({
+  /** The album cover when the album has one, else the track's own thumbnail; both cached. */
+  coverUrl: ArtworkPath.nullable(),
+  artist: TrackArtist,
+  album: TrackAlbum.nullable(),
+  /** Content type of the file on disk (`audio/mp4`), null without one. */
+  mimeType: z.string().nullable(),
+});
+export type TrackListItem = z.infer<typeof TrackListItem>;
+
+/**
+ * One artist on the Artists tab (`GET /api/library/artists`): every artist with a track in the
+ * library (not skipped by the rules) or added as a source. Sorted by name.
+ */
+export const ArtistListItem = z.object({
+  id: z.number().int().positive(),
+  name: z.string(),
+  avatarUrl: ArtworkPath.nullable(),
+  /** Added as a source and subscribed (the bell badge). */
+  subscribed: z.boolean(),
+  sourceId: z.number().int().positive().nullable(),
+  /** Albums of this artist on the Albums tab. */
+  albumCount: z.number().int().nonnegative(),
+  /** Tracks of this artist in the library: wanted, downloading, on disk or missing. */
+  trackCount: z.number().int().nonnegative(),
+});
+export type ArtistListItem = z.infer<typeof ArtistListItem>;
+
+/** `GET /api/library/albums` query. */
+export const AlbumListQuery = z.object({
+  /** Only albums of this `artists` row. */
+  artistId: z.coerce.number().int().positive().optional(),
+});
+export type AlbumListQuery = z.infer<typeof AlbumListQuery>;
+
+/**
+ * One album on the Albums tab (`GET /api/library/albums`). `trackCount` counts the album's
+ * tracks the rules want (wanted, downloading, on disk or missing; not skipped), `onDiskCount`
+ * those on disk: fewer on disk is an incomplete album (`12/14 tracks` in red). Albums whose
+ * every track is skipped are not listed. Sorted by artist, newest year first, then title.
+ */
+export const AlbumListItem = z.object({
+  id: z.number().int().positive(),
+  title: z.string(),
+  year: z.number().int().nullable(),
+  coverUrl: ArtworkPath.nullable(),
+  artist: z.object({ id: z.number().int().positive(), name: z.string() }),
+  trackCount: z.number().int().nonnegative(),
+  onDiskCount: z.number().int().nonnegative(),
+  /** The first track on disk in album order (the tile opens Preview on it), or null. */
+  firstTrackId: z.number().int().positive().nullable(),
+});
+export type AlbumListItem = z.infer<typeof AlbumListItem>;
+
+/**
+ * `GET /api/library/playlists` query. Only the Music library has a Playlists tab; the Video
+ * library shows its playlists as sources on the Channels tab.
+ */
+export const PlaylistListQuery = z.object({
+  library: z.literal('music').default('music'),
+});
+export type PlaylistListQuery = z.infer<typeof PlaylistListQuery>;
+
+/**
+ * One synced playlist on the Playlists tab (`GET /api/library/playlists?library=music`): the
+ * playlist sources of the library, sorted by name. Counts as for albums, over the playlist's
+ * positions; `durationSeconds` sums the counted items.
+ */
+export const PlaylistListItem = z.object({
+  id: z.number().int().positive(),
+  name: z.string(),
+  sourceId: z.number().int().positive().nullable(),
+  trackCount: z.number().int().nonnegative(),
+  onDiskCount: z.number().int().nonnegative(),
+  durationSeconds: z.number().int().nonnegative(),
+  /** The first four distinct covers of the items on disk, in playlist order (the stack). */
+  covers: z.array(ArtworkPath).max(4),
+  /** The first item on disk in playlist order (the tile opens Preview on it), or null. */
+  firstTrackId: z.number().int().positive().nullable(),
+});
+export type PlaylistListItem = z.infer<typeof PlaylistListItem>;
+
+// ---------------------------------------------------------------------------------------
 // Home.
 // ---------------------------------------------------------------------------------------
 
@@ -113,11 +238,15 @@ export const HomeQuery = z.object({
 });
 export type HomeQuery = z.infer<typeof HomeQuery>;
 
-/** A video on Home. Music items join this union in Stage 6 (`kind: 'track'`). */
+/** A video on Home. */
 export const HomeVideoItem = VideoListItem.extend({ kind: z.literal('video') });
 export type HomeVideoItem = z.infer<typeof HomeVideoItem>;
 
-export const HomeItem = z.discriminatedUnion('kind', [HomeVideoItem]);
+/** A track on Home (the art-only tile with the hover chin). */
+export const HomeMusicItem = TrackListItem.extend({ kind: z.literal('music') });
+export type HomeMusicItem = z.infer<typeof HomeMusicItem>;
+
+export const HomeItem = z.discriminatedUnion('kind', [HomeVideoItem, HomeMusicItem]);
 export type HomeItem = z.infer<typeof HomeItem>;
 
 /** The three stat cards. */
@@ -149,7 +278,10 @@ export type HomeFeed = z.infer<typeof HomeFeed>;
 // Summary.
 // ---------------------------------------------------------------------------------------
 
-/** `GET /api/library/summary`: the Video header sub (`4 channels · 1 playlist · 368 videos · 130 GB`). */
+/**
+ * `GET /api/library/summary`: the Video header sub (`4 channels · 1 playlist · 368 videos · 130 GB`)
+ * and the Music one (`31 artists · 84 albums · 3 playlists · 4 artist subscriptions`).
+ */
 export const LibrarySummary = z.object({
   videos: z.object({
     /** Channel sources in the Video library. */
@@ -160,6 +292,16 @@ export const LibrarySummary = z.object({
     videos: z.number().int().nonnegative(),
     /** Bytes of the videos on disk. */
     sizeBytes: z.number().int().nonnegative(),
+  }),
+  music: z.object({
+    /** Artists on the Artists tab. */
+    artists: z.number().int().nonnegative(),
+    /** Albums on the Albums tab. */
+    albums: z.number().int().nonnegative(),
+    /** Playlist sources in the Music library. */
+    playlists: z.number().int().nonnegative(),
+    /** Subscribed artist sources. */
+    artistSubscriptions: z.number().int().nonnegative(),
   }),
 });
 export type LibrarySummary = z.infer<typeof LibrarySummary>;
