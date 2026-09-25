@@ -28,6 +28,8 @@ export type ItemStatus = z.infer<typeof ItemStatus>;
  *   sync looks at them again on the next check.
  * - `unavailable`: YouTube refused the download for good (removed, private, members-only).
  *   Only an explicit retry tries it again.
+ * - `deleted_by_user`: the file was deleted with Delete file in Preview. Nothing brings it back
+ *   on its own: neither the sync nor revalidation changes it.
  *
  * A later sync or revalidation moves `no_match` and `no_longer_matches` items back to `wanted`
  * when the rules match them again.
@@ -38,6 +40,7 @@ export const SKIP_REASONS = [
   'live',
   'upcoming',
   'unavailable',
+  'deleted_by_user',
 ] as const;
 export const SkipReason = z.enum(SKIP_REASONS);
 export type SkipReason = z.infer<typeof SkipReason>;

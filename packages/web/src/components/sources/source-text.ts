@@ -1,4 +1,4 @@
-import type { Library, ResolvedSource, Source, SourceKind } from '@mytube/shared';
+import type { Library, LibrarySummary, ResolvedSource, Source, SourceKind } from '@mytube/shared';
 import { countOf, formatBytes, formatCadence } from '../../format';
 
 /*
@@ -65,17 +65,14 @@ export function resolvedMeta(resolved: ResolvedSource, library: Library): string
 }
 
 /**
- * The Video header sub line: `4 channels · 1 playlist · 368 videos · 130 GB`. Playlists, videos
- * and size appear once there are any.
+ * The Video header sub line from `GET /api/library/summary`:
+ * `4 channels · 1 playlist · 368 videos · 130 GB`. Playlists, videos and size appear once there
+ * are any.
  */
-export function videoLibrarySummary(sources: readonly Source[]): string {
-  const channels = sources.filter((source) => source.kind !== 'playlist').length;
-  const playlists = sources.length - channels;
-  const items = sources.reduce((sum, source) => sum + source.itemCount, 0);
-  const bytes = sources.reduce((sum, source) => sum + source.sizeBytes, 0);
-  const parts = [countOf(channels, 'channel')];
-  if (playlists > 0) parts.push(countOf(playlists, 'playlist'));
-  if (items > 0) parts.push(countOf(items, 'video'));
-  if (bytes > 0) parts.push(formatBytes(bytes));
+export function videoLibrarySummary(summary: LibrarySummary['videos']): string {
+  const parts = [countOf(summary.channels, 'channel')];
+  if (summary.playlists > 0) parts.push(countOf(summary.playlists, 'playlist'));
+  if (summary.videos > 0) parts.push(countOf(summary.videos, 'video'));
+  if (summary.sizeBytes > 0) parts.push(formatBytes(summary.sizeBytes));
   return parts.join(' · ');
 }

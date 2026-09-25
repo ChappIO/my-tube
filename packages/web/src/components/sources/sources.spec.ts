@@ -69,13 +69,11 @@ describe('source text', () => {
   });
 
   it('summarises the video library', () => {
-    expect(videoLibrarySummary([])).toBe('0 channels');
+    expect(videoLibrarySummary({ channels: 0, playlists: 0, videos: 0, sizeBytes: 0 })).toBe(
+      '0 channels',
+    );
     expect(
-      videoLibrarySummary([
-        { ...source, itemCount: 200, sizeBytes: 100e9 },
-        { ...source, id: 2 },
-        { ...source, id: 3, kind: 'playlist', itemCount: 168, sizeBytes: 30.4e9 },
-      ]),
+      videoLibrarySummary({ channels: 2, playlists: 1, videos: 368, sizeBytes: 130.4e9 }),
     ).toBe('2 channels · 1 playlist · 368 videos · 130 GB');
   });
 });

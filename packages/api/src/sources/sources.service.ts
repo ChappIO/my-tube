@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import {
   Source,
+  artworkPath,
   guessLibrary,
   parseYoutubeUrl,
   sourceIssues,
@@ -119,12 +120,12 @@ export class SourcesService {
       .where(library ? eq(sources.library, library) : undefined)
       .orderBy(desc(sources.createdAt), desc(sources.id))
       .all()
-      .map(toSource);
+      .map((row) => toSource(this.db, row));
   }
 
   /** One source; 404 when it does not exist. */
   get(id: number): Source {
-    return toSource(this.row(id));
+    return toSource(this.db, this.row(id));
   }
 
   /**
@@ -181,7 +182,7 @@ export class SourcesService {
         .returning()
         .get();
       linkCatalog(tx, row, resolved.itemCount);
-      return toSource(row);
+      return toSource(tx, row);
     });
     for (const listener of this.createdListeners) listener(created);
     return created;
@@ -212,6 +213,7 @@ export class SourcesService {
       if (issues.length > 0) throw invalid(issues);
     }
     const updated = toSource(
+      this.db,
       this.db
         .update(sources)
         .set({
@@ -354,8 +356,29 @@ function catalogTable(kind: SourceKind): 'channels' | 'artists' | 'playlists' {
   return kind === 'channel' ? 'channels' : kind === 'artist' ? 'artists' : 'playlists';
 }
 
-function toSource(row: SourceRow): Source {
-  return Source.parse(row);
+/**
+ * The DTO of a source row. `avatarUrl` becomes the artwork cache path of its catalog row
+ * (`/api/artwork/channel|artist|playlist/<id>`), so the web never loads Google's image hosts; the
+ * row keeps the remote URL the cache downloads from.
+ */
+function toSource(db: Database | Transaction, row: SourceRow): Source {
+  let avatarUrl: string | null = null;
+  if (row.avatarUrl !== null) {
+    const catalog = catalogTable(row.kind);
+    const table = catalog === 'channels' ? channels : catalog === 'artists' ? artists : playlists;
+    const entry = db
+      .select({ id: table.id })
+      .from(table)
+      .where(eq(table.youtubeId, row.youtubeId))
+      .get();
+    if (entry) {
+      avatarUrl = artworkPath(
+        catalog === 'channels' ? 'channel' : catalog === 'artists' ? 'artist' : 'playlist',
+        entry.id,
+      );
+    }
+  }
+  return Source.parse({ ...row, avatarUrl });
 }
 
 function invalid(issues: SourceIssue[]): BadRequestException {

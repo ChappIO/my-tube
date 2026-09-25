@@ -13,6 +13,8 @@ interface ModalBaseProps {
   dim?: 'default' | 'strong';
   /** CSS width of the dialog. Default `min(560px, 100%)`. */
   width?: string;
+  /** CSS max height of the dialog (Preview: `calc(100vh - 48px)`). None by default. */
+  maxHeight?: string;
   children: ReactNode;
 }
 
@@ -55,6 +57,7 @@ export function Modal({
   title,
   dim = 'default',
   width = 'min(560px, 100%)',
+  maxHeight,
   children,
   'aria-label': ariaLabel,
 }: ModalProps) {
@@ -115,7 +118,7 @@ export function Modal({
           dim === 'strong' ? 'shadow-preview' : 'shadow-modal',
           headed ? 'grid gap-[22px] p-7' : 'overflow-hidden',
         )}
-        style={{ width }}
+        style={{ width, maxHeight }}
       >
         {headed && (
           <div className="flex items-center justify-between gap-4">

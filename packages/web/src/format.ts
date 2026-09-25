@@ -154,3 +154,55 @@ export function resultTone(result: string): ResultTone {
   if (result === 'failed') return 'red';
   return 'muted';
 }
+
+// Library screens.
+
+/** A video's length on its duration badge: `4:05`, `48:12`, `1:02:09`. */
+export function formatLength(seconds: number): string {
+  const total = Math.max(0, Math.round(seconds));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const rest = pad(total % 60);
+  return hours > 0 ? `${hours}:${pad(minutes)}:${rest}` : `${minutes}:${rest}`;
+}
+
+const WEEKDAYS = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+] as const;
+
+/**
+ * A Home day group's label for a local date (`YYYY-MM-DD`): `Today`, `Yesterday`, the weekday
+ * within the last week (`Monday`), then the date itself.
+ */
+export function dayLabel(day: string, now: Date = new Date()): string {
+  const [year, month, date] = day.split('-').map(Number);
+  if (!year || !month || !date) return day;
+  const days = localDay(now) - Math.floor(Date.UTC(year, month - 1, date) / DAY);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return WEEKDAYS[new Date(Date.UTC(year, month - 1, date)).getUTCDay()]!;
+  return day;
+}
+
+/**
+ * When a video was published, for the tile chin: a date-only upload date (`2026-09-04`) counts
+ * in whole local days (`today`, `yesterday`, `3 days ago`, then `relativeTime`'s weeks and
+ * months); a full timestamp is `relativeTime`. Empty when unknown.
+ */
+export function publishedAgo(publishedAt: string | null, now: number = Date.now()): string {
+  if (!publishedAt) return '';
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(publishedAt);
+  if (!dateOnly) return relativeTime(publishedAt, now);
+  const days =
+    localDay(new Date(now)) -
+    Math.floor(Date.UTC(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3])) / DAY);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  return relativeTime(new Date(now - days * DAY).toISOString(), now);
+}

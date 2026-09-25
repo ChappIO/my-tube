@@ -6,6 +6,7 @@ import { useDeleteSource, useSetSubscribed, useSource } from '../../api/sources'
 import { checkedAgo } from '../../format';
 import { useNow } from '../../use-now';
 import { UnlinkIcon } from '../icons';
+import { VideoGrid } from '../library/VideoGrid';
 import { BellToggle } from '../media';
 import { BackLink } from '../ui/BackLink';
 import { Button } from '../ui/Button';
@@ -21,8 +22,8 @@ const backToChannels = linkOptions({ to: '/video/$tab', params: { tab: 'channels
 
 /**
  * The channel page (handoff Screen 3): back link, header with avatar, name, meta and rule
- * chips, Edit rules and the bell pill. `id` is the route param, a source id. The videos grid
- * arrives in Stage 5; until then the body is the plain empty state.
+ * chips, Edit rules and the bell pill, then the source's videos on disk as square tiles (title and
+ * relative date). `id` is the route param, a source id.
  */
 export function ChannelPage({ id }: { id: string }) {
   const sourceId = /^\d+$/.test(id) ? Number(id) : 0;
@@ -39,7 +40,7 @@ export function ChannelPage({ id }: { id: string }) {
     body = (
       <>
         <ChannelHeader source={source.data} />
-        <Body muted>Nothing downloaded yet.</Body>
+        <VideoGrid filter={{ sourceId: source.data.id }} meta="when" />
       </>
     );
   }

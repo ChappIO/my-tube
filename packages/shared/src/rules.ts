@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ImageUrl } from './artwork.js';
 import {
   Matcher,
   PLAYLIST_ONLY_LEAVES,
@@ -115,7 +116,8 @@ export const Source = z
     youtubeId: z.string().min(1),
     url: z.url(),
     name: z.string().min(1),
-    avatarUrl: z.url().nullable(),
+    /** `/api/artwork/<kind>/<id>` from the API (the cached avatar); the database stores the remote URL. */
+    avatarUrl: ImageUrl.nullable(),
     /** Checked for new content on the schedule. Unsubscribing never deletes files. */
     subscribed: z.boolean(),
     /** The rules: what is downloaded and what stays. */

@@ -23,13 +23,16 @@ packages/api/src
   activity/             HistoryService (global module) and ActivityController (queue, history, summary)
   logging/              AppLogger (stdout + rotating CONFIG_DIR/logs/mytube.log) and LogLevelSync
   sources/              URL resolution, source CRUD, rules (matcher + options) and the subscribe toggle
-  files/                media-files.ts: libraryPath (stay inside a mount), removeMediaFiles (file, sidecars, empty dirs)
+  files/                media-files.ts: libraryPath (stay inside a mount), removeMediaFiles (file, sidecars, empty dirs);
+                        send-file.ts: sendFile (Express sendFile with ETag, Range, dot-directories allowed)
   system/               GET /api/system/info and /logs, the backup and rescan stubs (see System)
   jobs/                 the jobs queue (JobsService), the worker pool (JobsWorker), the JobRunner seam,
                         per-job logs (JobLogsService) and /api/jobs/:id/{log,cancel,retry}
   sync/                 evaluateItem (live gate + matcher), SyncService, RevalidationService, SyncScheduler,
                         CheckSourceRunner, RevalidateRunner, the check and rules-preview endpoints
   downloads/            DownloadRunner and the Settings → Video to yt-dlp option mapping
+  library/              LibraryService and /api/library/*: videos list, Home, summary, stream, Delete file
+  artwork/              ArtworkService and /api/artwork/:kind/:id: the artwork cache in CONFIG_DIR/cache/artwork
 packages/api/test       end-to-end tests booting the real AppModule
 ```
 
@@ -145,7 +148,7 @@ The contract is `packages/shared/src/rules.ts`; the tables are in the database s
 
 - `Library` (`video`, `music`) and `SourceKind` (`channel`, `artist`, `playlist`).
 - `SourceOptions`: `embedCoverArt` (true; music only, ignored for video) and `syncOrder` (false; playlists only). `DEFAULT_SOURCE_OPTIONS`. `describeOptions(options, library)` gives `sync order` and `cover art` chips; `describeSource(source)` = rule chips then option chips (what the Channels row and channel page show).
-- `Source` is the DTO for one `sources` row: `id`, `library`, `kind`, `youtubeId`, `url`, `name`, `avatarUrl`, `subscribed`, `matcher`, `options`, `lastCheckedAt`, `itemCount`, `sizeBytes`, `createdAt`, `updatedAt` (`lastRevalidatedAt` stays internal). A Drizzle row parses directly.
+- `Source` is the DTO for one `sources` row: `id`, `library`, `kind`, `youtubeId`, `url`, `name`, `avatarUrl`, `subscribed`, `matcher`, `options`, `lastCheckedAt`, `itemCount`, `sizeBytes`, `createdAt`, `updatedAt` (`lastRevalidatedAt` stays internal). A Drizzle row parses directly (`avatarUrl` is an `ImageUrl`: a cache path or an absolute URL), but the API maps `avatarUrl` to the artwork cache path of the source's catalog row first (`/api/artwork/channel|artist|playlist/<catalog id>`, see "Artwork cache"); the row keeps the remote URL.
 - `sourceIssues({ library, kind, matcher?, options? })` lists invalid combinations: an artist outside Music, `syncOrder` or a playlist-only condition on anything but a playlist. `Source` applies it; create, update and the preview reuse it.
 - **Legacy rules.** `LegacyRules` (the Stage 3 flat `rules` JSON) and `convertLegacyRules(old)` → `{ matcher, options }` exist only for the one-time conversion (database skill "Matcher rules conversion"): each rule that was on becomes one item of a root `and`: `skipShorts` → `not(is_short)`, `keepDays` → `not(older_than_days)`, `publishedAfter` → `published_after`, `titleFilter` → `title_contains`, `skipLiveRecordings` → `not(title_matches \blive\b)` (`LIVE_WORD_PATTERN`); `syncOrder` and `embedCoverArt` become options.
 
@@ -278,6 +281,44 @@ The API test suite has no network: `test/setup.ts` (a Vitest setup file) replace
 
 - Failures: back to `wanted` and rethrow (the worker retries). `isUnavailableReason(reason)` (removed, private, members-only, copyright; not bot checks or HTTP errors) → `skipped/unavailable` and `PermanentJobError`. A cancel (signal reason not `shutdown`) removes `<name>.*.part`, `.ytdl`, `.fNNN.*` and `.temp.*` files, and the name's sidecars when no finished media file exists, then the folder if empty; a shutdown keeps partials so the next run resumes.
 - Options (`video-options.ts`, pure): `videoFormat(quality, container)`: `bestvideo[height<=1080]+bestaudio/best[height<=1080]` (`best` drops the cap; `mp4` and `webm` first try streams of that type). `videoExtraArgs(video)`: `--remux-video <container>` (not webm), subtitles `--embed-subs --sub-langs en,nl` when embedded or `--write-subs --sub-langs …` for sidecars (`--write-subs` together with `--embed-subs` would keep the files), thumbnails `--write-thumbnail --convert-thumbnails jpg` (the Plex sidecar `<name>.jpg`). `mergeOutputFormat` = container; network from `networkOptions`.
+
+## Library
+
+`src/library/` (`LibraryModule`, `LibraryService`, `LibraryController`). The contract is `packages/shared/src/library.ts`; tracks join these read models in Stage 6.
+
+| Endpoint                              | Query / body                                                                                  | Response                                                                   |
+| ------------------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `GET /api/library/videos`             | `VideoListQuery`: `channelId?`, `sourceId?`, `status` (`on_disk`), `sort`, `limit`, `cursor?` | `VideoPage` `{ items: VideoListItem[], nextCursor }`; 400 bad query/cursor |
+| `GET /api/library/videos/:id`         |                                                                                               | `VideoListItem`; 404                                                       |
+| `GET /api/library/videos/:id/stream`  | `Range` header                                                                                | the file, 200 or 206; 404 not on disk or file gone; 403 outside VIDEO_DIR  |
+| `DELETE /api/library/videos/:id/file` |                                                                                               | 204; 404 unknown; 409 not on disk; 403 outside VIDEO_DIR                   |
+| `GET /api/library/home`               | `HomeQuery`: `days` (14, 1–365), `tz?` (IANA zone, validated)                                 | `HomeFeed` `{ stats, groups: [{ day, items: HomeItem[] }] }`               |
+| `GET /api/library/summary`            |                                                                                               | `LibrarySummary` `{ videos: { channels, playlists, videos, sizeBytes } }`  |
+
+- **`VideoListItem`** = the `Video` DTO plus `channel` (`{ id, name, avatarUrl, sourceId }`: the `channels` row, `sourceId` = the channel page's id or null), `thumbnailUrl` (`/api/artwork/video/<id>`, null without any art), `mimeType` (by extension, `videoMimeType`: mkv `video/x-matroska`, mp4 `video/mp4`, webm `video/webm`; null when not on disk). `toListItem(video, channel)` builds it.
+- **List.** `status` defaults to `on_disk` (`all` drops the filter); `sort` `published` (default) or `downloaded`, newest first, rows without the value last, ties by id. Keyset pagination: `nextCursor` is base64url JSON `[sortValue, id]` of the page's last row (limit 1–200, default 60). `sourceId` means "this source's videos": listed by it first (`videos.source_id`) or of its channel (`channels.source_id`), so a channel page shows every video of the channel.
+- **Home.** On-disk videos with `downloaded_at` in the last `days` days, newest first, at most `HOME_ITEM_LIMIT` (200), grouped by the local day of `downloaded_at` in `tz` (the web sends the browser's zone; the server's zone otherwise). `HomeItem` is a discriminated union on `kind` (`video` now; Stage 6 adds music). `stats`: `activeDownloads` (`JobsService.summary()`), `downloadedAllTime` (history rows with result `done` and kind `video`/`music`), `librarySizeBytes` (sum of `file_size_bytes` of on-disk videos and tracks).
+- **Summary.** Channel and playlist sources of the Video library, on-disk videos and their bytes (the header sub).
+- **Stream.** `sendFile` (`files/send-file.ts`) wraps Express 5's `res.sendFile`: Range (206, `Accept-Ranges: bytes`, `Content-Range`), ETag, Last-Modified, `dotfiles: 'allow'` (worktrees live under `.claude/`); the content type is set from `videoMimeType`. The path goes through `libraryPath`, so a `file_path` that climbs out of `VIDEO_DIR` is a 403.
+- **Delete file** (the explicit deletion, next to revalidation): `removeMediaFiles(VIDEO_DIR, file_path)` (file, sidecars, empty folders), then the video becomes `skipped` / `deleted_by_user` with `file_path` and `file_size_bytes` cleared, its source loses the size (never below 0) and gets its `item_count` recounted, and history records `{ kind: 'video', title, result: 'removed', details: 'deleted by user' }`. The sync (`nextStatus`) and revalidation never move `deleted_by_user` items, so nothing downloads the file again on its own.
+- **Tests.** `test/library.e2e.spec.ts` seeds rows and files in a temp library: list, filters, pagination, Home grouping and stats, summary, the artwork cache (hit, miss, sidecar, 503, 404, prune; `fetch` stubbed), stream ranges and path escape, delete.
+
+## Artwork cache
+
+`src/artwork/` (`ArtworkModule`, `ArtworkService`, `ArtworkController`). The web never loads Google's image hosts (they rate-limit bursts with 429); every avatar and thumbnail in a DTO the screens render is `/api/artwork/<kind>/<id>` (shared `artworkPath`, `ArtworkPath`, `ARTWORK_KINDS`).
+
+| Kind       | Row         | Remote URL      | Used by                                                        |
+| ---------- | ----------- | --------------- | -------------------------------------------------------------- |
+| `channel`  | `channels`  | `avatar_url`    | `Source.avatarUrl` of channel sources, `VideoListItem.channel` |
+| `artist`   | `artists`   | `avatar_url`    | `Source.avatarUrl` of artist sources                           |
+| `playlist` | `playlists` | `thumbnail_url` | `Source.avatarUrl` of playlist sources                         |
+| `video`    | `videos`    | `thumbnail_url` | `VideoListItem.thumbnailUrl` (the sidecar `.jpg` when on disk) |
+
+`ResolvedSource.avatarUrl` (the Add modal card) stays the remote URL: the source is not saved, so there is no row to cache for.
+
+- `GET /api/artwork/:kind/:id` (400 for another kind or a non-numeric id, 404 for an unknown row or a row without art). A video on disk is served from its sidecar thumbnail (`<name>.jpg|webp|png` next to the file) when there is one. Otherwise the cached file `CONFIG_DIR/cache/artwork/<kind>/<id>.<ext>` when `artwork_cache` says it came from the row's current remote URL; else it is downloaded with `fetch` (`User-Agent: MyTube/<version> …`, 10 s timeout, at most 4 downloads at once, concurrent requests for one image share a download, images up to 10 MB, the type from `Content-Type`), written through a temp file and recorded.
+- Responses: `sendFile` with `Cache-Control: public, max-age=86400`, ETag and Last-Modified (304 on a matching `If-None-Match`). A 429, 5xx, timeout or network error is a **503 with `Retry-After: 5`** (the web retries after 2 s and 8 s); any other failure a 404. Failures are remembered in memory for 30 s (`ARTWORK_NEGATIVE_TTL_MS`) and never written to disk.
+- Bookkeeping: the `artwork_cache` table (database skill). `used_at` is refreshed at most hourly per image. After each download `prune()` removes the least recently used files until the cache is at most 500 MB (`ARTWORK_CACHE_MAX_BYTES`).
 
 ## Activity API
 

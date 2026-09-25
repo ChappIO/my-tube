@@ -1,5 +1,6 @@
 import { Outlet, createRootRoute, useLocation } from '@tanstack/react-router';
 import { useActivitySummary } from '../api/activity';
+import { useLibraryFollowsDownloads } from '../api/library';
 import { useThemeFromSettings } from '../api/settings';
 import { AppShell } from '../components/shell/AppShell';
 import { YtdlpFooter } from '../components/shell/YtdlpFooter';
@@ -11,6 +12,8 @@ function RootLayout() {
   // The stored theme (settings table) wins over the localStorage pre-paint copy.
   useThemeFromSettings();
   const summary = useActivitySummary();
+  // A finished download refreshes Home, the grids and the source sizes.
+  useLibraryFollowsDownloads();
   // /dev/* reference pages are standalone: they render their own <main> and padding.
   if (pathname === '/dev' || pathname.startsWith('/dev/')) return <Outlet />;
   return (
