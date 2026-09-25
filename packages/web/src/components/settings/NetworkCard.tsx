@@ -2,6 +2,7 @@ import { NetworkSettings } from '@mytube/shared';
 import { KeyValueGrid, KeyValueRow } from '../ui/KeyValueGrid';
 import { SettingsCard } from '../ui/SettingsCard';
 import { TextValueInput } from '../ui/TextValueInput';
+import { CookiesRow } from './CookiesRow';
 import { schemaError, textOrNull } from './fields';
 
 type NetworkField = keyof NetworkSettings;
@@ -11,10 +12,9 @@ export function validateNetworkField(field: NetworkField, text: string): string 
   return schemaError(NetworkSettings.shape[field], textOrNull(text));
 }
 
-const rows: { field: NetworkField; label: string }[] = [
+const rows: { field: Exclude<NetworkField, 'cookiesFile'>; label: string }[] = [
   { field: 'rateLimit', label: 'Rate limit' },
   { field: 'proxy', label: 'Proxy' },
-  { field: 'cookiesFile', label: 'Cookies file' },
 ];
 
 export interface NetworkCardProps {
@@ -24,8 +24,8 @@ export interface NetworkCardProps {
 }
 
 /**
- * Settings → Advanced → Network: rate limit (`500K`, `5M`), proxy URL and cookies file path,
- * passed to every yt-dlp call. An empty box reads "none" and is stored as null.
+ * Settings → Advanced → Network: rate limit (`500K`, `5M`) and proxy URL (an empty box reads
+ * "none" and is stored as null), and the cookies file (`CookiesRow`), passed to every yt-dlp call.
  */
 export function NetworkCard({ settings, onChange }: NetworkCardProps) {
   return (
@@ -41,6 +41,7 @@ export function NetworkCard({ settings, onChange }: NetworkCardProps) {
             />
           </KeyValueRow>
         ))}
+        <CookiesRow onPathChange={(cookiesFile) => onChange({ cookiesFile })} />
       </KeyValueGrid>
     </SettingsCard>
   );

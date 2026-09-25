@@ -178,7 +178,10 @@ export const NetworkSettings = z.object({
     .default(null),
   /** Proxy URL passed to yt-dlp, for example `socks5://host:1080`. */
   proxy: z.string().trim().min(1).max(500).nullable().default(null),
-  /** Path of a Netscape cookies file inside the container. */
+  /**
+   * Path of a Netscape cookies file inside the container. `PUT /api/system/cookies` sets it to
+   * the managed `CONFIG_DIR/cookies.txt`; a path of a mounted file can be set by hand.
+   */
   cookiesFile: z.string().trim().min(1).max(500).nullable().default(null),
 });
 export type NetworkSettings = z.infer<typeof NetworkSettings>;

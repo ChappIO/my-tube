@@ -28,14 +28,15 @@ Runtime facts:
 
 What lives in `/config` (user docs: `README.md`, "Where things are"):
 
-| Path                         | What                                                                       |
-| ---------------------------- | -------------------------------------------------------------------------- |
-| `/config/mytube.db`          | the database, settings included (WAL mode: `-wal` and `-shm` next to it)   |
-| `/config/backups/`           | `mytube-<UTC time>.sqlite`, nightly at 04:00 container time, newest 7 kept |
-| `/config/logs/mytube.log`    | the app log (also stdout), rotated at 5 MB with `.1` to `.3`               |
-| `/config/logs/jobs/<id>.log` | yt-dlp output per job, newest 200                                          |
-| `/config/bin/yt-dlp`         | the managed yt-dlp binary                                                  |
-| `/config/cache/artwork/`     | the artwork cache (500 MB, disposable)                                     |
+| Path                         | What                                                                                                                                                                  |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/config/mytube.db`          | the database, settings included (WAL mode: `-wal` and `-shm` next to it)                                                                                              |
+| `/config/backups/`           | `mytube-<UTC time>.sqlite`, nightly at 04:00 container time, newest 7 kept                                                                                            |
+| `/config/logs/mytube.log`    | the app log (also stdout), rotated at 5 MB with `.1` to `.3`                                                                                                          |
+| `/config/logs/jobs/<id>.log` | yt-dlp output per job, newest 200                                                                                                                                     |
+| `/config/bin/yt-dlp`         | the managed yt-dlp binary                                                                                                                                             |
+| `/config/cache/artwork/`     | the artwork cache (500 MB, disposable)                                                                                                                                |
+| `/config/cookies.txt`        | the managed yt-dlp cookies file (Settings → Advanced → Network → Cookies: Upload or Paste), mode 0600, **not in backups** (the backup is the database only); optional |
 
 `TZ` sets the container's time zone, which the nightly backup (04:00) and rescan (04:30) follow; without it they run in UTC. `README.md` at the repository root is the user-facing install guide (compose example, mounts, PUID/PGID, no-authentication note, restore, update); keep it in step with this skill.
 
