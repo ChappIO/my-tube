@@ -7,6 +7,8 @@ import { useNow } from '../../use-now';
 import { BellToggle } from '../media';
 import { Button } from '../ui/Button';
 import { cx, focusRing } from '../ui/cx';
+import { EmptyState } from '../ui/EmptyState';
+import { ErrorState, fromQuery, loadFailed } from '../ui/ErrorState';
 import { Meta } from '../ui/typography';
 import { EditRulesModal } from './EditRulesModal';
 import { RuleChips, SourceAvatar, StatusLine } from './SourceBits';
@@ -25,10 +27,12 @@ export function ChannelsTab() {
   const [editingId, setEditingId] = useState<number>();
   const now = useNow();
 
-  if (sources.isPending) return <StatusLine>Loading channels.</StatusLine>;
-  if (sources.isError) return <StatusLine>Could not load channels.</StatusLine>;
+  if (sources.data === undefined) {
+    if (loadFailed(sources)) return <ErrorState what="the channels" {...fromQuery(sources)} />;
+    return <StatusLine>Loading channels.</StatusLine>;
+  }
   if (sources.data.length === 0) {
-    return <StatusLine>No channels yet. Add one with + Add to library.</StatusLine>;
+    return <EmptyState>No channels yet. Add one with + Add to library.</EmptyState>;
   }
 
   const editing = sources.data.find((source) => source.id === editingId);

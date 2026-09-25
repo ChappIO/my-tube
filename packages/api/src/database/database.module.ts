@@ -23,6 +23,18 @@ export function openDatabase(file: string): { db: Database; client: BetterSqlite
 }
 
 /**
+ * The better-sqlite3 connection under a Drizzle database, for what Drizzle does not wrap (the
+ * online `backup()`).
+ */
+export function sqliteClient(db: Database): BetterSqlite3.Database {
+  const client: unknown = Reflect.get(db, '$client');
+  if (!(client instanceof BetterSqlite3)) {
+    throw new Error('The database has no better-sqlite3 connection');
+  }
+  return client;
+}
+
+/**
  * Text folded for searching and sorting: decomposed, accents dropped, lower case. SQLite's own
  * `lower()` and `LIKE` only fold ASCII, so `beyonce` would not find `Beyoncé`.
  */

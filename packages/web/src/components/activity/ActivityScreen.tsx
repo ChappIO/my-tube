@@ -1,6 +1,8 @@
 import { useCancelJob, useCheckAll, useHistory, useQueue, useRetryJob } from '../../api/activity';
 import { RefreshIcon } from '../icons';
 import { Button } from '../ui/Button';
+import { EmptyState } from '../ui/EmptyState';
+import { ErrorState, fromQuery, loadFailed } from '../ui/ErrorState';
 import { PageHeader } from '../ui/PageHeader';
 import { Body, Meta } from '../ui/typography';
 import { ActivityList, ActivitySection } from './ActivitySection';
@@ -57,12 +59,12 @@ export function ActivityScreen() {
         }
       />
       <ActivitySection label={queue.data ? `Queue · ${jobs.length}` : 'Queue'}>
-        {queue.isPending ? (
+        {loadFailed(queue) ? (
+          <ErrorState what="the queue" {...fromQuery(queue)} />
+        ) : queue.data === undefined ? (
           <Body muted>Loading the queue.</Body>
-        ) : queue.isError && !queue.data ? (
-          <Body muted>Could not load the queue.</Body>
         ) : jobs.length === 0 ? (
-          <Body muted>Nothing in the queue.</Body>
+          <EmptyState>Queue is empty.</EmptyState>
         ) : (
           <ActivityList>
             {jobs.map((job) => (
@@ -78,12 +80,12 @@ export function ActivityScreen() {
         )}
       </ActivitySection>
       <ActivitySection label="History">
-        {history.isPending ? (
+        {loadFailed(history) ? (
+          <ErrorState what="the history" {...fromQuery(history)} />
+        ) : history.data === undefined ? (
           <Body muted>Loading the history.</Body>
-        ) : history.isError && !history.data ? (
-          <Body muted>Could not load the history.</Body>
         ) : history.data.length === 0 ? (
-          <Body muted>Nothing has happened yet.</Body>
+          <EmptyState>No history yet.</EmptyState>
         ) : (
           <HistoryTable entries={history.data} />
         )}

@@ -9,7 +9,11 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { AppModule } from '../src/app.module.js';
+import { JOB_RUNNERS } from '../src/jobs/job-runner.js';
 import { JobsService } from '../src/jobs/jobs.service.js';
+import { CheckSourceRunner } from '../src/sync/check-source.runner.js';
+import { DownloadDispatchRunner } from '../src/downloads/download-dispatch.runner.js';
+import { RevalidateRunner } from '../src/sync/revalidate.runner.js';
 
 /*
  * The sync → download → Activity loop against the fake yt-dlp: adding a source checks it at
@@ -32,7 +36,14 @@ describe('Activity (e2e)', () => {
     process.env.VIDEO_DIR = join(root, 'video');
     process.env.MUSIC_DIR = join(root, 'music');
     process.env.YTDLP_PATH = FAKE_YTDLP;
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    // Without the maintenance runners, so a `rescan` job stays where the test puts it.
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(JOB_RUNNERS)
+      .useFactory({
+        factory: (...runners: unknown[]) => runners,
+        inject: [CheckSourceRunner, RevalidateRunner, DownloadDispatchRunner],
+      })
+      .compile();
     app = moduleRef.createNestApplication({ logger: false });
     app.setGlobalPrefix('api');
     await app.init();
@@ -86,7 +97,7 @@ describe('Activity (e2e)', () => {
 
   it('GET /api/activity/queue, /summary and /history answer the shared schemas', async () => {
     const jobs = app.get(JobsService);
-    // No runner handles `rescan` yet, so this job stays queued.
+    // No runner handles `rescan` in this app (see beforeAll), so this job stays queued.
     const { job } = jobs.enqueue({ type: 'rescan', payload: { title: 'Rescan libraries' } });
 
     const queue = z.array(Job).parse((await request(server()).get('/api/activity/queue')).body);

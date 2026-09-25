@@ -26,6 +26,19 @@ Runtime facts:
 | Health  | `GET /api/health`, also used by the image `HEALTHCHECK`                       |
 | Version | `APP_VERSION` build arg, surfaced by `/api/health`                            |
 
+What lives in `/config` (user docs: `README.md`, "Where things are"):
+
+| Path                         | What                                                                       |
+| ---------------------------- | -------------------------------------------------------------------------- |
+| `/config/mytube.db`          | the database, settings included (WAL mode: `-wal` and `-shm` next to it)   |
+| `/config/backups/`           | `mytube-<UTC time>.sqlite`, nightly at 04:00 container time, newest 7 kept |
+| `/config/logs/mytube.log`    | the app log (also stdout), rotated at 5 MB with `.1` to `.3`               |
+| `/config/logs/jobs/<id>.log` | yt-dlp output per job, newest 200                                          |
+| `/config/bin/yt-dlp`         | the managed yt-dlp binary                                                  |
+| `/config/cache/artwork/`     | the artwork cache (500 MB, disposable)                                     |
+
+`TZ` sets the container's time zone, which the nightly backup (04:00) and rescan (04:30) follow; without it they run in UTC. `README.md` at the repository root is the user-facing install guide (compose example, mounts, PUID/PGID, no-authentication note, restore, update); keep it in step with this skill.
+
 The entrypoint only chowns `/config`. Media mounts are left alone because they can be huge and belong to the host user.
 
 yt-dlp is not in the image. The app downloads it into `/config` on first boot and updates it on a schedule, so the image does not need rebuilding when yt-dlp changes.

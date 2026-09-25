@@ -16,13 +16,18 @@ export interface LibraryCardProps {
   tags: readonly PathTag[];
   /** Muted note after the tag chips. */
   tagNote: string;
+  /**
+   * `282 GB · 3,104 tracks` (`librarySizeText`); null before the library is indexed, undefined
+   * while the status loads.
+   */
+  size: string | null | undefined;
 }
 
 /**
  * Settings → Music / Video → Library: the mount path (read-only, from env), the folder
  * structure template (editable, saves on blur or Enter) with its supported tags under it, and
- * the library size. The size is a placeholder until the library index exists (Stage 5 for
- * video, Stage 6 for music; the Stage 7 rescan fills it).
+ * the library size from `GET /api/system/maintenance`. Before the library is indexed (no
+ * rescan yet and nothing on disk) the size reads `— · —` with a note.
  */
 export function LibraryCard({
   path,
@@ -31,6 +36,7 @@ export function LibraryCard({
   validatePathTemplate,
   tags,
   tagNote,
+  size,
 }: LibraryCardProps) {
   return (
     <SettingsCard title="Library">
@@ -49,10 +55,12 @@ export function LibraryCard({
           </div>
         </KeyValueRow>
         <KeyValueRow label="Size" control={false}>
-          <KeyValueText>— · —</KeyValueText>
+          <KeyValueText>{size === undefined ? '…' : (size ?? '— · —')}</KeyValueText>
         </KeyValueRow>
       </KeyValueGrid>
-      <SettingsNote size="small">Size is counted once the library is indexed.</SettingsNote>
+      {size === null && (
+        <SettingsNote size="small">Size is counted once the library is indexed.</SettingsNote>
+      )}
     </SettingsCard>
   );
 }

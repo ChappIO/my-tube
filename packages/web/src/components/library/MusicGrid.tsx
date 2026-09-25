@@ -2,7 +2,8 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { TileGrid } from '../media';
 import { StatusLine } from '../sources/SourceBits';
-import { Body } from '../ui/typography';
+import { EmptyState } from '../ui/EmptyState';
+import { ErrorState, fromQuery, loadFailed } from '../ui/ErrorState';
 
 export interface MusicGridProps<T> {
   /** The tab's list query. */
@@ -20,8 +21,11 @@ export interface MusicGridProps<T> {
  * loading, failure and empty lines.
  */
 export function MusicGrid<T>({ query, noun, empty, children }: MusicGridProps<T>) {
-  if (query.isPending) return <StatusLine>Loading {noun}.</StatusLine>;
-  if (query.isError) return <StatusLine>Could not load the {noun}.</StatusLine>;
-  if (query.data.length === 0) return <Body muted>{empty}</Body>;
+  // A failed refetch keeps what was loaded; the error shows only when there is nothing.
+  if (query.data === undefined) {
+    if (loadFailed(query)) return <ErrorState what={`the ${noun}`} {...fromQuery(query)} />;
+    return <StatusLine>Loading {noun}.</StatusLine>;
+  }
+  if (query.data.length === 0) return <EmptyState>{empty}</EmptyState>;
   return <TileGrid>{query.data.map(children)}</TileGrid>;
 }

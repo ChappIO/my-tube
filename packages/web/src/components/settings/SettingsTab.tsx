@@ -1,6 +1,7 @@
 import type { Settings } from '@mytube/shared';
 import type { ReactNode } from 'react';
 import { useSettings } from '../../api/settings';
+import { ErrorState, fromQuery, loadFailed } from '../ui/ErrorState';
 import { SettingsColumn, SettingsNote } from '../ui/SettingsCard';
 
 export interface SettingsTabProps {
@@ -16,12 +17,14 @@ export interface SettingsTabProps {
  * cards through it.
  */
 export function SettingsTab({ children, saveFailed }: SettingsTabProps) {
-  const { data, isPending, isError } = useSettings();
+  const settings = useSettings();
+  const { data, isPending } = settings;
+  const failed = loadFailed(settings);
   return (
     <SettingsColumn>
       {data ? children(data) : null}
-      {isPending && <SettingsNote role="status">Loading settings.</SettingsNote>}
-      {isError && !data && <SettingsNote role="alert">Could not load settings.</SettingsNote>}
+      {isPending && !failed && <SettingsNote role="status">Loading settings.</SettingsNote>}
+      {failed && <ErrorState what="the settings" {...fromQuery(settings)} />}
       {saveFailed && (
         <SettingsNote role="alert">
           Could not save the change. The previous value is back.

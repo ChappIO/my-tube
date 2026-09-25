@@ -1,16 +1,39 @@
-import { Controller, Get, HttpException, HttpStatus, Post, StreamableFile } from '@nestjs/common';
-import type { SystemActionResult, SystemInfo } from '@mytube/shared';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  HttpException,
+  HttpStatus,
+  Post,
+  StreamableFile,
+} from '@nestjs/common';
+import type { MaintenanceStatus, SystemActionResult, SystemInfo } from '@mytube/shared';
+import type { EnqueueResult } from '../jobs/jobs.service.js';
+import { MaintenanceService } from '../maintenance/maintenance.service.js';
 import { SystemService } from './system.service.js';
 
 /** The download name of `GET /api/system/logs`. */
 const LOGS_FILENAME = 'mytube.log';
 
-/** Answer of the maintenance actions until Stage 7 implements them. */
-const NOT_IMPLEMENTED: SystemActionResult = { message: 'Not implemented until Stage 7' };
+/**
+ * The answer of a maintenance action: 202 with the new job, or 409 when one is already queued
+ * or running (the body names that job).
+ */
+function actionResult(
+  { job, created }: EnqueueResult,
+  noun: { queued: string; busy: string },
+): SystemActionResult {
+  if (created) return { message: noun.queued, jobId: job.id };
+  const message = `${noun.busy} is already ${job.status === 'running' ? 'running' : 'queued'}.`;
+  throw new HttpException({ message, jobId: job.id }, HttpStatus.CONFLICT);
+}
 
 @Controller('system')
 export class SystemController {
-  constructor(private readonly system: SystemService) {}
+  constructor(
+    private readonly system: SystemService,
+    private readonly maintenance: MaintenanceService,
+  ) {}
 
   /** Version, mount paths and platform, shown read-only in Settings. */
   @Get('info')
@@ -34,15 +57,29 @@ export class SystemController {
       : new StreamableFile(Buffer.from(logs.text, 'utf8'), options);
   }
 
-  /** Back up the database and settings now. Stub: 501 until Stage 7 (maintenance). */
-  @Post('backup')
-  backup(): never {
-    throw new HttpException(NOT_IMPLEMENTED, HttpStatus.NOT_IMPLEMENTED);
+  /** Library totals, the last rescan and the last backup (Settings → Library, → Data). */
+  @Get('maintenance')
+  maintenanceStatus(): MaintenanceStatus {
+    return this.maintenance.status();
   }
 
-  /** Rescan both library mounts for on-disk and missing files. Stub: 501 until Stage 7. */
+  /** Back up the database (settings included) now: 202 with the job, 409 while one is queued. */
+  @Post('backup')
+  @HttpCode(HttpStatus.ACCEPTED)
+  backup(): SystemActionResult {
+    return actionResult(this.maintenance.enqueueBackup(), {
+      queued: 'Backup queued.',
+      busy: 'A backup',
+    });
+  }
+
+  /** Rescan both library mounts now: 202 with the job, 409 while one is queued or running. */
   @Post('rescan')
-  rescan(): never {
-    throw new HttpException(NOT_IMPLEMENTED, HttpStatus.NOT_IMPLEMENTED);
+  @HttpCode(HttpStatus.ACCEPTED)
+  rescan(): SystemActionResult {
+    return actionResult(this.maintenance.enqueueRescan(), {
+      queued: 'Rescan queued.',
+      busy: 'A rescan',
+    });
   }
 }
