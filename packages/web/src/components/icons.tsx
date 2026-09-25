@@ -13,6 +13,7 @@ import {
   ArrowDownToLine,
   ArrowLeft,
   AudioLines,
+  Brackets,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -24,6 +25,7 @@ import {
   Film,
   House,
   ListMusic,
+  ListPlus,
   type LucideIcon,
   type LucideProps,
   Music,
@@ -102,8 +104,18 @@ export const ICON_REGISTRY = {
   },
   CloseIcon: {
     base: X,
-    meaning: 'Close / dismiss / cancel',
-    usedIn: 'Modal close button, Activity queue row cancel',
+    meaning: 'Close / dismiss / cancel / remove from a list being edited',
+    usedIn: 'Modal close button, Activity queue row cancel, rule builder remove',
+  },
+  AddConditionIcon: {
+    base: ListPlus,
+    meaning: 'Add a condition to a rule group',
+    usedIn: 'rule builder "+ condition"',
+  },
+  AddGroupIcon: {
+    base: Brackets,
+    meaning: 'Add a nested group of conditions',
+    usedIn: 'rule builder "+ group"',
   },
   SearchIcon: { base: Search, meaning: 'Search', usedIn: 'search inputs (demo only so far)' },
   PlayIcon: { base: Play, meaning: 'Play (preview)', usedIn: 'preview player (Stage 3+)' },
@@ -139,7 +151,7 @@ export const ICON_REGISTRY = {
   ChevronDownIcon: {
     base: ChevronDown,
     meaning: 'Expand / sort descending',
-    usedIn: 'Tracks table sort, selects (Stage 3+)',
+    usedIn: 'Tracks table sort, selects, rules preview list',
   },
 } as const satisfies Record<string, IconEntry>;
 
@@ -211,8 +223,12 @@ export const AdvancedIcon = icon('AdvancedIcon');
 
 /** Add to library: sidebar Add button, top bar "+", Add modal trigger. */
 export const PlusIcon = icon('PlusIcon');
-/** Close / dismiss / cancel: Modal close button, Activity queue row cancel. */
+/** Close / dismiss / cancel / remove: Modal close, queue row cancel, rule builder remove. */
 export const CloseIcon = icon('CloseIcon');
+/** Add a condition to a rule group: rule builder "+ condition". */
+export const AddConditionIcon = icon('AddConditionIcon');
+/** Add a nested group of conditions: rule builder "+ group". */
+export const AddGroupIcon = icon('AddGroupIcon');
 /** Search: search inputs. */
 export const SearchIcon = icon('SearchIcon');
 /** Play (preview): preview player. */

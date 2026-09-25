@@ -1,6 +1,15 @@
-import { type Library, type ResolvedSource, guessLibrary, parseYoutubeUrl } from '@mytube/shared';
+import {
+  DEFAULT_MUSIC_MATCHER,
+  DEFAULT_SOURCE_OPTIONS,
+  DEFAULT_VIDEO_MATCHER,
+  type Library,
+  type ResolvedSource,
+  type SourceOptions,
+  guessLibrary,
+  parseYoutubeUrl,
+} from '@mytube/shared';
 import { useNavigate } from '@tanstack/react-router';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { apiErrorMessage } from '../../api/client';
 import { useSettings } from '../../api/settings';
 import { conflictSourceId, useCreateSource, useResolveSource } from '../../api/sources';
@@ -10,8 +19,9 @@ import { Modal, ModalActions } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { TabPills } from '../ui/TabPills';
 import { Body, FieldLabel, Meta } from '../ui/typography';
-import { RuleRows } from './RuleRows';
-import { type RulesDraft, newRulesDraft, rulesFromDraft } from './rules-draft';
+import { MatcherBuilder } from '../rules/MatcherBuilder';
+import { SourceOptionRows } from '../rules/SourceOptionRows';
+import { type DraftGroup, draftFromMatcher, matcherFromDraft } from '../rules/matcher-draft';
 import { SourceAvatar, StatusLine } from './SourceBits';
 import { kindInLibrary, libraryLabel, resolvedMeta } from './source-text';
 
@@ -35,7 +45,9 @@ export interface AddSourceModalProps {
  *
  * Typing or pasting a link is checked with `parseYoutubeUrl` on every keystroke; a valid one is
  * resolved through the API once typing pauses for 400ms (Enter skips the wait). The source
- * card, the Save to switch and the rule rows appear once it resolves. Subscribe creates the
+ * card, the Save to switch, the rule builder (seeded from the library's default rules in
+ * Settings; switching libraries swaps to the other default unless that library's rules were
+ * edited) and the options appear once it resolves. Subscribe creates the
  * source, closes the modal and opens the library it went to. A source that already exists in
  * the chosen library turns Subscribe into Open.
  */
@@ -52,7 +64,19 @@ export function AddSourceModal({ onClose }: AddSourceModalProps) {
   const [settled, setSettled] = useState('');
   // Save to, as picked for one link; another link starts from its own guess again.
   const [choice, setChoice] = useState<{ url: string; library: Library }>();
-  const [drafts, setDrafts] = useState<Partial<Record<Library, RulesDraft>>>({});
+  // Rules and options as edited, per library; an unedited library shows its default.
+  const [drafts, setDrafts] = useState<Partial<Record<Library, DraftGroup>>>({});
+  const [optionDrafts, setOptionDrafts] = useState<Partial<Record<Library, SourceOptions>>>({});
+  const videoDefault = settings.data?.video.defaultRules ?? DEFAULT_VIDEO_MATCHER;
+  const musicDefault = settings.data?.music.defaultRules ?? DEFAULT_MUSIC_MATCHER;
+  const defaultsKey = JSON.stringify([videoDefault, musicDefault]);
+  // One draft per default tree, so the unedited builder keeps its node ids across renders.
+  const seeded = useMemo(
+    () => ({ video: draftFromMatcher(videoDefault), music: draftFromMatcher(musicDefault) }),
+    // `defaultsKey` stands for both trees.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+    [defaultsKey],
+  );
 
   // The link box takes focus on open. This runs after Modal's own effect, which focuses the
   // dialog, because parent effects run after their children's.
@@ -84,8 +108,12 @@ export function AddSourceModal({ onClose }: AddSourceModalProps) {
   const chosenLibrary = choice && parsed && choice.url === parsed.url ? choice.library : undefined;
   const library = chosenLibrary ?? resolved?.library ?? (parsed ? guessLibrary(parsed) : 'video');
   const kind = resolved ? kindInLibrary(resolved.kind, library) : 'channel';
-  const draft = drafts[library] ?? newRulesDraft(library, settings.data?.video);
-  const draftResult = rulesFromDraft(draft, kind);
+  const draft = drafts[library] ?? seeded[library];
+  const draftResult = matcherFromDraft(draft, { playlist: kind === 'playlist' });
+  const options = optionDrafts[library] ?? {
+    ...DEFAULT_SOURCE_OPTIONS,
+    embedCoverArt: settings.data?.music.embedCoverArt ?? true,
+  };
 
   // The source this link already is in the chosen library: from the lookup, or from a 409.
   const existingId =
@@ -110,7 +138,15 @@ export function AddSourceModal({ onClose }: AddSourceModalProps) {
   function subscribe() {
     if (!resolved || !draftResult.ok) return;
     create.mutate(
-      { url: resolved.url, library, rules: draftResult.rules },
+      {
+        url: resolved.url,
+        library,
+        matcher: draftResult.matcher,
+        options: {
+          ...(library === 'music' && { embedCoverArt: options.embedCoverArt }),
+          ...(kind === 'playlist' && { syncOrder: options.syncOrder }),
+        },
+      },
       {
         onSuccess: (source) => {
           onClose();
@@ -174,11 +210,19 @@ export function AddSourceModal({ onClose }: AddSourceModalProps) {
             )}
           </div>
           {existingId === undefined && (
-            <RuleRows
-              draft={draft}
-              kind={kind}
-              onChange={(next) => setDrafts((all) => ({ ...all, [library]: next }))}
-            />
+            <>
+              <MatcherBuilder
+                value={draft}
+                playlist={kind === 'playlist'}
+                onChange={(next) => setDrafts((all) => ({ ...all, [library]: next }))}
+              />
+              <SourceOptionRows
+                library={library}
+                kind={kind}
+                options={options}
+                onChange={(next) => setOptionDrafts((all) => ({ ...all, [library]: next }))}
+              />
+            </>
           )}
         </>
       )}

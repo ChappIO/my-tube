@@ -10,6 +10,7 @@ import { LoggingModule } from './logging/logging.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { SourcesModule } from './sources/sources.module.js';
 import { CheckSourceRunner } from './sync/check-source.runner.js';
+import { RevalidateRunner } from './sync/revalidate.runner.js';
 import { SyncModule } from './sync/sync.module.js';
 import { SystemModule } from './system/system.module.js';
 import { WebModule } from './web/web.module.js';
@@ -23,10 +24,10 @@ import { YtdlpModule } from './ytdlp/ytdlp.module.js';
     ScheduleModule.forRoot(),
     ActivityModule,
     HealthModule,
-    // Queue and worker with the sync and download runners.
+    // Queue and worker with the sync, revalidation and download runners.
     JobsModule.forRoot({
       imports: [YtdlpModule, SyncModule],
-      runners: [CheckSourceRunner, DownloadRunner],
+      runners: [CheckSourceRunner, RevalidateRunner, DownloadRunner],
     }),
     SettingsModule,
     SourcesModule,

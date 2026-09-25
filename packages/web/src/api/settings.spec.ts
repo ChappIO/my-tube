@@ -15,10 +15,11 @@ describe('applySettingsPatch', () => {
 
   it('keeps null values and skips undefined ones', () => {
     const next = applySettingsPatch(DEFAULT_SETTINGS, {
-      video: { keepDays: null, quality: undefined },
+      network: { cookiesFile: '/config/cookies.txt' },
     });
-    expect(next.video.keepDays).toBeNull();
-    expect(next.video.quality).toBe(DEFAULT_SETTINGS.video.quality);
+    const cleared = applySettingsPatch(next, { network: { cookiesFile: null, proxy: undefined } });
+    expect(cleared.network.cookiesFile).toBeNull();
+    expect(cleared.network.proxy).toBe(DEFAULT_SETTINGS.network.proxy);
   });
 
   it('does not mutate the input', () => {

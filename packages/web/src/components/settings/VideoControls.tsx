@@ -1,10 +1,7 @@
-import { DEFAULT_SETTINGS, VideoSettings } from '@mytube/shared';
-import { useId, useState } from 'react';
-import { NumberInput } from '../ui/NumberInput';
+import { VideoSettings } from '@mytube/shared';
+import { useId } from 'react';
 import { Select } from '../ui/Select';
 import { TextValueInput } from '../ui/TextValueInput';
-import { Toggle } from '../ui/Toggle';
-import { Body } from '../ui/typography';
 import { formatLanguageList, parseLanguageList, schemaError } from './fields';
 
 /** Error message for a subtitle language list that cannot be saved. */
@@ -48,57 +45,6 @@ export function SubtitlesControl({ languages, embedded, onChange }: SubtitlesCon
         disabled={languages.length === 0}
         onChange={(choice) => onChange({ subtitlesEmbedded: choice === 'embedded' })}
       />
-    </div>
-  );
-}
-
-const KEEP_DAYS_MIN = 1;
-const KEEP_DAYS_MAX = 3650;
-const DEFAULT_KEEP_DAYS = DEFAULT_SETTINGS.video.keepDays ?? 90;
-
-export interface KeepDaysControlProps {
-  /** `video.keepDays`; null keeps videos forever. */
-  value: number | null;
-  onChange: (keepDays: number | null) => void;
-}
-
-/**
- * "Keep videos for 90 days" with a "forever" switch for null. While forever is on the number is
- * disabled; switching it off restores the last number entered on this page (else 90, the default).
- */
-export function KeepDaysControl({ value, onChange }: KeepDaysControlProps) {
-  const foreverId = useId();
-  const [lastDays, setLastDays] = useState(value ?? DEFAULT_KEEP_DAYS);
-  const forever = value === null;
-  return (
-    <div className="flex items-center gap-3">
-      {/* Full width on narrow (like every value box), content width on wide. */}
-      <div className="min-w-0 flex-1 wide:flex-none">
-        <NumberInput
-          min={KEEP_DAYS_MIN}
-          max={KEEP_DAYS_MAX}
-          value={value ?? lastDays}
-          disabled={forever}
-          className="disabled:opacity-50"
-          onChange={(days) => {
-            setLastDays(days);
-            onChange(days);
-          }}
-        />
-      </div>
-      <Body as="span" muted>
-        days
-      </Body>
-      <Toggle
-        id={foreverId}
-        label="Keep videos forever"
-        className="wide:ml-3"
-        checked={forever}
-        onChange={(on) => onChange(on ? null : lastDays)}
-      />
-      <label htmlFor={foreverId} className="cursor-pointer text-body text-muted">
-        forever
-      </label>
     </div>
   );
 }

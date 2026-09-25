@@ -22,11 +22,13 @@ packages/api/src
   settings/             SettingsService over the settings table, GET/PATCH /api/settings
   activity/             HistoryService (global module) and ActivityController (queue, history, summary)
   logging/              AppLogger (stdout + rotating CONFIG_DIR/logs/mytube.log) and LogLevelSync
-  sources/              URL resolution, source CRUD, rules and the subscribe toggle
+  sources/              URL resolution, source CRUD, rules (matcher + options) and the subscribe toggle
+  files/                media-files.ts: libraryPath (stay inside a mount), removeMediaFiles (file, sidecars, empty dirs)
   system/               GET /api/system/info and /logs, the backup and rescan stubs (see System)
   jobs/                 the jobs queue (JobsService), the worker pool (JobsWorker), the JobRunner seam,
                         per-job logs (JobLogsService) and /api/jobs/:id/{log,cancel,retry}
-  sync/                 rule evaluation (evaluateItem), SyncService, SyncScheduler, CheckSourceRunner
+  sync/                 evaluateItem (live gate + matcher), SyncService, RevalidationService, SyncScheduler,
+                        CheckSourceRunner, RevalidateRunner, the check and rules-preview endpoints
   downloads/            DownloadRunner and the Settings → Video to yt-dlp option mapping
 packages/api/test       end-to-end tests booting the real AppModule
 ```
@@ -60,6 +62,7 @@ Feature modules go in `src/<feature>/` with `<feature>.module.ts`, `<feature>.co
 - `SettingsService.get(): Settings` merges the rows over the defaults. A row with an unknown key (a removed setting), invalid JSON or a value that no longer validates is ignored with a one-time warning and its default used; it never throws.
 - `SettingsService.patch(patch: SettingsPatch): Settings` validates, upserts only the given fields in one transaction (bumping `updated_at`) and returns the merged settings.
 - `GET /api/settings` returns `Settings`. `PATCH /api/settings` takes a `SettingsPatch` (any fields of any groups; unknown keys and empty patches are a 400) and returns `Settings`.
+- `video.defaultRules` and `music.defaultRules` are `Matcher` trees (defaults `DEFAULT_VIDEO_MATCHER`, `DEFAULT_MUSIC_MATCHER`) that new sources start from; a tree with playlist-only conditions is refused because it also seeds channels and artists. They replaced `video.keepDays`, `video.skipShorts` and `music.skipLiveRecordings` (converted once, database skill). `music.embedCoverArt` stays: the option new music sources start with.
 - Other modules import `SettingsModule` and call `settings.get()` when they need a value (read at use time, so changes apply without a restart). Do not cache settings in a service.
 
 **Adding a setting:** add the field with a `.default()` to its group in `packages/shared/src/settings.ts` (option lists as exported `as const` arrays, so the web select reuses them), extend the defaults test in `settings.spec.ts`, rebuild shared, then add the control to the Settings tab (see the frontend skill). No migration: a field without a row uses its default. Removing or narrowing a field is safe too; stale rows are ignored.
@@ -108,36 +111,66 @@ Env (`AppConfig`) stays for what is known before the database exists: mount path
 - `renderPathTemplate(template, values)` (pure, shared) fills a template: `{tag}` → value, `{tag:02}` pads a number, unknown tags and null values → ''. Each folder or file name is sanitised on its own after substitution (`sanitizePathSegment`: NFC, whitespace runs → one space, `/ \ : * ? " < > |` and control characters removed, leading and trailing dots and spaces trimmed, cut to 200 UTF-8 bytes without splitting a character), empty names are dropped (`{playlist}` outside a playlist) and an empty result is `untitled`. A value can never add a folder or climb out of the library (`../../etc` → `etc`). The extension is not part of the template. The download job adds a second guard (`insideLibrary`) before writing.
 - `validatePathTemplate(template, tags)` (pure) returns `{ unknownTags, errors }`: unknown tags or modifiers (`{bogus}`, `{track:3}`), `:02` on a text tag, unmatched braces, `..` folders and absolute paths (`/…`, `\…`, `C:…`). The settings schema runs it in a `superRefine`, so `PATCH /api/settings` answers 400 with the message (`Unknown tag {bogus}.`; the Settings chips list the supported ones) and a stored row that no longer validates falls back to the default.
 
+## Matchers
+
+A source's rules are one expression tree. The contract is `packages/shared/src/matchers.ts` (settled decisions in the architecture skill).
+
+- **Schema.** `Matcher` is a recursive Zod discriminated union on `type`. Gates: `{ type: 'and' | 'or', items: Matcher[] }`, `{ type: 'not', item: Matcher }`. Leaves: `title_contains { text }` (case-insensitive substring), `title_matches { pattern }` (case-insensitive JS regex; `regexError` validates), `is_short`, `published_before { date }` (strictly before the UTC day), `published_after { date }` (on or after), `older_than_days { days }` (1–3650; before the UTC day `days` ago, the boundary day is not older), `duration_under { seconds }` / `duration_over { seconds }` (strict), `live_status { status }` (`LIVE_STATUSES`: yt-dlp's `not_live`, `is_live`, `was_live`, `is_upcoming`, `post_live`; a missing status is `not_live`), `channel_is { channel }` (uploader id exactly or name case-insensitively) and `in_playlist_position_under { position }` (≥ 2). Texts are trimmed, 1–200 characters. Objects are strict (unknown fields are a 400). At most `MATCHER_MAX_DEPTH` 8 levels (a raw, non-recursive depth check runs first so a hostile body cannot blow the stack) and `MATCHER_MAX_NODES` 100 nodes. `PLAYLIST_ONLY_LEAVES`: `channel_is`, `in_playlist_position_under`.
+- **Example** (the Stage 3b acceptance rule):
+
+  ```json
+  {
+    "type": "and",
+    "items": [
+      { "type": "not", "item": { "type": "is_short" } },
+      {
+        "type": "or",
+        "items": [
+          { "type": "title_contains", "text": "Artemis" },
+          { "type": "title_contains", "text": "Orion" }
+        ]
+      },
+      { "type": "not", "item": { "type": "older_than_days", "days": 90 } }
+    ]
+  }
+  ```
+
+- **Evaluation.** `evaluateMatcher(matcher, ctx)` is pure. `MatcherContext`: `title`, `isShort`, `publishedAt` (`YYYY-MM-DD` or ISO; the UTC day counts), `durationSeconds`, `liveStatus`, `channelName`, `channelId`, `playlistPosition`, `now`. Returns `{ matches }` or `{ matches: false, failing }` where `failing` are chip-style labels of the conditions that decided the miss, with their negation (`no shorts`, `not older than 90 days`, `only "Artemis"`), used in history details and the preview. Empty `and` is true, empty `or` false. Missing data (date, duration, position, uploader) makes a leaf unknown; three-valued logic, and unknown at the root matches.
+- **Chips.** `describeMatcher(matcher)`: one chip per item of the root `and` (nested `and`s flattened), otherwise one chip; an `or` is one chip (`only "Artemis" or "Orion"` when all its items are titles, else items joined with `or`, deeper groups parenthesised; a negated group reads `none of (a, b)` / `not all of (a, b)`, titles `no "A" or "B"`); `describeLeaf(leaf, negated)` for single labels. The empty root `and` gives no chips.
+- **Defaults and builders.** `DEFAULT_VIDEO_MATCHER` = `and(not(is_short), not(older_than_days 90))`, `DEFAULT_MUSIC_MATCHER` = `and()`. `and(...)`, `or(...)`, `not(x)` build trees; `matcherDepth`, `matcherSize`, `matcherLeaves`, `childrenOf`, `daysAgo`, `formatDuration`.
+
 ## Sources and rules
 
 The contract is `packages/shared/src/rules.ts`; the tables are in the database skill ("Sources and catalog").
 
 - `Library` (`video`, `music`) and `SourceKind` (`channel`, `artist`, `playlist`).
-- `Rules` is a discriminated union on `library`. Video: `skipShorts` (true), `keepDays` (90, null keeps forever), `publishedAfter` (null; ISO `YYYY-MM-DD`, only items published on or after it are downloaded; independent of `keepDays`: the date decides what comes in, the day window decides what retention deletes, both may be set; the sync maps it to yt-dlp `--dateafter`), `titleFilter` (null; case-insensitive plain substring, no wildcards or regex), `syncOrder` (false; playlists only). Music: `skipLiveRecordings` (false), `embedCoverArt` (true). There is no album-only rule: an artist source downloads albums and singles alike. `DEFAULT_VIDEO_RULES`, `DEFAULT_MUSIC_RULES` and `defaultRules(library)` are the handoff defaults; new video sources should take `keepDays` and `skipShorts` from Settings → Video.
-- `describeRules(rules)` returns the handoff's chip labels in order: `no shorts`, `keep 90 days` (`keep 1 day`), `since 2025-01-01`, `only "Monologue"`, `sync order`, `no live`, `cover art`. Rules that are off give no chip.
-- `Source` is the DTO for one `sources` row: `id`, `library`, `kind`, `youtubeId`, `url`, `name`, `avatarUrl`, `subscribed`, `rules`, `lastCheckedAt`, `itemCount`, `sizeBytes`, `createdAt`, `updatedAt`. A Drizzle row parses directly.
-- `sourceIssues({ library, kind, rules })` lists invalid combinations (rules of the other library, an artist outside Music, sync order on a non-playlist). `Source` applies it; reuse it in create and update inputs.
+- `SourceOptions`: `embedCoverArt` (true; music only, ignored for video) and `syncOrder` (false; playlists only). `DEFAULT_SOURCE_OPTIONS`. `describeOptions(options, library)` gives `sync order` and `cover art` chips; `describeSource(source)` = rule chips then option chips (what the Channels row and channel page show).
+- `Source` is the DTO for one `sources` row: `id`, `library`, `kind`, `youtubeId`, `url`, `name`, `avatarUrl`, `subscribed`, `matcher`, `options`, `lastCheckedAt`, `itemCount`, `sizeBytes`, `createdAt`, `updatedAt` (`lastRevalidatedAt` stays internal). A Drizzle row parses directly.
+- `sourceIssues({ library, kind, matcher?, options? })` lists invalid combinations: an artist outside Music, `syncOrder` or a playlist-only condition on anything but a playlist. `Source` applies it; create, update and the preview reuse it.
+- **Legacy rules.** `LegacyRules` (the Stage 3 flat `rules` JSON) and `convertLegacyRules(old)` → `{ matcher, options }` exist only for the one-time conversion (database skill "Matcher rules conversion"): each rule that was on becomes one item of a root `and`: `skipShorts` → `not(is_short)`, `keepDays` → `not(older_than_days)`, `publishedAfter` → `published_after`, `titleFilter` → `title_contains`, `skipLiveRecordings` → `not(title_matches \blive\b)` (`LIVE_WORD_PATTERN`); `syncOrder` and `embedCoverArt` become options.
 
 ### Sources API
 
 `src/sources/` (`SourcesService`, `SourcesController`); the DTOs are in `packages/shared/src/sources.ts`.
 
-| Endpoint                            | Body / query                                     | Response                                                     |
-| ----------------------------------- | ------------------------------------------------ | ------------------------------------------------------------ |
-| `POST /api/sources/resolve`         | `ResolveRequest` `{ url }`                       | 200 `ResolvedSource`; 400 unsupported link; 502 yt-dlp error |
-| `GET /api/sources`                  | `?library=video\|music` (optional)               | `Source[]`, newest first                                     |
-| `GET /api/sources/:id`              |                                                  | `Source`; 404                                                |
-| `POST /api/sources`                 | `CreateSource` `{ url, library, kind?, rules? }` | 201 `Source`; 400; 409 `SourceConflict` `{ sourceId }`       |
-| `PATCH /api/sources/:id`            | `UpdateSource` `{ rules?, subscribed?, name? }`  | `Source`; 400; 404                                           |
-| `PATCH /api/sources/:id/subscribed` | `SetSubscribed` `{ subscribed }` (the bell)      | `Source`; 404                                                |
-| `DELETE /api/sources/:id`           |                                                  | 204; 404                                                     |
+| Endpoint                              | Body / query                                                 | Response                                                                            |
+| ------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| `POST /api/sources/resolve`           | `ResolveRequest` `{ url }`                                   | 200 `ResolvedSource`; 400 unsupported link; 502 yt-dlp error                        |
+| `GET /api/sources`                    | `?library=video\|music` (optional)                           | `Source[]`, newest first                                                            |
+| `GET /api/sources/:id`                |                                                              | `Source`; 404                                                                       |
+| `POST /api/sources`                   | `CreateSource` `{ url, library, kind?, matcher?, options? }` | 201 `Source`; 400; 409 `SourceConflict` `{ sourceId }`                              |
+| `PATCH /api/sources/:id`              | `UpdateSource` `{ matcher?, options?, subscribed?, name? }`  | `Source`; 400; 404                                                                  |
+| `POST /api/sources/:id/rules/preview` | `RulesPreviewRequest` `{ matcher }`                          | 200 `RulesPreview` `{ wouldRemove: [{ id, title, failing }], wouldKeep }`; 400; 404 |
+| `PATCH /api/sources/:id/subscribed`   | `SetSubscribed` `{ subscribed }` (the bell)                  | `Source`; 404                                                                       |
+| `DELETE /api/sources/:id`             |                                                              | 204; 404                                                                            |
 
 - **Links.** `parseYoutubeUrl(input)` (shared, pure, also for the web's pre-validation) returns `{ kind: channel|artist|playlist|video, id, url (canonical), music }` or null. It accepts `@handle` (bare or in a URL), `/channel/UC…`, `/c/…`, `/user/…`, `/playlist?list=…`, `watch?v=…&list=…` (the playlist), `watch?v=…`, `youtu.be/…`, `/shorts/…`, `/live/…`, and on `music.youtube.com` `/channel/UC…` (an artist) and `/playlist?list=…`. Mixes (`RD…`, except YouTube Music's curated `RDCLAK…`), liked and watch-later lists are rejected. `guessLibrary(parsed)` is Music for `music.youtube.com`, else Video.
 - **Resolve.** Parse (400 with a clear message when null), then `runner.metadata(canonicalUrl, { limit: 30, network })` with the Settings network options. A video resolves to its channel with a second call (`resolvedFrom: 'video'`). `ResolvedSource`: `kind` (a channel in the guessed Music library is an `artist`), `library` (guess), `youtubeId` (channel id or playlist id), `url` (id-based: `/channel/UC…`, artists on `music.youtube.com`, `/playlist?list=…`), `name`, `avatarUrl` (absolute; YouTube's original-size `=s0` avatars are requested at `=s256`), `itemCount` (playlists only; YouTube's flat channel listing has no total, so null for channels and artists), `uploadsPerWeek` and `latestItemAt` (from the newest 30 dated uploads across the channel tabs; null with fewer than two), `alreadyAdded` (`{ sourceId, library }`, preferring the guessed library). yt-dlp failures are 502 `{ message, reason }` with the runner's `reason`. Nothing is cached.
-- **Create.** Re-resolves the URL. `kind` defaults to the resolved kind mapped to the chosen library (`kindForLibrary`: channel ↔ artist; a playlist stays a playlist; a playlist link cannot become a channel or the reverse). Rules: `defaultRules(library)`, then for video Settings → Video `keepDays` and `skipShorts`, then the client's `rules`. Then `sourceIssues`. Inserts subscribed, and in the same transaction upserts the `channels`, `artists` or `playlists` row (by kind) and links it when it is not linked yet. 409 with `sourceId` when `(library, youtubeId)` exists.
-- **Rule inputs** (`RulesInput`) are partial and have no defaults: `library` is required and must equal the source's library, the other fields are optional and unknown ones rejected. On create they overlay the defaults above, on `PATCH` they overlay the current rules, so a full `Rules` object and a single changed field both work.
-- **Removing never deletes media.** `DELETE` removes the `sources` row only. The migration's `ON DELETE SET NULL` unlinks the catalog row (relinked to the same YouTube id's source in the other library when one exists); files and items are never touched. Unsubscribing only flips `subscribed`. The only link to the sync is `SourcesService.onCreated(listener)`, called after a create; `SyncScheduler` uses it to check a new subscribed source at once.
-- **Tests.** `sources.e2e.spec.ts` sets `YTDLP_PATH` to the fake binary, so `@NASA`, `/channel/UC…` and `music.youtube.com/channel/…` get `channel.json`, `list=` links `playlist.json` and `watch?v=`/`youtu.be` links `video.json` (then `channel.json` for its channel); `FAKE_YTDLP_FAIL=1` drives the 502. Pure helpers (`resolve.ts`: cadence, kind mapping, canonical URLs, rule overlay) and `parseYoutubeUrl` have unit tests.
+- **Create.** Re-resolves the URL. `kind` defaults to the resolved kind mapped to the chosen library (`kindForLibrary`: channel ↔ artist; a playlist stays a playlist; a playlist link cannot become a channel or the reverse). `initialRules`: the client's `matcher`, else the library's default tree from Settings (`video.defaultRules` / `music.defaultRules`); options are `DEFAULT_SOURCE_OPTIONS` (music: `embedCoverArt` from `music.embedCoverArt`) overlaid with the client's `options`. Then `sourceIssues`. Inserts subscribed, and in the same transaction upserts the `channels`, `artists` or `playlists` row (by kind) and links it when it is not linked yet. 409 with `sourceId` when `(library, youtubeId)` exists.
+- **Update.** `matcher` replaces the tree as a whole; `SourceOptionsInput` (partial, no defaults, unknown fields rejected) overlays the current options (`mergeOptions`). A changed tree calls `SourcesService.onRulesChanged(listener)`; `SyncScheduler` uses it to enqueue a revalidation at once.
+- **Preview** (`SyncController`, answered by `RevalidationService.preview`): evaluates the candidate tree against the source's items on disk without touching anything; 400 for a tree the source cannot have (`sourceIssues`), 404 for an unknown source.
+- **Removing never deletes media.** `DELETE` removes the `sources` row only (revalidation is the only automatic deletion). The migration's `ON DELETE SET NULL` unlinks the catalog row (relinked to the same YouTube id's source in the other library when one exists); files and items are never touched. Unsubscribing only flips `subscribed`. The links to the sync are `SourcesService.onCreated(listener)` (check a new subscribed source at once) and `onRulesChanged(listener)` (revalidate it), both used by `SyncScheduler`.
+- **Tests.** `sources.e2e.spec.ts` sets `YTDLP_PATH` to the fake binary, so `@NASA`, `/channel/UC…` and `music.youtube.com/channel/…` get `channel.json`, `list=` links `playlist.json` and `watch?v=`/`youtu.be` links `video.json` (then `channel.json` for its channel); `FAKE_YTDLP_FAIL=1` drives the 502. Pure helpers (`resolve.ts`: cadence, kind mapping, canonical URLs, `initialRules`, `mergeOptions`) and `parseYoutubeUrl` have unit tests.
 
 ## Background work
 
@@ -200,35 +233,44 @@ The API test suite has no network: `test/setup.ts` (a Vitest setup file) replace
   }
   ```
 
-  and list it in `AppModule`: `JobsModule.forRoot({ imports: [YtdlpModule, SyncModule], runners: [CheckSourceRunner, DownloadRunner] })` (the current registration). `run` may resolve `null` to record no history row (a routine check); outcomes and final failures are recorded with the job's id. Open a job log with `JobLogsService.open(job)`, pass `log.line` to the runner calls, close it and `prune()` in `finally`. `JobContext.progress` is a plain property, so it can be destructured. Runner classes become providers of `JobsModule` (so they can inject `JobsService` to enqueue follow-up work) and are collected into the `JOB_RUNNERS` array the worker reads; one runner per type. Honour `signal`: a cancel or shutdown aborts it, and the worker ignores the run's result afterwards. Progress writes are throttled to one per 500 ms.
+  and list it in `AppModule`: `JobsModule.forRoot({ imports: [YtdlpModule, SyncModule], runners: [CheckSourceRunner, RevalidateRunner, DownloadRunner] })` (the current registration). `run` may resolve `null` to record no history row (a routine check); outcomes and final failures are recorded with the job's id. Open a job log with `JobLogsService.open(job)`, pass `log.line` to the runner calls, close it and `prune()` in `finally`. `JobContext.progress` is a plain property, so it can be destructured. Runner classes become providers of `JobsModule` (so they can inject `JobsService` to enqueue follow-up work) and are collected into the `JOB_RUNNERS` array the worker reads; one runner per type. Honour `signal`: a cancel or shutdown aborts it, and the worker ignores the run's result afterwards. Progress writes are throttled to one per 500 ms.
 
 - **Tests**: `jobs.service.spec.ts` and `jobs.worker.spec.ts` use `test/jobs-harness.ts` (in-memory database, real `JobsService`/`SettingsService`/`HistoryService`, a hand-moved clock via the `JOBS_CLOCK` seam) and fake runners whose runs the test resolves or rejects.
 
 ## Sync rules
 
-`src/sync/rules.ts` holds `evaluateItem(entry, rules, now)`: a pure function over one `SourceMetadata` entry and a source's `Rules`, returning `{ accept: true }` or `{ accept: false, reason: SkipReason, transient }`. The first failing rule wins:
+`src/sync/rules.ts` holds `evaluateItem(entry, matcher, ctx)`: pure, over one `SourceMetadata` entry, the source's tree and an `EntryContext` (`now`; `channelName` / `channelId` for entries that name no uploader, which is a channel's own flat listing; `playlistPosition`, the 1-based index in a playlist source's listing). It returns `{ accept: true }` or `{ accept: false, reason, transient, failing }`:
 
-| Library | Rule                 | Reason                 | Rejects                                                                                      |
-| ------- | -------------------- | ---------------------- | -------------------------------------------------------------------------------------------- |
-| both    | (always)             | `upcoming` (transient) | `liveStatus` `is_upcoming`                                                                   |
-| both    | (always)             | `live` (transient)     | `liveStatus` `is_live` or `post_live`: never download an ongoing stream                      |
-| video   | `skipShorts`         | `short`                | `isShort`                                                                                    |
-| video   | `publishedAfter`     | `published_before`     | upload date before the date; the same day is accepted                                        |
-| video   | `keepDays`           | `older_than_keep_days` | upload date before `now` minus `keepDays` days (UTC date; the boundary day is accepted)      |
-| video   | `titleFilter`        | `title_filter`         | title without the case-insensitive substring (no title never matches)                        |
-| music   | `skipLiveRecordings` | `live`                 | title with the word "live" (`\blive\b`, case-insensitive: "Live at…", "(Live)", not "Olive") |
+| Check                    | Reason                 | Rejects                                                                 |
+| ------------------------ | ---------------------- | ----------------------------------------------------------------------- |
+| always, before the rules | `upcoming` (transient) | `liveStatus` `is_upcoming`                                              |
+| always, before the rules | `live` (transient)     | `liveStatus` `is_live` or `post_live`: never download an ongoing stream |
+| the source's matcher     | `no_match`             | `evaluateMatcher` does not match; `failing` names the conditions        |
 
-Entries without a date pass the date rules (flat listings omit dates now and then; yt-dlp's flat dates are approximate to the day). The sync stores non-transient rejections as `skipped` items with the reason and leaves transient ones for the next check.
+`entryContext(entry, ctx)` maps an entry to the `MatcherContext` (the upload date, else the timestamp's UTC day; duration rounded). Entries without a date or duration are unknown to those leaves and so are not dropped for it (flat listings omit dates now and then and date them approximately). The sync stores non-transient rejections as `skipped` / `no_match` and leaves transient ones for the next check.
 
 ## Sync
 
 `src/sync/` (`SyncModule`). `SyncService`:
 
-- `checkSource(sourceId, { signal?, log? })`: for a video source, `runner.metadata(source.url, { limit, network, signal, log })` with `limit` 200 on the first check (`last_checked_at` null) and 60 after. `applyListing(source, metadata, now)` (one transaction, testable without yt-dlp): a `channels` row for every uploader (playlist entries carry theirs; flat channel listings use the source's channel; the playlist owner is the fallback; `source_id` stays null for channels that are not sources), then per entry `evaluateItem`: accepted → `wanted`, rejected → `skipped` with the reason, transient → not stored. Known items move by `nextStatus`: `on_disk`, `downloading`, `missing` and `skipped/unavailable` never change; `wanted` and rules-`skipped` follow the verdict (so a rules change can bring skipped items back). Existing rows keep their `published_at` (the download stores the exact one) and `source_id`. Playlists also get `playlist_items` positions 1..n for the fetched range and `playlists.item_count`. Then `enqueueDownloads`: one `download` job per `wanted` video (`key: video:<youtube id>`, `priority` = days since epoch of `published_at` so the newest runs first, payload `{ title, subtitle: channel name, historyKind: 'video', videoId, detail: video.quality, playlist? }`), except when its latest download job failed for good or was cancelled (those wait for Retry). Finally `last_checked_at` and `item_count` (`wanted` + `downloading` + `on_disk` videos of the source). A music source is only marked checked ("music sync arrives in Stage 6"). A removed source throws `SourceGoneError`. Nothing goes to history unless the check fails.
+- `checkSource(sourceId, { signal?, log? })`: for a video source, `runner.metadata(source.url, { limit, network, signal, log })` with `limit` 200 on the first check (`last_checked_at` null) and 60 after. `applyListing(source, metadata, now)` (one transaction, testable without yt-dlp): a `channels` row for every uploader (playlist entries carry theirs; flat channel listings use the source's channel; the playlist owner is the fallback; `source_id` stays null for channels that are not sources), then per entry `evaluateItem`: accepted → `wanted`, rejected → `skipped` with the reason, transient → not stored. Known items move by `nextStatus`: `on_disk`, `downloading`, `missing` and `skipped/unavailable` never change; `wanted` and rules-`skipped` (`no_match`, `no_longer_matches`) follow the verdict (so a rules change can bring skipped items back). The sync never removes files; revalidation does. Existing rows keep their `published_at` (the download stores the exact one) and `source_id`. Playlists also get `playlist_items` positions 1..n for the fetched range and `playlists.item_count`. Then `enqueueDownloads`: one `download` job per `wanted` video (`key: video:<youtube id>`, `priority` = days since epoch of `published_at` so the newest runs first, payload `{ title, subtitle: channel name, historyKind: 'video', videoId, detail: video.quality, playlist? }`), except when its latest download job failed for good or was cancelled (those wait for Retry). Finally `last_checked_at` and `item_count` (`wanted` + `downloading` + `on_disk` videos of the source). A music source is only marked checked ("music sync arrives in Stage 6"). A removed source throws `SourceGoneError`. Nothing goes to history unless the check fails.
 - `enqueueCheck(id)` (`check_source`, key `source:<id>`, payload `{ sourceId, title: name, subtitle: 'checking for new content', historyKind: library }`), `enqueueAll()` (subscribed sources), `dueSources(now)` (subscribed, never checked or `last_checked_at` older than `general.checkIntervalHours`, and no check that failed for good within the interval).
 - `CheckSourceRunner` (`check_source`) runs `checkSource` with a job log; `PermanentJobError` when the source is gone; resolves `null` (no history).
-- `SyncScheduler`: `@Interval` every 5 minutes (and once at boot) enqueues a check for every due source; `SourcesService.onCreated` enqueues a new subscribed source at once.
-- `SyncController`: `POST /api/sources/:id/check` → 202 `Job` (404 unknown; works for unsubscribed sources too), `POST /api/sync/check-all` → 202 `Job[]`.
+- `SyncScheduler`: `@Interval` every 5 minutes (and once at boot) enqueues a check for every due source and a revalidation for every source `RevalidationService.dueSources` returns; `SourcesService.onCreated` enqueues a check of a new subscribed source at once and `onRulesChanged` a revalidation.
+- `SyncController`: `POST /api/sources/:id/check` → 202 `Job` (404 unknown; works for unsubscribed sources too), `POST /api/sync/check-all` → 202 `Job[]`, `POST /api/sources/:id/rules/preview` (see Sources API).
+
+## Revalidation
+
+`src/sync/revalidation.service.ts` (`RevalidationService`) and `revalidate.runner.ts` (`RevalidateRunner`, job type `revalidate`). The only automatic deletion; it replaces the old retention job.
+
+- `revalidate(sourceId, { jobId?, log?, signal? })` evaluates the source's **current** tree on each of its items (`videos` or `tracks` with `source_id` = the source; items another source listed first are never touched). The context comes from the row (title, is_short, published_at, duration, live_status), the uploader from `channels` (tracks: the artist) and, for playlist sources, the position from `playlist_items`.
+  - `on_disk` and not matching → `removeMediaFiles(VIDEO_DIR or MUSIC_DIR, file_path)` deletes the media file, its sidecars (`<name>.jpg|png|webp`, `<name>[.<lang>].vtt|srt|ass|lrc`; nothing else with the same stem) and every folder left empty up to (not including) the mount; then the item becomes `skipped` / `no_longer_matches` with `file_path` and `file_size_bytes` cleared, `sources.size_bytes` drops by its size (never below 0), and history gets `{ kind: video|music, title, result: 'removed', details: 'no longer matches: <failing conditions>', jobId }`. A path outside the mount or a delete error is a `failed` history row and the item stays on disk.
+  - `wanted` and not matching → `skipped` / `no_match` (its queued download becomes a no-op).
+  - `skipped` / `no_match` or `no_longer_matches` and matching again → `wanted`, and `SyncService.enqueueDownloads` queues it.
+  - `downloading`, `missing` and `unavailable` items are left alone. Finally `last_revalidated_at` and `item_count` are updated. Returns `{ removed, kept, unwanted, rewanted, failed }`.
+- `preview(sourceId, matcher)` runs the same evaluation on the `on_disk` items against a candidate tree and changes nothing: `RulesPreview` `{ wouldRemove: [{ id, title, failing }], wouldKeep }`.
+- `enqueue(sourceId)`: `revalidate` job, key `source:<id>`, payload `{ sourceId, title: name, subtitle: 'checking files against the rules', historyKind }`. `dueSources(now)`: subscribed sources never revalidated or last revalidated `REVALIDATE_INTERVAL_MS` (6 h) or more ago, unless a revalidation failed for good within the interval. Unsubscribed sources are paused (saving their rules still revalidates once).
+- `RevalidateRunner` opens a job log (each removal is logged with the files it deleted), resolves `null` (the per-file history rows are the record) and turns `SourceGoneError` into `PermanentJobError`.
 
 ## Downloads
 

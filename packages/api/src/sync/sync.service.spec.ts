@@ -1,5 +1,11 @@
 import { join } from 'node:path';
-import { DEFAULT_MUSIC_RULES, DEFAULT_VIDEO_RULES, type Rules } from '@mytube/shared';
+import {
+  DEFAULT_MUSIC_MATCHER,
+  DEFAULT_SOURCE_OPTIONS,
+  and,
+  not,
+  type Matcher,
+} from '@mytube/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createJobsHarness } from '../../test/jobs-harness.js';
@@ -12,6 +18,7 @@ import {
   videos,
 } from '../database/schema.js';
 import { YtdlpRunner } from '../ytdlp/ytdlp-runner.js';
+import type { RuleVerdict } from './rules.js';
 import { nextStatus, SourceGoneError, SyncService } from './sync.service.js';
 
 const FAKE = join(import.meta.dirname, '../../test/fixtures/fake-yt-dlp');
@@ -19,8 +26,8 @@ const NASA = 'UCLA_DiR1FfKNvjuUpBHmylQ';
 const PLAYLIST = 'PLB29CbKaE2OY';
 const NOW = new Date('2026-09-24T12:00:00Z');
 
-/** Video rules with only skipShorts on, so the fixture's dates do not age out. */
-const OPEN: Rules = { ...DEFAULT_VIDEO_RULES, keepDays: null };
+/** Video rules with only "no shorts", so the fixture's dates do not age out. */
+const OPEN: Matcher = and(not({ type: 'is_short' }));
 
 function setup() {
   const harness = createJobsHarness(NOW.toISOString());
@@ -28,7 +35,7 @@ function setup() {
   const sync = new SyncService(harness.db, runner, harness.settings, harness.jobs);
   const addSource = (
     kind: 'channel' | 'playlist' | 'artist',
-    rules: Rules = OPEN,
+    matcher: Matcher = OPEN,
     library: 'video' | 'music' = 'video',
   ) => {
     const youtubeId = kind === 'playlist' ? PLAYLIST : NASA;
@@ -39,7 +46,7 @@ function setup() {
     const name = kind === 'playlist' ? 'NASA Moon Base' : 'NASA';
     const source = harness.db
       .insert(sources)
-      .values({ library, kind, youtubeId, url, name, rules })
+      .values({ library, kind, youtubeId, url, name, matcher, options: DEFAULT_SOURCE_OPTIONS })
       .returning()
       .get();
     if (kind === 'channel') {
@@ -78,7 +85,7 @@ describe('SyncService', () => {
       title: 'NASA Moon Base: The First Six Months',
       durationSeconds: 67,
     });
-    expect(video('myZ9kn9MIWQ')).toMatchObject({ status: 'skipped', skipReason: 'short' });
+    expect(video('myZ9kn9MIWQ')).toMatchObject({ status: 'skipped', skipReason: 'no_match' });
     expect(video('M3HKLzjvKPc')).toBeUndefined();
 
     const queue = jobs.listQueue().filter((job) => job.type === 'download');
@@ -123,13 +130,13 @@ describe('SyncService', () => {
       .where(eq(videos.youtubeId, '90Kgw_SvK4w'))
       .run();
 
-    const onlyMoon: Rules = { ...OPEN, skipShorts: false, titleFilter: 'moon' };
-    db.update(sources).set({ rules: onlyMoon }).where(eq(sources.id, source.id)).run();
+    const onlyMoon = and({ type: 'title_contains', text: 'moon' });
+    db.update(sources).set({ matcher: onlyMoon }).where(eq(sources.id, source.id)).run();
     await sync.checkSource(source.id);
 
     expect(video('90Kgw_SvK4w')?.status).toBe('on_disk');
     expect(video('jHKf1eHp3eQ')).toMatchObject({ status: 'wanted' }); // "…to the Moon"
-    expect(video('v03RjDNwG1o')).toMatchObject({ status: 'skipped', skipReason: 'title_filter' });
+    expect(video('v03RjDNwG1o')).toMatchObject({ status: 'skipped', skipReason: 'no_match' });
     // A short that was skipped as a short matches the new rules and becomes wanted.
     expect(video('VV_JW4iCni0')).toMatchObject({ status: 'wanted', skipReason: null });
   });
@@ -172,9 +179,25 @@ describe('SyncService', () => {
     expect(db.select().from(playlistItems).all()).toHaveLength(4);
   });
 
-  it('applies keepDays against the check time', () => {
+  it('lets playlist rules use the entry position and uploader', async () => {
+    const { sync, addSource, video } = setup();
+    const source = addSource(
+      'playlist',
+      and(
+        { type: 'in_playlist_position_under', position: 3 },
+        { type: 'channel_is', channel: 'nasa' },
+      ),
+    );
+    const result = await sync.checkSource(source.id);
+    expect(result).toMatchObject({ entries: 4, wanted: 2 });
+    expect(video('tQcNSJc8gEg')?.status).toBe('wanted');
+    expect(video('yIlTwwJv1Ac')?.status).toBe('wanted');
+    expect(video('BYH6W9iCs2E')).toMatchObject({ status: 'skipped', skipReason: 'no_match' });
+  });
+
+  it('applies "not older than" against the check time', () => {
     const { sync, addSource } = setup();
-    const source = addSource('channel', { ...OPEN, keepDays: 14 });
+    const source = addSource('channel', and(not({ type: 'older_than_days', days: 14 })));
     const channel = {
       kind: 'channel' as const,
       id: NASA,
@@ -215,7 +238,7 @@ describe('SyncService', () => {
   it('marks a music source checked without fetching (Stage 6)', async () => {
     const { sync, addSource, db } = setup();
     process.env.FAKE_YTDLP_FAIL = '1';
-    const source = addSource('artist', DEFAULT_MUSIC_RULES, 'music');
+    const source = addSource('artist', DEFAULT_MUSIC_MATCHER, 'music');
     await expect(sync.checkSource(source.id)).resolves.toMatchObject({ synced: false });
     expect(db.select().from(sources).get()?.lastCheckedAt).not.toBeNull();
   });
@@ -263,7 +286,7 @@ describe('SyncService', () => {
 
 describe('nextStatus', () => {
   const accept = { accept: true } as const;
-  const reject = { accept: false, reason: 'short', transient: false } as const;
+  const reject: RuleVerdict = { accept: false, reason: 'no_match', transient: false, failing: [] };
   it('leaves downloaded, downloading, missing and unavailable items alone', () => {
     expect(nextStatus('on_disk', null, reject)).toEqual({ status: 'on_disk', skipReason: null });
     expect(nextStatus('downloading', null, reject).status).toBe('downloading');
@@ -274,7 +297,15 @@ describe('nextStatus', () => {
     });
   });
   it('moves wanted and rule-skipped items with the verdict', () => {
-    expect(nextStatus('wanted', null, reject)).toEqual({ status: 'skipped', skipReason: 'short' });
-    expect(nextStatus('skipped', 'short', accept)).toEqual({ status: 'wanted', skipReason: null });
+    expect(nextStatus('wanted', null, reject)).toEqual({
+      status: 'skipped',
+      skipReason: 'no_match',
+    });
+    expect(nextStatus('skipped', 'no_match', accept)).toEqual({
+      status: 'wanted',
+      skipReason: null,
+    });
+    // A file revalidation removed comes back when the rules match it again.
+    expect(nextStatus('skipped', 'no_longer_matches', accept).status).toBe('wanted');
   });
 });

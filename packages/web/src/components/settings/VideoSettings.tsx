@@ -14,7 +14,8 @@ import { ToggleRow } from '../ui/Toggle';
 import { LibraryCard } from './LibraryCard';
 import { optionsOf, qualityLabel, schemaError } from './fields';
 import { SettingsTab } from './SettingsTab';
-import { KeepDaysControl, SubtitlesControl } from './VideoControls';
+import { DefaultRulesEditor } from './DefaultRulesEditor';
+import { SubtitlesControl } from './VideoControls';
 
 const qualityOptions = optionsOf(VIDEO_QUALITIES, qualityLabel);
 const containerOptions = optionsOf(VIDEO_CONTAINERS);
@@ -26,8 +27,8 @@ export function validateVideoTemplate(template: string): string | undefined {
 
 /**
  * Settings → Video: Library, Format and Defaults for new channels. Every change saves
- * immediately (text on blur or Enter). The defaults apply to channels added later; existing
- * subscriptions keep their own rules.
+ * immediately (text on blur or Enter), except the default rules, which have their own Save. The
+ * defaults apply to channels and playlists added later; existing ones keep their own rules.
  */
 export function VideoSettings() {
   const update = useUpdateSettings();
@@ -71,19 +72,10 @@ export function VideoSettings() {
             </KeyValueGrid>
           </SettingsCard>
           <SettingsCard title="Defaults for new channels">
-            <KeyValueGrid>
-              <KeyValueRow label="Keep videos for">
-                <KeepDaysControl
-                  value={video.keepDays}
-                  onChange={(keepDays) => save({ keepDays })}
-                />
-              </KeyValueRow>
-            </KeyValueGrid>
-            <ToggleRow
-              label="Skip shorts"
-              description="Anything under 60 seconds or in the Shorts shelf."
-              checked={video.skipShorts}
-              onChange={(skipShorts) => save({ skipShorts })}
+            <DefaultRulesEditor
+              value={video.defaultRules}
+              onSave={(defaultRules) => save({ defaultRules })}
+              appliesTo="channels and playlists"
             />
             <ToggleRow
               label="Save thumbnails"

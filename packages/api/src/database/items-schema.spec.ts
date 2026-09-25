@@ -1,4 +1,4 @@
-import { DEFAULT_VIDEO_RULES, Track, Video } from '@mytube/shared';
+import { DEFAULT_SOURCE_OPTIONS, DEFAULT_VIDEO_MATCHER, Track, Video } from '@mytube/shared';
 import type BetterSqlite3 from 'better-sqlite3';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -36,7 +36,8 @@ describe('items schema', () => {
         youtubeId: 'UCwood',
         url: 'https://www.youtube.com/channel/UCwood',
         name: 'Woodshop',
-        rules: DEFAULT_VIDEO_RULES,
+        matcher: DEFAULT_VIDEO_MATCHER,
+        options: DEFAULT_SOURCE_OPTIONS,
       })
       .returning()
       .get().id;
@@ -72,10 +73,10 @@ describe('items schema', () => {
     expect(Video.parse(row).status).toBe('wanted');
 
     db.update(videos)
-      .set({ status: 'skipped', skipReason: 'short' })
+      .set({ status: 'skipped', skipReason: 'no_match' })
       .where(eq(videos.id, row.id))
       .run();
-    expect(Video.parse(db.select().from(videos).get()).skipReason).toBe('short');
+    expect(Video.parse(db.select().from(videos).get()).skipReason).toBe('no_match');
   });
 
   it('rejects unknown statuses and duplicate youtube ids', () => {

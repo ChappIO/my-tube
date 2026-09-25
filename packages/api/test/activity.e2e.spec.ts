@@ -1,10 +1,10 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { ActivitySummary, HistoryEntry, Job, Source } from '@mytube/shared';
+import { ActivitySummary, HistoryEntry, Job, RulesPreview, Source, and, not } from '@mytube/shared';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -18,6 +18,8 @@ import { JobsService } from '../src/jobs/jobs.service.js';
  */
 
 const FAKE_YTDLP = fileURLToPath(new URL('./fixtures/fake-yt-dlp', import.meta.url));
+/** The listing's title; later checks refresh the title the download stored. */
+const MOON_BASE = 'NASA Moon Base: The First Six Months';
 
 describe('Activity (e2e)', () => {
   let app: INestApplication;
@@ -55,7 +57,7 @@ describe('Activity (e2e)', () => {
       .send({
         url: 'https://www.youtube.com/@NASA',
         library: 'video',
-        rules: { library: 'video', keepDays: null, titleFilter: 'Six Months' },
+        matcher: and({ type: 'title_contains', text: 'Six Months' }),
       })
       .expect(201);
     source = Source.parse(created.body);
@@ -124,6 +126,77 @@ describe('Activity (e2e)', () => {
       return queue.length === 0 ? true : undefined;
     });
     expect((await history()).filter((entry) => entry.result === 'done')).toHaveLength(1);
+  });
+
+  it('tightened rules preview the removal, then revalidation removes the file', async () => {
+    const file = join(root, 'video', 'NASA/What It Takes (2026-09-04).mp4');
+    const thumbnail = join(root, 'video', 'NASA/What It Takes (2026-09-04).jpg');
+    const subtitles = join(root, 'video', 'NASA/What It Takes (2026-09-04).en.vtt');
+    writeFileSync(thumbnail, 'jpg');
+    writeFileSync(subtitles, 'vtt');
+    // Rules that still match keep the file.
+    const keep = RulesPreview.parse(
+      (
+        await request(server())
+          .post(`/api/sources/${source.id}/rules/preview`)
+          .send({ matcher: and(not({ type: 'is_short' })) })
+          .expect(200)
+      ).body,
+    );
+    expect(keep).toEqual({ wouldRemove: [], wouldKeep: 1 });
+
+    const tightened = and({ type: 'title_contains', text: 'Zebra' });
+    const preview = RulesPreview.parse(
+      (
+        await request(server())
+          .post(`/api/sources/${source.id}/rules/preview`)
+          .send({ matcher: tightened })
+          .expect(200)
+      ).body,
+    );
+    expect(preview).toEqual({
+      wouldRemove: [{ id: expect.any(Number), title: MOON_BASE, failing: ['only "Zebra"'] }],
+      wouldKeep: 0,
+    });
+    expect(existsSync(file)).toBe(true);
+
+    // Saving the rules queues a revalidation at once.
+    await request(server())
+      .patch(`/api/sources/${source.id}`)
+      .send({ matcher: tightened })
+      .expect(200);
+    const removed = await waitFor(async () =>
+      (await history()).find((entry) => entry.result === 'removed'),
+    );
+    expect(removed).toMatchObject({
+      kind: 'video',
+      title: MOON_BASE,
+      details: 'no longer matches: only "Zebra"',
+      jobId: expect.any(Number),
+    });
+    expect(existsSync(file)).toBe(false);
+    expect(existsSync(thumbnail)).toBe(false);
+    expect(existsSync(subtitles)).toBe(false);
+    // The channel folder was left empty and is gone; the library root stays.
+    expect(readdirSync(join(root, 'video'))).toEqual([]);
+    const log = await request(server()).get(`/api/jobs/${removed.jobId}/log`).expect(200);
+    expect(log.text).toMatch(/^=== revalidate job \d+/);
+    expect(log.text).toContain('removed NASA/What It Takes (2026-09-04).mp4');
+
+    const after = Source.parse(
+      (await request(server()).get(`/api/sources/${source.id}`).expect(200)).body,
+    );
+    expect(after).toMatchObject({ sizeBytes: 0, itemCount: 0 });
+    // Nothing is left to remove.
+    const again = RulesPreview.parse(
+      (
+        await request(server())
+          .post(`/api/sources/${source.id}/rules/preview`)
+          .send({ matcher: tightened })
+          .expect(200)
+      ).body,
+    );
+    expect(again).toEqual({ wouldRemove: [], wouldKeep: 0 });
   });
 });
 

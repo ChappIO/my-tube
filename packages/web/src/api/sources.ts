@@ -1,7 +1,9 @@
 import {
   type CreateSource,
   type Library,
+  type Matcher,
   ResolvedSource,
+  RulesPreview,
   Source,
   SourceConflict,
   type UpdateSource,
@@ -19,6 +21,8 @@ export const sourceKeys = {
   lists: ['sources', 'list'] as const,
   list: (library?: Library) => ['sources', 'list', library ?? 'all'] as const,
   detail: (id: number) => ['sources', 'detail', id] as const,
+  preview: (id: number, matcher: Matcher | undefined) =>
+    ['sources', 'preview', id, JSON.stringify(matcher ?? null)] as const,
 };
 
 const SourceList = z.array(Source);
@@ -85,13 +89,33 @@ function writeSource(queryClient: QueryClient, source: Source): void {
   queryClient.setQueryData(sourceKeys.detail(source.id), source);
 }
 
-/** Changes rules or the name (`PATCH /api/sources/:id`); the answer updates every cache. */
+/**
+ * Changes rules, options or the name (`PATCH /api/sources/:id`); the answer updates every
+ * cache. A rules change queues a revalidation, so the Activity queue is refreshed too.
+ */
 export function useUpdateSource() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, patch }: { id: number; patch: UpdateSource }) =>
       apiPatch(`/api/sources/${id}`, patch, Source),
-    onSuccess: (source) => writeSource(queryClient, source),
+    onSuccess: (source, { patch }) => {
+      writeSource(queryClient, source);
+      if (patch.matcher) void queryClient.invalidateQueries({ queryKey: ['activity'] });
+    },
+  });
+}
+
+/**
+ * What saving `matcher` would remove from the source's files on disk
+ * (`POST /api/sources/:id/rules/preview`). A query keyed by the tree, so going back to an
+ * earlier tree answers from the cache; no request while `matcher` is undefined.
+ */
+export function useRulesPreview(id: number, matcher: Matcher | undefined) {
+  return useQuery({
+    queryKey: sourceKeys.preview(id, matcher),
+    enabled: matcher !== undefined,
+    queryFn: () => apiPost(`/api/sources/${id}/rules/preview`, { matcher }, RulesPreview),
+    staleTime: 10_000,
   });
 }
 

@@ -1,11 +1,12 @@
 import {
-  Rules,
-  defaultRules,
+  DEFAULT_SOURCE_OPTIONS,
+  SourceOptions,
   uploadsPerWeek,
   type Library,
-  type RulesInput,
+  type Matcher,
   type Settings,
   type SourceKind,
+  type SourceOptionsInput,
 } from '@mytube/shared';
 import type { SourceEntry, SourceMetadata } from '../ytdlp/metadata.js';
 
@@ -93,24 +94,26 @@ export function cadence(metadata: Pick<SourceMetadata, 'entries'>): {
 }
 
 /**
- * The rules a new source starts with: the library defaults, for video sources overlaid with
- * Settings → Video (`keepDays`, `skipShorts`), then overlaid with what the client sent. The
- * caller checks `input.library` against the source's library first.
+ * The rules and options a new source starts with. Rules: the client's tree, else the library's
+ * default tree from Settings (`video.defaultRules`, `music.defaultRules`). Options: the defaults
+ * (for music with `music.embedCoverArt` from Settings), overlaid with the client's.
  */
 export function initialRules(
   library: Library,
-  settings: Pick<Settings, 'video'>,
-  input?: RulesInput,
-): Rules {
-  const base = defaultRules(library);
-  const withSettings =
-    base.library === 'video'
-      ? { ...base, keepDays: settings.video.keepDays, skipShorts: settings.video.skipShorts }
-      : base;
-  return Rules.parse({ ...withSettings, ...input });
+  settings: Pick<Settings, 'video' | 'music'>,
+  input: { matcher?: Matcher; options?: SourceOptionsInput } = {},
+): { matcher: Matcher; options: SourceOptions } {
+  const base: SourceOptions =
+    library === 'music'
+      ? { ...DEFAULT_SOURCE_OPTIONS, embedCoverArt: settings.music.embedCoverArt }
+      : DEFAULT_SOURCE_OPTIONS;
+  return {
+    matcher: input.matcher ?? settings[library].defaultRules,
+    options: mergeOptions(base, input.options),
+  };
 }
 
-/** The current rules with the client's changes on top. */
-export function mergeRules(current: Rules, input: RulesInput): Rules {
-  return Rules.parse({ ...current, ...input });
+/** The current options with the client's changes on top. */
+export function mergeOptions(current: SourceOptions, input?: SourceOptionsInput): SourceOptions {
+  return SourceOptions.parse({ ...current, ...input });
 }

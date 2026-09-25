@@ -1,4 +1,4 @@
-import { type Source, describeRules } from '@mytube/shared';
+import { type Source, describeSource } from '@mytube/shared';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useSetSubscribed, useSources } from '../../api/sources';
@@ -77,7 +77,7 @@ function ChannelRow({ source, checked, onSubscribe, onEdit }: ChannelRowProps) {
           {source.name}
         </Link>
         <div className="mt-[3px] font-sans text-[13px] text-muted">{sourceMeta(source)}</div>
-        <RuleChips chips={describeRules(source.rules)} className="mt-2" />
+        <RuleChips chips={describeSource(source)} className="mt-2" />
       </div>
       <div className="col-span-full flex items-center justify-end gap-2 wide:col-span-1">
         <Meta className="hidden whitespace-nowrap wide:block">{checked}</Meta>

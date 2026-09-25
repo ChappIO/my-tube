@@ -28,7 +28,7 @@ export function SourceAvatar({ src, name, size, className }: SourceAvatarProps) 
 }
 
 export interface RuleChipsProps {
-  /** Chip texts, usually `describeRules(source.rules)`. Nothing renders without any. */
+  /** Chip texts, usually `describeSource(source)` (rules, then options). Nothing renders without any. */
   chips: readonly string[];
   /** `row`: 3px 8px (Channels row). `page`: 4px 9px (channel page header). */
   size?: 'row' | 'page';

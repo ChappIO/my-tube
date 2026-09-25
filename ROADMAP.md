@@ -63,7 +63,7 @@ Skills: backend, database, frontend. Handoff: Screen 3 Channels tab and Channel 
 
 Skills: architecture (settled decisions), backend, database, frontend. Decided by Thomas on 2026-09-25 while validating Stage 3.
 
-- [ ] **Matcher rules.** Replace the flat per-source rules with an expression tree: AND, OR, NOT gates over predicates (title contains, title matches regex, is short, published before/after a date, older than N days, duration under/over, live status, channel name for playlists). One tree per source decides both what is downloaded at sync and what stays: a periodic revalidation re-evaluates on-disk items against the current tree and removes files that no longer match, recording each removal in history (this replaces the Stage 7 retention job; "keep the last N days" is `NOT(older than N days)`). Saving a rule change previews what it would remove. Options that are not predicates (subtitles, thumbnails, cover art and tags, playlist-order numbering) stay as plain source options. Builder-only UI in the Add and Edit modals, seeded from per-library default trees in Settings → Video and Settings → Music, edited with the same builder; chips render from the tree. One-time conversion of stored rules. Done when a nested rule such as `no shorts AND (title contains "Artemis" OR title contains "Orion") AND NOT older than 90 days` can be built, saved, applied by a sync, and shown as chips, and a tightened rule removes a downloaded file after revalidation with a history entry.
+- [x] **Matcher rules.** Replace the flat per-source rules with an expression tree: AND, OR, NOT gates over predicates (title contains, title matches regex, is short, published before/after a date, older than N days, duration under/over, live status, channel name for playlists). One tree per source decides both what is downloaded at sync and what stays: a periodic revalidation re-evaluates on-disk items against the current tree and removes files that no longer match, recording each removal in history (this replaces the Stage 7 retention job; "keep the last N days" is `NOT(older than N days)`). Saving a rule change previews what it would remove. Options that are not predicates (subtitles, thumbnails, cover art and tags, playlist-order numbering) stay as plain source options. Builder-only UI in the Add and Edit modals, seeded from per-library default trees in Settings → Video and Settings → Music, edited with the same builder; chips render from the tree. One-time conversion of stored rules. Done when a nested rule such as `no shorts AND (title contains "Artemis" OR title contains "Orion") AND NOT older than 90 days` can be built, saved, applied by a sync, and shown as chips, and a tightened rule removes a downloaded file after revalidation with a history entry.
 
 ## Stage 4: Sync, queue and Activity
 
@@ -94,7 +94,7 @@ Skills: frontend, backend, database. Handoff: Screen 2 Music, Components open mu
 - [ ] **Artists, Albums and Playlists tabs.** Open music tiles, artist circles with the bell badge, incomplete counts in red, playlist stack art. Done when the summary line and meta lines match the handoff formats.
 - [ ] **Tracks tab.** Filter input, All, Missing and Recent filters, sortable columns with the Added-descending default, the narrow list collapse with sort pills. Done when filtering and sorting are server-backed and covered by tests.
 
-## Stage 7: Retention and maintenance
+## Stage 7: Maintenance
 
 Skills: backend, database. Handoff: Screen 6 Advanced, Screen 5 History entries.
 

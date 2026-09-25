@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_MUSIC_MATCHER, DEFAULT_VIDEO_MATCHER } from './matchers.js';
 import { DEFAULT_SETTINGS, Settings, SettingsPatch, settingsKey } from './settings.js';
 
 describe('Settings', () => {
@@ -11,7 +12,7 @@ describe('Settings', () => {
         container: 'm4a',
         loudnessNormalization: false,
         embedCoverArt: true,
-        skipLiveRecordings: false,
+        defaultRules: DEFAULT_MUSIC_MATCHER,
       },
       video: {
         pathTemplate: '{channel}/{title} ({date})',
@@ -19,8 +20,7 @@ describe('Settings', () => {
         container: 'mkv',
         subtitleLanguages: ['en', 'nl'],
         subtitlesEmbedded: true,
-        keepDays: 90,
-        skipShorts: true,
+        defaultRules: DEFAULT_VIDEO_MATCHER,
         saveThumbnails: true,
       },
       ytdlp: { autoUpdate: true, updateIntervalHours: 6 },
@@ -41,10 +41,10 @@ describe('SettingsPatch', () => {
     expect(SettingsPatch.parse({ general: { theme: 'dark' } })).toEqual({
       general: { theme: 'dark' },
     });
-    expect(SettingsPatch.parse({ network: { proxy: null }, video: { keepDays: 30 } })).toEqual({
-      network: { proxy: null },
-      video: { keepDays: 30 },
-    });
+    const rules = { type: 'and', items: [{ type: 'is_short' }] };
+    expect(
+      SettingsPatch.parse({ network: { proxy: null }, video: { defaultRules: rules } }),
+    ).toEqual({ network: { proxy: null }, video: { defaultRules: rules } });
   });
 
   it('rejects empty patches, unknown keys and invalid values', () => {
@@ -56,6 +56,13 @@ describe('SettingsPatch', () => {
     expect(SettingsPatch.safeParse({ general: { downloadsAtOnce: 6 } }).success).toBe(false);
     expect(SettingsPatch.safeParse({ general: { downloadsAtOnce: 1.5 } }).success).toBe(false);
     expect(SettingsPatch.safeParse({ general: { theme: 'sepia' } }).success).toBe(false);
+    expect(SettingsPatch.safeParse({ video: { keepDays: 30 } }).success).toBe(false);
+    expect(SettingsPatch.safeParse({ video: { defaultRules: { type: 'x' } } }).success).toBe(false);
+    expect(
+      SettingsPatch.safeParse({
+        video: { defaultRules: { type: 'channel_is', channel: 'NASA' } },
+      }).success,
+    ).toBe(false);
   });
 });
 
