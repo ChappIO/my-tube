@@ -119,9 +119,9 @@ export const DEFAULT_METADATA_PROVIDERS: MetadataProviders = {
 
 /** Settings → Music. */
 export const MusicSettings = z.object({
-  /** Handoff "Artist / Album / ## Title". */
+  /** Reads "Artist / Album / ## Title". */
   pathTemplate: pathTemplate(MUSIC_PATH_TAGS).default('{artist}/{album}/{track:02} {title}'),
-  /** Handoff "best available". */
+  /** Reads "best available". */
   audioQuality: z.enum(AUDIO_QUALITIES).default('best'),
   container: z.enum(AUDIO_CONTAINERS).default('m4a'),
   loudnessNormalization: z.boolean().default(false),
@@ -136,7 +136,7 @@ export type MusicSettings = z.infer<typeof MusicSettings>;
 
 /** Settings → Video. `defaultRules` is what new channels and playlists start with. */
 export const VideoSettings = z.object({
-  /** Handoff "Channel / Title (Date)". */
+  /** Reads "Channel / Title (Date)". */
   pathTemplate: pathTemplate(VIDEO_PATH_TAGS).default('{channel}/{title} ({date})'),
   quality: z.enum(VIDEO_QUALITIES).default('1080p'),
   container: z.enum(VIDEO_CONTAINERS).default('mkv'),

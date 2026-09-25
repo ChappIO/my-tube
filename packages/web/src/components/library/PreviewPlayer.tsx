@@ -26,7 +26,7 @@ export interface PreviewPlayerProps {
 }
 
 /**
- * The Preview player area (handoff Screen 7): 16/9 black with the thumbnail as poster and the
+ * The Preview player area: 16/9 black with the thumbnail as poster and the
  * 72px translucent white play circle until playback starts; then the native controls. The file
  * streams with HTTP Range requests (`preload="metadata"` reads only the header until play). A
  * container the browser cannot play shows the poster alone. Playback pauses when Preview closes.

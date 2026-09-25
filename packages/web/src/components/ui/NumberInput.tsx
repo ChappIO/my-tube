@@ -59,7 +59,7 @@ export function NumberInput({
       value={text}
       disabled={disabled}
       className={cx(
-        // The handoff's value box has no spin buttons; arrow keys still step.
+        // The value box has no spin buttons by design; arrow keys still step.
         '[appearance:textfield] aria-invalid:text-red [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
         className,
       )}

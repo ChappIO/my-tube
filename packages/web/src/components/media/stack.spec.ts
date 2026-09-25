@@ -38,7 +38,7 @@ describe('stackCovers', () => {
 });
 
 describe('stackLayerStyle', () => {
-  it('follows the handoff geometry', () => {
+  it('follows the stack geometry', () => {
     expect(stackLayerStyle(0)).toMatchObject({
       left: '8%',
       zIndex: 4,

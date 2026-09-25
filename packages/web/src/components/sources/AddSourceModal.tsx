@@ -40,7 +40,7 @@ export interface AddSourceModalProps {
 }
 
 /**
- * "Add to library" (handoff Screen 4). Render it only while open (the app shell does), so every
+ * "Add to library". Render it only while open (the app shell does), so every
  * opening starts empty.
  *
  * Typing or pasting a link is checked with `parseYoutubeUrl` on every keystroke; a valid one is

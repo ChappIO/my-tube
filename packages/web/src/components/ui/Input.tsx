@@ -27,7 +27,7 @@ const shapes: Record<InputShape, string> = {
   value: '',
 };
 
-/** Text input from the handoff's Inputs section. */
+/** Text input: `surface` fill, 1px `line` border, pill or radius-10 field. */
 export function Input({
   shape = 'field',
   mono,

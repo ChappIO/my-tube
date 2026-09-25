@@ -13,8 +13,7 @@ export interface PlaylistStackProps {
 }
 
 /**
- * Playlist art: four track covers in one 3D row inside a square (handoff "Playlist stack",
- * brand board Turn 5 option 5b). The back covers fade into `surface`; no shadows.
+ * Playlist art: four track covers in one 3D row inside a square. The back covers fade into `surface`; no shadows.
  */
 export function PlaylistStack({ covers, seed, fill = false, className = '' }: PlaylistStackProps) {
   const layers = stackCovers(covers, seed);

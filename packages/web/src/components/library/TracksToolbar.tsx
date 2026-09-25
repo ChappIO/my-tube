@@ -22,7 +22,7 @@ export interface TracksToolbarProps {
 }
 
 /**
- * The Tracks toolbar (handoff Screen 2): the 300px pill filter input ("Filter by title, artist
+ * The Tracks toolbar: the 300px pill filter input ("Filter by title, artist
  * or album"), the All / Missing / Recent filter pills and the count on the right (Space Mono 12
  * muted). Wraps on narrow screens.
  */

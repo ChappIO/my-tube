@@ -501,7 +501,7 @@ function ComponentsDemo() {
 /** Stand-in for the Preview player area: 16/9 black with a 72px translucent white play circle. */
 function PreviewPlayer() {
   return (
-    // The player black is fixed in both themes (handoff Screen 7: #0F1012).
+    // The player black is fixed in both themes (#0F1012).
     <div className="grid aspect-video place-items-center" style={{ background: '#0F1012' }}>
       <button
         type="button"

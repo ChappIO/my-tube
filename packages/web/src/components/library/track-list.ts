@@ -72,7 +72,7 @@ export function toTrackSearch(state: TrackListState): TrackSearch {
 
 /**
  * The sort after clicking a column (a header or a narrow sort pill): the active column flips
- * its direction; another column starts ascending (the prototype's behaviour).
+ * its direction; another column starts ascending.
  */
 export function nextSort(
   current: Pick<TrackListState, 'sort' | 'dir'>,

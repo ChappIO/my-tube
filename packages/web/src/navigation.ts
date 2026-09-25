@@ -42,8 +42,8 @@ export const TAB_LABELS: Record<MusicTab | VideoTab | SettingsTab, string> = {
 };
 
 /**
- * Icon per tab id, shown before the label in the tab pills. An addition to the handoff
- * (its pills are text only), requested by the owner.
+ * Icon per tab id, shown before the label in the tab pills on wide screens, at the owner's
+ * request.
  */
 export const TAB_ICONS: Record<MusicTab | VideoTab | SettingsTab, ComponentType<IconProps>> = {
   artists: ArtistsIcon,

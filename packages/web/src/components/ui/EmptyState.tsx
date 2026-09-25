@@ -9,8 +9,8 @@ export interface EmptyStateProps {
 }
 
 /**
- * What a screen shows when it has nothing to list. The handoff leaves empty states undesigned
- * and asks for plain muted Archivo 14 text; announced politely, like the other status lines.
+ * What a screen shows when it has nothing to list: plain muted Archivo 14 text by design;
+ * announced politely, like the other status lines.
  */
 export function EmptyState({ children, action }: EmptyStateProps) {
   return (

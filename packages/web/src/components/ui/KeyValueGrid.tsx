@@ -2,7 +2,7 @@ import { type ReactNode, createContext, useContext, useId } from 'react';
 import { cx, valueBox } from './cx';
 
 /**
- * Settings key/value grid (handoff Screen 6): `180px 1fr`, gap 12px 20px, rows centered. Narrow:
+ * Settings key/value grid: `180px 1fr`, gap 12px 20px, rows centered. Narrow:
  * one column, each key above its value with an 8px top margin, gap 6px, values full width.
  * Children are `KeyValueRow`s.
  */

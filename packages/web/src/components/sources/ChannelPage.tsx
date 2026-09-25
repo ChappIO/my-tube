@@ -23,7 +23,7 @@ import { sourceMeta } from './source-text';
 const backToChannels = linkOptions({ to: '/video/$tab', params: { tab: 'channels' } });
 
 /**
- * The channel page (handoff Screen 3): back link, header with avatar, name, meta and rule
+ * The channel page: back link, header with avatar, name, meta and rule
  * chips, Edit rules and the bell pill, then the source's videos on disk as square tiles (title and
  * relative date). `id` is the route param, a source id.
  */
@@ -95,7 +95,7 @@ function ChannelHeader({ source }: { source: Source }) {
 }
 
 /**
- * Confirms "Remove from library" (`DELETE /api/sources/:id`). Not in the handoff: added so test
+ * Confirms "Remove from library" (`DELETE /api/sources/:id`), added so test
  * adds can be undone. Only the source goes; downloaded files stay on disk.
  */
 function RemoveSourceModal({ source, onClose }: { source: Source; onClose: () => void }) {

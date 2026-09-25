@@ -15,7 +15,7 @@ const status: YtdlpStatus = {
 };
 
 describe('ytdlpSummary', () => {
-  it('reads like the handoff footer', () => {
+  it('reads like the sidebar footer', () => {
     expect(ytdlpSummary(status)).toBe('up to date · auto-update on');
     expect(ytdlpSummary({ ...status, state: 'update_available', autoUpdate: false })).toBe(
       'update available · auto-update off',

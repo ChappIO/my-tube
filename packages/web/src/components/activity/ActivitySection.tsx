@@ -7,7 +7,7 @@ export interface ActivitySectionProps {
   children: ReactNode;
 }
 
-/** An Activity section: the Space Mono section label over its content, gap 10 (handoff). */
+/** An Activity section: the Space Mono section label over its content, gap 10. */
 export function ActivitySection({ label, children }: ActivitySectionProps) {
   const id = useId();
   return (

@@ -50,7 +50,7 @@ Migration `20260924193510_sources.sql`. Every table has `id` (INTEGER PK), `crea
 - The same YouTube id can be a source in both libraries (two `sources` rows), but it has one `channels`, `artists` or `playlists` row.
 - In Drizzle, `subscribed` is `integer({ mode: 'boolean' })`, `matcher` is `text({ mode: 'json' }).$type<Matcher>()` and `options` `$type<SourceOptions>()`. The `Source` DTO in shared maps onto a `sources` row (`Source.parse(row)`; `lastRevalidatedAt` is not in the DTO).
 
-### Matcher rules conversion (Stage 3b)
+### Matcher rules conversion
 
 Two migrations with a code migration between them:
 
@@ -58,7 +58,7 @@ Two migrations with a code migration between them:
 2. Code migration `convertLegacyData` (`legacy-rules.ts`): every source whose `matcher` is `'null'` gets `convertLegacyRules(rules)` (rules that no longer parse fall back to the library defaults); the settings rows `video.keepDays`, `video.skipShorts` and `music.skipLiveRecordings`, when any exist, become `video.defaultRules` / `music.defaultRules` (a stored `null` keep window stays "forever") and are deleted. With no old rows nothing is written, because the new defaults equal the old ones.
 3. `20260926090100_drop_sources_rules.sql` drops `sources.rules` (with its CHECK) via `ALTER TABLE … DROP COLUMN`; no table rebuild, so the `ON DELETE SET NULL` links of the catalog and item tables are untouched.
 
-`legacy-rules.spec.ts` migrates to the last pre-3b file, writes Stage 3 rows and runs the rest.
+`legacy-rules.spec.ts` migrates to the last file before `20260926090000_matcher_rules.sql`, writes rows in the flat rules format used before matcher trees and runs the rest.
 
 - Items (`videos`, `tracks`, `albums`, `playlist_items`) are in "Items and jobs" below.
 

@@ -26,7 +26,7 @@ function intervalText(hours: number): string {
 }
 
 /**
- * Settings → Advanced → yt-dlp (handoff Screen 6): installed version and state, Check now, and
+ * Settings → Advanced → yt-dlp: installed version and state, Check now, and
  * the auto-update toggle. Check now installs a newer release right away when auto-update is
  * on, and only looks when it is off; then an "Update to" button offers the install.
  */

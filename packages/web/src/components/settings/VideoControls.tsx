@@ -21,7 +21,7 @@ export interface SubtitlesControlProps {
 }
 
 /**
- * The Video → Format "Subtitles" value (handoff `en, nl · embedded`): a comma-separated list
+ * The Video → Format "Subtitles" value (`en, nl · embedded`): a comma-separated list
  * of language codes (empty for none) and whether they are embedded or written as sidecar
  * files. The list takes the row's label; the delivery select names itself.
  */

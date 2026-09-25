@@ -32,7 +32,7 @@ const sizes: Record<ButtonSize, string> = {
   xl: 'text-[15px] p-3',
 };
 
-/** Pill button from the handoff's Buttons section. */
+/** Pill button: primary (red), secondary (`surface`) or outlined. */
 export function Button({
   variant = 'secondary',
   size = 'md',

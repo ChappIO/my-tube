@@ -6,7 +6,7 @@ import { cx, focusRingInset } from '../ui/cx';
 import { TableHeaderLabel } from '../ui/typography';
 import { TRACK_COLUMNS, sortArrow, trackStatus } from './track-list';
 
-/** The wide grid of the handoff: `40px 2fr 1.3fr 1.3fr 80px 110px 90px`, gap 16. */
+/** The wide grid: `40px 2fr 1.3fr 1.3fr 80px 110px 90px`, gap 16. */
 const WIDE_GRID =
   'wide:grid wide:grid-cols-[40px_minmax(0,2fr)_minmax(0,1.3fr)_minmax(0,1.3fr)_80px_110px_90px] wide:gap-4';
 
@@ -21,7 +21,7 @@ export interface TrackTableProps {
 }
 
 /**
- * The Tracks table (handoff Screen 2): a bordered radius-12 list with a `surface` header row of
+ * The Tracks table: a bordered radius-12 list with a `surface` header row of
  * sortable column labels (every column but # and Status; the active one in `ink` with ↑/↓)
  * over rows that open Preview. Below 760px the header is hidden (`TrackSortPills` sorts
  * instead) and each row collapses to a list item.

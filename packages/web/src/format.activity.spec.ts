@@ -35,7 +35,7 @@ const job: Job = {
 };
 
 describe('sizes and speeds', () => {
-  it('formats like the handoff', () => {
+  it('formats bytes per second in decimal units', () => {
     expect(formatSpeed(4_100_000)).toBe('4.1 MB/s');
     expect(formatSpeed(396_000)).toBe('396 KB/s');
   });
@@ -128,7 +128,7 @@ describe('whenLabel', () => {
 });
 
 describe('results and polling', () => {
-  it('colours results like the handoff', () => {
+  it('colours results by outcome', () => {
     expect(resultTone('done')).toBe('ok');
     expect(resultTone('updated')).toBe('ok');
     expect(resultTone('installed')).toBe('ok');

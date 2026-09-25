@@ -16,7 +16,7 @@ const LEGACY_SETTINGS = {
 } as const;
 
 /**
- * Code migration after `20260926090000_matcher_rules.sql` (Stage 3b):
+ * Code migration after `20260926090000_matcher_rules.sql` (the switch to matcher trees):
  *
  * 1. Every source whose `matcher` is still `'null'` gets the tree and options equivalent to its
  *    flat `rules` (`convertLegacyRules` in shared). Rules that no longer parse fall back to the

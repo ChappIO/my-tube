@@ -18,7 +18,7 @@ export interface SettingsCardProps {
   className?: string;
 }
 
-/** Settings card (handoff Screen 6): 1px `line` border, radius 14, padding 22px 24px, gap 16. */
+/** Settings card: 1px `line` border, radius 14, padding 22px 24px, gap 16. */
 export function SettingsCard({ title, children, className }: SettingsCardProps) {
   const titleId = useId();
   return (
@@ -57,7 +57,7 @@ export interface SettingsNoteProps {
   role?: 'status' | 'alert';
   /**
    * `body` (default): Archivo 14, for status lines under the cards (loading, load or save
-   * failure). `small`: Archivo 12, the handoff's footnote ("Paths are container mounts. …"),
+   * failure). `small`: Archivo 12, the footnote ("Paths are container mounts. …"),
    * also used for short notes inside a card.
    */
   size?: 'body' | 'small';

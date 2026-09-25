@@ -11,11 +11,11 @@ export interface HistoryTableProps {
 }
 
 /**
- * The History list (handoff Screen 5): a bordered container of rows, grid `120px 1fr auto auto`
+ * The History list: a bordered container of rows, grid `120px 1fr auto auto`
  * (when, title, kind chip, result) with gap 16 and 12px 16px padding; below 760px `1fr auto`
  * with when and kind hidden. `when` groups by day (`Today 08:12`, `Yesterday 21:40`,
  * `3 days ago`). Results: `done`, `updated`, `installed` green, `failed` red, the rest muted.
- * Rows written by a job get a View log link (addition to the handoff, for troubleshooting);
+ * Rows written by a job get a View log link (for troubleshooting);
  * `details` (the file path or the error) is the row's tooltip.
  */
 export function HistoryTable({ entries, now = new Date() }: HistoryTableProps) {

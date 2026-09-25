@@ -1,7 +1,6 @@
 /**
- * Placeholder artwork: a deterministic two-tone gradient hashed from a seed string, ported from
- * the design prototype ("Artwork colors (prototype only)"). It stands in for real covers and
- * thumbnails in demos and when an item has no art yet.
+ * Placeholder artwork: a deterministic two-tone gradient hashed from a seed string. It stands in
+ * for real covers and thumbnails in demos and when an item has no art yet.
  *
  * The palette below is picture content, like the pixels of a real cover, not UI color. UI code
  * never uses these values; it uses the tokens in styles.css.
@@ -25,7 +24,7 @@ export const PLACEHOLDER_PALETTE: readonly (readonly [string, string])[] = [
   ['#bc6c25', '#283618'],
 ];
 
-/** The prototype's string hash: `x = x * 31 + code`, kept as an unsigned 32-bit integer. */
+/** The string hash: `x = x * 31 + code`, kept as an unsigned 32-bit integer. */
 export function hashSeed(seed: string): number {
   let x = 0;
   for (const ch of seed) x = (x * 31 + ch.charCodeAt(0)) >>> 0;
@@ -35,7 +34,7 @@ export function hashSeed(seed: string): number {
 /**
  * CSS background for a placeholder cover. The same seed always gives the same gradient.
  * `offset` picks a later palette entry with the same angle; the playlist stack uses offsets
- * 0, 3, 7 and 11 so its four covers differ, as in the prototype.
+ * 0, 3, 7 and 11 so its four covers differ.
  */
 export function placeholderFill(seed: string, offset = 0): string {
   const [from, to] = PLACEHOLDER_PALETTE[(hashSeed(seed) + offset) % PLACEHOLDER_PALETTE.length]!;

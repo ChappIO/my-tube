@@ -132,7 +132,7 @@ function LogoDemo() {
         </div>
       </Section>
 
-      <Section title="Icons · Lucide, 16px default; BellIcon uses the handoff path at 14px">
+      <Section title="Icons · Lucide, 16px default; BellIcon uses its own path at 14px">
         <div
           style={{
             display: 'grid',

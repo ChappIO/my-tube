@@ -11,7 +11,7 @@ import { PreviewAudioPlayer, canPlayAudio } from './PreviewAudioPlayer';
 import { PreviewFooter } from './PreviewFooter';
 import { PreviewNote, PreviewPlayer, canPlayInBrowser } from './PreviewPlayer';
 
-/** Handoff Screen 7: as wide as fits 880px, the screen, and a 16/9 player 160px shorter than it. */
+/** As wide as fits 880px, the screen, and a 16/9 player 160px shorter than it. */
 const PREVIEW_WIDTH = 'min(880px, 100%, calc((100vh - 160px) * 16 / 9))';
 const PREVIEW_MAX_HEIGHT = 'calc(100vh - 48px)';
 
@@ -20,7 +20,7 @@ export const AUDIO_NOTE = 'This format cannot play in the browser. Plex plays it
 export const NOTHING_ON_DISK = 'Nothing on disk yet.';
 
 /**
- * Preview (handoff Screen 7), opened from any tile through `openPreview(id)`,
+ * Preview, opened from any tile through `openPreview(id)`,
  * `openTrackPreview(id)` or `openEmptyPreview(title)` and rendered by `AppShell`: the
  * header-less `Modal` on the strong scrim, the player and the footer with **Delete file**. A
  * video plays in the 16/9 player; a track shows its cover there with the audio controls; an

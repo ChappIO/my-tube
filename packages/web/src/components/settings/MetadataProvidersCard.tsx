@@ -25,7 +25,7 @@ export interface MetadataProvidersCardProps {
 }
 
 /**
- * Settings → Music → Metadata providers (not in the handoff, which predates the chain): the
+ * Settings → Music → Metadata providers: the
  * MusicBrainz and Discogs toggles (off by default) and the Discogs personal access token in a
  * masked Space Mono value box. yt-dlp's own tags are always written; these providers fill in
  * the album, numbers and year after each download (backend skill "Metadata").

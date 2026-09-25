@@ -5,7 +5,7 @@ import { MusicTile } from '../media';
 import { MusicGrid } from './MusicGrid';
 
 /**
- * Music → Albums (handoff Screen 2): an open music tile per album with the artist and
+ * Music → Albums: an open music tile per album with the artist and
  * `2007 · 10 tracks`, or `12/14 tracks` in red when tracks are missing. A tile opens Preview on
  * the album's first track on disk ("Nothing on disk yet." without one).
  */

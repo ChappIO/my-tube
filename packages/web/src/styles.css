@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 
 /*
- * Design tokens from design_handoff_mytube/README.md ("Design Tokens").
+ * Design tokens (the frontend skill's "Design reference" lists them with their use).
  * Token names are a contract: components use them as Tailwind utilities
  * (bg-bg, text-ink, border-line, rounded-tile, shadow-modal, font-mono) or as
  * CSS variables (var(--color-red)). The default Tailwind palette is removed so
@@ -22,12 +22,12 @@
   --color-white: #ffffff;
   /*
    * Modal overlays: the light-theme ink at fixed opacity, the same in both themes
-   * (handoff Screens 4 and 7). `scrim` for Add to library, `scrim-strong` for Preview.
+   * `scrim` for Add to library and confirmations, `scrim-strong` for Preview.
    */
   --color-scrim: rgba(21, 22, 24, 0.45);
   --color-scrim-strong: rgba(21, 22, 24, 0.7);
   /*
-   * The Preview player (handoff Screen 7): the black 16/9 area and its translucent white play
+   * The Preview player: the black 16/9 area and its translucent white play
    * circle. Picture content, the same in both themes. `player-note` is the dark theme's muted,
    * for a plain line in the player area ("Nothing on disk yet.").
    */
@@ -54,7 +54,7 @@
   --shadow-modal: 0 40px 80px -30px rgba(0, 0, 0, 0.5);
   --shadow-preview: 0 40px 80px -30px rgba(0, 0, 0, 0.6);
 
-  /* The handoff's single responsive breakpoint: narrow below, wide at and above. */
+  /* The single responsive breakpoint: narrow below, wide at and above. */
   --breakpoint-wide: 760px;
 }
 
@@ -101,7 +101,7 @@
   }
 
   /*
-   * Global keyboard focus style (handoff Inputs: 2px red outline, offset 2px). Anything
+   * Global keyboard focus style (2px red outline, offset 2px). Anything
    * focusable gets it without opting in; components use the focus-ring utilities below to
    * override the offset or to draw it on a parent.
    */
@@ -139,7 +139,7 @@
 }
 
 /*
- * Motion (handoff "Motion"; nothing else animates). Tailwind 4 scales and translates through
+ * Motion (nothing else animates). Tailwind 4 scales and translates through
  * the individual `scale` and `translate` properties, so those are what transition.
  *   motion-tile   tile hover: transform .2s ease, box-shadow .2s ease (open music tiles also
  *                 fade in their `surface` background with it)
@@ -175,10 +175,10 @@
 }
 
 /*
- * Type scale: one utility per role in the handoff's Typography table.
+ * Type scale: one utility per type role.
  * Each sets family, size, weight, line height, tracking and case, never color.
- * Pair with a color utility; the handoff makes labels and meta lines text-muted.
- * Roles without a line height in the handoff use `normal`, like the prototype.
+ * Pair with a color utility; labels and meta lines are text-muted.
+ * Roles without a set line height use `normal`.
  */
 @utility text-h1 {
   font-family: var(--font-sans);

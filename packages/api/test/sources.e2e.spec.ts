@@ -51,7 +51,7 @@ describe('Sources (e2e)', () => {
     configDir = mkdtempSync(join(tmpdir(), 'mytube-sources-e2e-'));
     process.env.CONFIG_DIR = configDir;
     process.env.YTDLP_PATH = FAKE_YTDLP;
-    // Created sources are checked and downloaded at once (Stage 4); keep the files here.
+    // Created sources are checked and downloaded at once; keep the files here.
     process.env.VIDEO_DIR = join(configDir, 'video');
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication({ logger: false });

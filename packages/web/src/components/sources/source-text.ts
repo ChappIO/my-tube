@@ -2,7 +2,7 @@ import type { Library, LibrarySummary, ResolvedSource, Source, SourceKind } from
 import { countOf, formatBytes, formatCadence } from '../../format';
 
 /*
- * The text lines of the sources screens (handoff Screen 3 and Screen 4), as pure functions.
+ * The text lines of the sources screens (Channels, channel page, Add), as pure functions.
  */
 
 const KIND_LABELS: Record<SourceKind, string> = {

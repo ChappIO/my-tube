@@ -4,9 +4,9 @@ import { MusicTile } from '../media';
 import { MusicGrid } from './MusicGrid';
 
 /**
- * Music → Artists (handoff Screen 2): a centred circle tile per artist with
- * `9 albums · 112 tracks` and the bell badge when subscribed. Artists have no page of their own
- * in the handoff, so the tiles do not open anything.
+ * Music → Artists: a centred circle tile per artist with
+ * `9 albums · 112 tracks` and the bell badge when subscribed. Artists have no page of their own,
+ * so the tiles do not open anything.
  */
 export function ArtistsTab() {
   return (

@@ -20,7 +20,7 @@ describe('settings field helpers', () => {
     expect(formatLanguageList(['en', 'nl'])).toBe('en, nl');
   });
 
-  it('labels the best quality as in the handoff', () => {
+  it('labels the best quality "best available"', () => {
     expect(qualityLabel('best')).toBe('best available');
     expect(qualityLabel('1080p')).toBe('1080p');
   });

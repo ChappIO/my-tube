@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { PLACEHOLDER_PALETTE, hashSeed, placeholderFill } from './placeholder';
 
 describe('hashSeed', () => {
-  it('matches the prototype hash', () => {
+  it('hashes like x * 31 + code', () => {
     expect(hashSeed('')).toBe(0);
     expect(hashSeed('a')).toBe(97);
     expect(hashSeed('ab')).toBe(97 * 31 + 98);
@@ -32,7 +32,7 @@ describe('placeholderFill', () => {
     expect(PLACEHOLDER_PALETTE).toContainEqual([match![2], match![3]]);
   });
 
-  it('reproduces the prototype formula for a known seed', () => {
+  it('reproduces the formula for a known seed', () => {
     const [from, to] = PLACEHOLDER_PALETTE[hashSeed('Blue') % 16]!;
     const angle = 100 + (hashSeed('Bluea') % 160);
     expect(placeholderFill('Blue')).toBe(`linear-gradient(${angle}deg, ${from}, ${to})`);

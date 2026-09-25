@@ -13,7 +13,7 @@ import { type ThemeChoice, useTheme } from '../../theme';
 
 export const Route = createFileRoute('/dev/media')({ component: MediaDemo });
 
-// Sample data from the design prototype. Art is the seeded placeholder gradient of the title.
+// Sample data. Art is the seeded placeholder gradient of the title.
 const homeGroups = [
   {
     label: 'Today',

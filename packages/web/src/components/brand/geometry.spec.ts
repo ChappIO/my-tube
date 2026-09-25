@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { glyphGeometry, glyphShapes, tileGeometry } from './geometry';
 
 describe('tileGeometry', () => {
-  it('uses the handoff values for the header tile', () => {
+  it('uses the hinted values for the header tile', () => {
     expect(tileGeometry(28)).toEqual({
       radius: 7,
       triangleWidth: 10,

@@ -150,7 +150,7 @@ export const TRACK_FILTERS = ['all', 'missing', 'recent'] as const;
 export const TrackFilter = z.enum(TRACK_FILTERS);
 export type TrackFilter = z.infer<typeof TrackFilter>;
 
-/** "Recent" is the last 30 days (the handoff's prototype used the current month). */
+/** "Recent" is the last 30 days. */
 export const RECENT_TRACK_DAYS = 30;
 
 /** The sortable columns of the Tracks table; `added` is the download time. */

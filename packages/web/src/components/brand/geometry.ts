@@ -2,9 +2,8 @@
  * Geometry of the MyTube mark: a downward triangle resting on a bar (a play button turned
  * on its head, sitting on a shelf), inside a rounded tile.
  *
- * All values are in CSS pixels for a mark rendered at `size` × `size`. The sizes drawn in
- * the handoff's logo set (Brand Directions, Turn 4) are pixel-hinted there, so those are
- * used verbatim. Every other size scales the 96px reference.
+ * All values are in CSS pixels for a mark rendered at `size` × `size`. The logo set's sizes
+ * are pixel-hinted, so those are used verbatim. Every other size scales the 96px reference.
  */
 export interface MarkGeometry {
   /** Tile corner radius. */
@@ -36,8 +35,8 @@ type Hinted = [
 ];
 
 /**
- * Tile sizes drawn in the handoff (Turn 4: sizes row, lockups, app tile). 16px is snapped to
- * whole pixels for the favicon: the handoff's 7 × 1.5 bar would sit on half pixels and blur,
+ * The logo set's hinted tile sizes (sizes row, lockups, app tile). 16px is snapped to whole
+ * pixels for the favicon: a 7 × 1.5 bar would sit on half pixels and blur,
  * so it is 8 × 2, and the 7px block starts at y 4 (see SNAPPED_TOP).
  */
 const TILE_HINTED: Record<number, Hinted> = {
@@ -58,7 +57,7 @@ const TILE_HINTED: Record<number, Hinted> = {
  */
 const SNAPPED_TOP: Record<number, number> = { 16: 4 };
 
-/** The glyph without a tile fills more of its box (Turn 4: "Glyph, red" at 96px). */
+/** The glyph without a tile fills more of its box (the red glyph at 96px). */
 const GLYPH_REFERENCE: Hinted = [0, 52, 34, 58, 9, 4, 7];
 
 function fromHinted([radius, tw, th, bw, bh, br, gap]: Hinted): MarkGeometry {

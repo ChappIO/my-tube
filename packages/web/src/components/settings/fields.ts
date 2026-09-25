@@ -24,12 +24,12 @@ export function parseLanguageList(text: string): string[] {
     .filter((code) => code !== '');
 }
 
-/** `['en', 'nl']` → `en, nl`, the handoff's spelling. */
+/** `['en', 'nl']` → `en, nl`. */
 export function formatLanguageList(codes: readonly string[]): string {
   return codes.join(', ');
 }
 
-/** Labels for quality options: `best` reads "best available" as in the handoff. */
+/** Labels for quality options: `best` reads "best available". */
 export function qualityLabel(value: string): string {
   return value === 'best' ? 'best available' : value;
 }
@@ -42,7 +42,7 @@ export function optionsOf<T extends string>(
   return values.map((value) => ({ value, label: label(value) }));
 }
 
-/** `off` / `on` options for a boolean shown in a key/value row (handoff: "Loudness … off"). */
+/** `off` / `on` options for a boolean shown in a key/value row ("Loudness normalization off"). */
 export const ON_OFF_OPTIONS = [
   { value: 'off', label: 'off' },
   { value: 'on', label: 'on' },
