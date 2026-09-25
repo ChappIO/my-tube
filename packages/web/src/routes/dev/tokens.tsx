@@ -19,12 +19,26 @@ const colors = [
   { name: 'scrim-strong', light: 'ink @ 0.7', dark: 'ink @ 0.7', use: 'preview overlay' },
   { name: 'player', light: '#0F1012', dark: '#0F1012', use: 'preview player area' },
   { name: 'player-glyph', light: 'white @ 0.12', dark: 'white @ 0.12', use: 'preview play circle' },
+  { name: 'on-red-track', light: 'white @ 0.3', dark: 'white @ 0.3', use: 'player bar scrubber' },
+  { name: 'on-red-hover', light: 'white @ 0.15', dark: 'white @ 0.15', use: 'player bar hover' },
+  { name: 'player-card', light: '#151618', dark: '#151618', use: 'floating card' },
+  { name: 'player-card-hover', light: '#1F2126', dark: '#1F2126', use: 'card Up next hover' },
+  { name: 'player-line', light: 'white @ 0.2', dark: 'white @ 0.2', use: 'card progress track' },
+  { name: 'player-dismiss', light: '#151618 @ 0.55', dark: '#151618 @ 0.55', use: 'card ×' },
+  { name: 'player-fade', light: '#0F1012 @ 0.9', dark: '#0F1012 @ 0.9', use: 'fade over card art' },
+  {
+    name: 'player-fade-panel',
+    light: '#0F1012 @ 0.85',
+    dark: '#0F1012 @ 0.85',
+    use: 'fade over Now Playing',
+  },
 ] as const;
 
 const motions = [
   { cls: 'motion-tile', value: 'transform, box-shadow .2s ease', use: 'tile hover' },
   { cls: 'motion-chin', value: 'transform .2s ease', use: 'chin reveal' },
   { cls: 'motion-knob', value: 'left .15s', use: 'toggle knob' },
+  { cls: 'motion-spin', value: 'rotate .8s linear, repeating', use: 'player buffering' },
 ] as const;
 
 const typeRoles = [
@@ -58,6 +72,14 @@ const shadows = [
   { cls: 'shadow-tile', value: '0 12px 28px -12px rgba(0,0,0,.35)', use: 'tile hover' },
   { cls: 'shadow-modal', value: '0 40px 80px -30px rgba(0,0,0,.5)', use: 'modals' },
   { cls: 'shadow-preview', value: '0 40px 80px -30px rgba(0,0,0,.6)', use: 'preview modal' },
+  { cls: 'shadow-player-bar', value: 'red glow + 0 8px 20px -10px', use: 'player bar' },
+  { cls: 'shadow-player-card', value: '0 30px 60px -24px rgba(0,0,0,.55)', use: 'floating card' },
+  { cls: 'shadow-player-art', value: '0 8px 18px -8px rgba(0,0,0,.5)', use: 'bar art' },
+  {
+    cls: 'shadow-player-cover',
+    value: '0 12px 24px -12px rgba(0,0,0,.6)',
+    use: 'Now Playing cover',
+  },
 ] as const;
 
 const choices: ThemeChoice[] = ['light', 'dark', 'system'];

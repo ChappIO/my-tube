@@ -1,11 +1,15 @@
 import type { ComponentProps, ReactNode } from 'react';
 import { cx, focusRing, minHit } from './cx';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'outlined';
+export type ButtonVariant = 'primary' | 'secondary' | 'outlined' | 'ink';
 export type ButtonSize = 'md' | 'lg' | 'xl';
 
 export interface ButtonProps extends Omit<ComponentProps<'button'>, 'children'> {
-  /** `primary` red, `secondary` surface, `outlined` 1px line border. Default `secondary`. */
+  /**
+   * `primary` red, `secondary` surface, `outlined` 1px line border, `ink` (the album page's Play
+   * and the artist page's Play all: `ink` fill, `bg` text, Archivo 700, hover opacity .85; with an
+   * icon 9px 18px 9px 14px). Default `secondary`.
+   */
   variant?: ButtonVariant;
   /**
    * `md`: Archivo 13, 9px 16px ("Edit rules"). `lg`: Archivo 14, 11px 18–20px (modal footer).
@@ -28,6 +32,7 @@ const variants: Record<ButtonVariant, string> = {
   primary: 'bg-red text-white border-red',
   secondary: 'bg-surface text-ink border-surface',
   outlined: 'bg-transparent text-ink border-line hover:bg-surface',
+  ink: 'bg-ink text-bg border-ink hover:opacity-85',
 };
 
 // A pressed outlined toggle: the active sort pill's `ink` border.
@@ -40,7 +45,7 @@ const sizes: Record<ButtonSize, string> = {
   xl: 'text-[15px] p-3',
 };
 
-/** Pill button: primary (red), secondary (`surface`) or outlined. */
+/** Pill button: primary (red), secondary (`surface`), outlined or ink. */
 export function Button({
   variant = 'secondary',
   size = 'md',
@@ -55,6 +60,8 @@ export function Button({
   // Primary on the large size is Archivo 700 with 20px sides, like the modal's Subscribe.
   // The extra-large size is always Archivo 700.
   const heavy = variant === 'primary' && size === 'lg';
+  // Play: the glyph side is 4px tighter than the label side.
+  const inkIcon = variant === 'ink' && icon !== undefined && size === 'md';
   return (
     <button
       type={type}
@@ -65,7 +72,8 @@ export function Button({
         pressed && variant === 'outlined' ? pressedOutlined : variants[variant],
         sizes[size],
         heavy && 'px-[19px]',
-        heavy || size === 'xl' ? 'font-bold' : 'font-semibold',
+        inkIcon && 'pr-[17px] pl-[13px]',
+        heavy || size === 'xl' || variant === 'ink' ? 'font-bold' : 'font-semibold',
         fullWidth && 'w-full',
         className,
       )}

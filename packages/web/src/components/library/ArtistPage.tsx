@@ -1,12 +1,15 @@
 import type { ArtistDetail, Source } from '@mytube/shared';
+import { useQueryClient } from '@tanstack/react-query';
 import { linkOptions } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ApiError, apiErrorMessage } from '../../api/client';
-import { useArtist, useArtistDownloadMissing } from '../../api/library';
+import { artistTracksQuery, useArtist, useArtistDownloadMissing } from '../../api/library';
 import { useSettings } from '../../api/settings';
 import { useCheckSource, useSetSubscribed, useSource } from '../../api/sources';
 import { countOf } from '../../format';
+import { PlayIcon } from '../icons';
 import { Artwork, BellToggle } from '../media';
+import { artistQueue, startQueue } from '../player/queues';
 import { SUBSCRIBE_FAILED } from '../sources/ChannelsTab';
 import { EditRulesModal } from '../sources/EditRulesModal';
 import { StatusLine } from '../sources/SourceBits';
@@ -116,7 +119,8 @@ export function ArtistHeader({
 }
 
 /**
- * The pills under the meta line: the bell (`Subscribed` / `Subscribe`, bound to the artist's
+ * The pills under the meta line: **Play all** (ink; every track of the artist on disk, albums in
+ * library order; absent while none is), the bell (`Subscribed` / `Subscribe`, bound to the artist's
  * source), **Download N missing tracks** (primary; `N queued` and disabled while every missing
  * track is queued; absent when nothing is missing) and **Check for new releases** (outlined;
  * checks the source, disabled without one). A status line under the row reports what happened.
@@ -131,10 +135,18 @@ export function ArtistActions({
   source: Source | null | undefined;
   className?: string;
 }) {
+  const queryClient = useQueryClient();
   const setSubscribed = useSetSubscribed();
   const download = useArtistDownloadMissing();
   const check = useCheckSource();
   const { artist } = detail;
+  const playAll = () => {
+    void queryClient
+      .fetchQuery(artistTracksQuery(artist.id))
+      .then((tracks) => startQueue(artistQueue(tracks, artist.name)))
+      // A failed read leaves the page as it was; clicking again retries.
+      .catch(() => undefined);
+  };
   const action = artistDownloadAction(detail);
   const subscribed = source?.subscribed ?? artist.subscribed;
 
@@ -152,6 +164,11 @@ export function ArtistActions({
   return (
     <div className={cx('grid gap-2', className)}>
       <div className="flex flex-wrap items-center justify-center gap-2 wide:justify-start">
+        {detail.onDiskTracks > 0 && (
+          <Button variant="ink" icon={<PlayIcon size={12} />} onClick={playAll}>
+            Play all
+          </Button>
+        )}
         {artist.sourceId !== null && (
           <BellToggle
             form="pill"

@@ -13,6 +13,9 @@ export const focusRing = 'focus-ring';
 /** The same ring drawn inside the element, for items in a clipping container (tab pills). */
 export const focusRingInset = 'focus-ring-inset';
 
+/** The ring in white, for controls on the red player bar. */
+export const focusRingOnRed = 'focus-ring-on-red';
+
 /**
  * Rings the element when its overlay control (the descendant with `data-overlay`) has keyboard
  * focus. For tiles whose single interactive element is a full-size overlay button.

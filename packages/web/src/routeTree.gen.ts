@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ActivityRouteImport } from './routes/activity'
+import { Route as NowPlayingRouteImport } from './routes/now-playing'
 import { Route as DevComponentsRouteImport } from './routes/dev/components'
 import { Route as DevLogoRouteImport } from './routes/dev/logo'
 import { Route as DevMediaRouteImport } from './routes/dev/media'
@@ -33,6 +34,11 @@ const IndexRoute = IndexRouteImport.update({
 const ActivityRoute = ActivityRouteImport.update({
   id: '/activity',
   path: '/activity',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NowPlayingRoute = NowPlayingRouteImport.update({
+  id: '/now-playing',
+  path: '/now-playing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DevComponentsRoute = DevComponentsRouteImport.update({
@@ -104,6 +110,7 @@ const VideoChannelIdRoute = VideoChannelIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/now-playing': typeof NowPlayingRoute
   '/dev/components': typeof DevComponentsRoute
   '/dev/logo': typeof DevLogoRoute
   '/dev/media': typeof DevMediaRoute
@@ -121,6 +128,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/now-playing': typeof NowPlayingRoute
   '/dev/components': typeof DevComponentsRoute
   '/dev/logo': typeof DevLogoRoute
   '/dev/media': typeof DevMediaRoute
@@ -139,6 +147,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/now-playing': typeof NowPlayingRoute
   '/dev/components': typeof DevComponentsRoute
   '/dev/logo': typeof DevLogoRoute
   '/dev/media': typeof DevMediaRoute
@@ -158,6 +167,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/activity'
+    | '/now-playing'
     | '/dev/components'
     | '/dev/logo'
     | '/dev/media'
@@ -175,6 +185,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/activity'
+    | '/now-playing'
     | '/dev/components'
     | '/dev/logo'
     | '/dev/media'
@@ -192,6 +203,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/activity'
+    | '/now-playing'
     | '/dev/components'
     | '/dev/logo'
     | '/dev/media'
@@ -210,6 +222,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActivityRoute: typeof ActivityRoute
+  NowPlayingRoute: typeof NowPlayingRoute
   DevComponentsRoute: typeof DevComponentsRoute
   DevLogoRoute: typeof DevLogoRoute
   DevMediaRoute: typeof DevMediaRoute
@@ -239,6 +252,13 @@ declare module '@tanstack/react-router' {
       path: '/activity'
       fullPath: '/activity'
       preLoaderRoute: typeof ActivityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/now-playing': {
+      id: '/now-playing'
+      path: '/now-playing'
+      fullPath: '/now-playing'
+      preLoaderRoute: typeof NowPlayingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dev/components': {
@@ -338,6 +358,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivityRoute: ActivityRoute,
+  NowPlayingRoute: NowPlayingRoute,
   DevComponentsRoute: DevComponentsRoute,
   DevLogoRoute: DevLogoRoute,
   DevMediaRoute: DevMediaRoute,

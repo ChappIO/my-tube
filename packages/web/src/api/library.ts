@@ -19,6 +19,7 @@ import {
 import {
   type QueryClient,
   keepPreviousData,
+  queryOptions,
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -31,8 +32,8 @@ import { ApiError, apiDelete, apiGet, apiPost } from './client';
 
 /*
  * The library read models (`/api/library/*`, backend skill "Library"): the videos grid, the
- * Music tabs (artists, albums, playlists), Home, the header summaries, one video or track for
- * Preview and Delete file. Everything starts with `['library']`, so a finished download or a
+ * Music tabs (artists, albums, playlists), Home, the header summaries, one video for Preview and
+ * its Delete file, the player's queues (a playlist's and an artist's tracks) and the streams. Everything starts with `['library']`, so a finished download or a
  * deletion refreshes all of it at once.
  */
 
@@ -50,7 +51,8 @@ export const libraryKeys = {
   albums: (artistId: number | undefined) => ['library', 'albums', artistId ?? 'all'] as const,
   album: (id: number) => ['library', 'album', id] as const,
   playlists: ['library', 'playlists'] as const,
-  track: (id: number) => ['library', 'track', id] as const,
+  playlistTracks: (id: number) => ['library', 'playlist-tracks', id] as const,
+  artistTracks: (id: number) => ['library', 'artist-tracks', id] as const,
   tracks: (filter: TrackFilterState) => ['library', 'tracks', filter] as const,
 };
 
@@ -268,24 +270,33 @@ export function useUnpinAlbum() {
   });
 }
 
+/**
+ * A playlist's tracks on disk in playlist order (`GET /api/library/playlists/:id/tracks`): the
+ * queue of a playlist tile, fetched on click through `queryClient.fetchQuery`.
+ */
+export function playlistTracksQuery(id: number) {
+  return queryOptions({
+    queryKey: libraryKeys.playlistTracks(id),
+    queryFn: () => apiGet(`/api/library/playlists/${id}/tracks`, z.array(TrackListItem)),
+  });
+}
+
+/**
+ * The artist's tracks on disk in library order (`GET /api/library/artists/:id/tracks`): the queue
+ * of Play all, fetched on click through `queryClient.fetchQuery`.
+ */
+export function artistTracksQuery(id: number) {
+  return queryOptions({
+    queryKey: libraryKeys.artistTracks(id),
+    queryFn: () => apiGet(`/api/library/artists/${id}/tracks`, z.array(TrackListItem)),
+  });
+}
+
 /** The Playlists tab (`GET /api/library/playlists?library=music`), by name. */
 export function usePlaylists() {
   return useQuery({
     queryKey: libraryKeys.playlists,
     queryFn: () => apiGet('/api/library/playlists?library=music', z.array(PlaylistListItem)),
-  });
-}
-
-/**
- * One track (`GET /api/library/tracks/:id`), for Preview. A 404 is not retried; ids below 1
- * never fetch.
- */
-export function useTrack(id: number) {
-  return useQuery({
-    queryKey: libraryKeys.track(id),
-    enabled: id > 0,
-    queryFn: () => apiGet(`/api/library/tracks/${id}`, TrackListItem),
-    retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 2,
   });
 }
 
@@ -314,26 +325,7 @@ export function useTracks(filter: TrackFilterState) {
   });
 }
 
-/** Seeds the single-track cache from a Home tile, so Preview renders without a request. */
-export function primeTrack(queryClient: QueryClient, track: TrackListItem): void {
-  queryClient.setQueryData(libraryKeys.track(track.id), track);
-}
-
-/** Delete file in Preview for a track (`DELETE /api/library/tracks/:id/file`). */
-export function useDeleteTrackFile() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationKey: ['library', 'delete-file'],
-    mutationFn: (id: number) => apiDelete(`/api/library/tracks/${id}/file`),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: libraryKeys.all });
-      void queryClient.invalidateQueries({ queryKey: ['sources'] });
-      void queryClient.invalidateQueries({ queryKey: ['activity'] });
-    },
-  });
-}
-
-/** Preview's `<audio>` source for a track, with HTTP Range support. */
+/** The player's `<audio>` source for a track, with HTTP Range support. */
 export function trackStreamUrl(id: number): string {
   return `/api/library/tracks/${id}/stream`;
 }

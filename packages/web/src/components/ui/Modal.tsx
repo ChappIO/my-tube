@@ -50,6 +50,11 @@ const scrims = {
 // closes (and traps focus) before the one below it.
 const layers = createLayerStack();
 
+/** Whether any modal is open (the player's keyboard shortcuts stay out of its way). */
+export function hasOpenModal(): boolean {
+  return layers.size() > 0;
+}
+
 /**
  * Modal frame: scrim overlay and a centered dialog (radius 18, modal shadow). With a `title`
  * it has padding 28, gap 22 and a title row with a round close button; without one it is a

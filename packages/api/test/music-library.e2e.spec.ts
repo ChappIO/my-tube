@@ -8,11 +8,9 @@ import {
   AlbumListItem,
   ArtistListItem,
   DEFAULT_SOURCE_OPTIONS,
-  HistoryEntry,
   HomeFeed,
   LibrarySummary,
   PlaylistListItem,
-  Source,
   TrackListItem,
   and,
 } from '@mytube/shared';
@@ -32,8 +30,9 @@ import {
 } from '../src/database/schema.js';
 
 /*
- * The music read endpoints (artists, albums, playlists, one track), Preview's track stream and
- * Delete file, the music items of Home and the Music summary, against rows seeded straight into
+ * The music read endpoints (artists, albums, playlists, one track), the player's queues (a
+ * playlist's and an artist's tracks) and track stream, the music items of Home and the Music
+ * summary, against rows seeded straight into
  * the database and files in a temp MUSIC_DIR.
  */
 
@@ -308,6 +307,41 @@ describe('Music library (e2e)', () => {
     await request(server()).get('/api/library/playlists?library=video').expect(400);
   });
 
+  it('GET /api/library/playlists/:id/tracks lists the tracks on disk in playlist order', async () => {
+    const list = z
+      .array(TrackListItem)
+      .parse(
+        (await request(server()).get(`/api/library/playlists/${roadTrip}/tracks`).expect(200)).body,
+      );
+    // "gone" is missing: never in a queue.
+    expect(list.map((track) => track.id)).toEqual([ids.road, ids.two]);
+    expect(list[1]).toMatchObject({ album: { title: 'First Light' }, mimeType: 'audio/mp4' });
+    await request(server()).get('/api/library/playlists/9999/tracks').expect(404);
+    await request(server()).get('/api/library/playlists/abc/tracks').expect(400);
+  });
+
+  it('GET /api/library/artists/:id/tracks lists the tracks on disk in library order', async () => {
+    const list = z
+      .array(TrackListItem)
+      .parse(
+        (
+          await request(server())
+            .get(`/api/library/artists/${artistIds['Test Artist']}/tracks`)
+            .expect(200)
+        ).body,
+      );
+    // Newest album first, each by track number; wanted and skipped tracks are left out.
+    expect(list.map((track) => track.id)).toEqual([ids.one, ids.two, ids.single]);
+    const none = z
+      .array(TrackListItem)
+      .parse(
+        (await request(server()).get(`/api/library/artists/${artistIds['Other Artist']}/tracks`))
+          .body,
+      );
+    expect(none).toEqual([]);
+    await request(server()).get('/api/library/artists/9999/tracks').expect(404);
+  });
+
   it('GET /api/library/summary counts the music library', async () => {
     const summary = LibrarySummary.parse(
       (await request(server()).get('/api/library/summary').expect(200)).body,
@@ -383,7 +417,7 @@ describe('Music library (e2e)', () => {
     });
   });
 
-  describe('track stream and Delete file', () => {
+  describe('track stream', () => {
     it('streams the audio with range support and its content type', async () => {
       const whole = await request(server())
         .get(`/api/library/tracks/${ids.one}/stream`)
@@ -408,51 +442,11 @@ describe('Music library (e2e)', () => {
       writeFileSync(join(root, 'secret.m4a'), 'secret');
       db.update(tracks).set({ filePath: '../secret.m4a' }).where(eq(tracks.id, ids.two!)).run();
       await request(server()).get(`/api/library/tracks/${ids.two}/stream`).expect(403);
-      await request(server()).delete(`/api/library/tracks/${ids.two}/file`).expect(403);
       expect(existsSync(join(root, 'secret.m4a'))).toBe(true);
       db.update(tracks)
         .set({ filePath: 'Test Artist/First Light/02 Track two.m4a' })
         .where(eq(tracks.id, ids.two!))
         .run();
-    });
-
-    it('removes the file and its sidecars, marks the track deleted and records history', async () => {
-      file('Test Artist/First Light/01 Track one.lrc', 'lyrics');
-      await request(server()).delete(`/api/library/tracks/${ids.one}/file`).expect(204);
-      expect(existsSync(join(musicDir(), 'Test Artist/First Light/01 Track one.m4a'))).toBe(false);
-      expect(existsSync(join(musicDir(), 'Test Artist/First Light/01 Track one.lrc'))).toBe(false);
-      expect(existsSync(join(musicDir(), 'Test Artist/First Light/02 Track two.m4a'))).toBe(true);
-
-      const item = TrackListItem.parse(
-        (await request(server()).get(`/api/library/tracks/${ids.one}`)).body,
-      );
-      expect(item).toMatchObject({
-        status: 'skipped',
-        skipReason: 'deleted_by_user',
-        filePath: null,
-        mimeType: null,
-      });
-      const [latest] = z
-        .array(HistoryEntry)
-        .parse((await request(server()).get('/api/activity/history?limit=1')).body);
-      expect(latest).toMatchObject({
-        kind: 'music',
-        title: 'Track one',
-        result: 'removed',
-        details: 'deleted by user',
-      });
-      const source = Source.parse(
-        (await request(server()).get(`/api/sources/${artistSource}`)).body,
-      );
-      expect(source.sizeBytes).toBe(20);
-      // A deleted track leaves the album: 1 of 2 tracks on disk now, opening on track two.
-      const albumList = z
-        .array(AlbumListItem)
-        .parse((await request(server()).get('/api/library/albums')).body);
-      expect(albumList[0]).toMatchObject({ trackCount: 2, onDiskCount: 1, firstTrackId: ids.two });
-
-      await request(server()).delete(`/api/library/tracks/${ids.one}/file`).expect(409);
-      await request(server()).delete('/api/library/tracks/9999/file').expect(404);
     });
   });
 });
