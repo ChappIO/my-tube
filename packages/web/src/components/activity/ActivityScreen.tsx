@@ -1,4 +1,5 @@
 import { useCancelJob, useCheckAll, useHistory, useQueue, useRetryJob } from '../../api/activity';
+import { useSettings } from '../../api/settings';
 import { RefreshIcon } from '../icons';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
@@ -20,6 +21,8 @@ export function ActivityScreen() {
   const cancel = useCancelJob();
   const retry = useRetryJob();
   const checkAll = useCheckAll();
+  const settings = useSettings();
+  const cookiesSet = Boolean(settings.data?.network.cookiesFile);
 
   const pendingId = cancel.isPending
     ? cancel.variables
@@ -72,6 +75,7 @@ export function ActivityScreen() {
                 key={job.id}
                 job={job}
                 busy={pendingId === job.id}
+                cookiesSet={cookiesSet}
                 onCancel={(id) => cancel.mutate(id)}
                 onRetry={(id) => retry.mutate(id)}
               />

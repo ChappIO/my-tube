@@ -16,8 +16,9 @@ import {
 } from '../jobs/job-runner.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { networkOptions } from '../ytdlp/network.js';
-import { YtdlpError } from '../ytdlp/ytdlp-error.js';
-import { YtdlpRunner } from '../ytdlp/ytdlp-runner.js';
+import { noDownloadableFormat, YtdlpError } from '../ytdlp/ytdlp-error.js';
+import { YtdlpRunner, YtdlpSession } from '../ytdlp/ytdlp-runner.js';
+import { NO_DOWNLOADABLE_FORMAT, probeForDownload } from './probe.js';
 import {
   DownloadProgressTracker,
   isUnavailableReason,
@@ -43,8 +44,8 @@ const MEDIA_EXTENSIONS = new Set(['mkv', 'mp4', 'webm', 'm4a', 'mp3', 'opus', 'f
  *    time, and adds the size to its source.
  *
  * A failure puts the video back to `wanted` and rethrows (the worker retries). A video YouTube
- * refuses for good (removed, private, members-only) becomes `skipped` / `unavailable` and fails
- * the job at once. A cancel kills yt-dlp and removes partial files; a shutdown keeps them so the
+ * refuses for good (removed, private, members-only) or that has no downloadable format at all
+ * (`noDownloadableFormat`) becomes `skipped` / `unavailable` and fails the job at once. A cancel kills yt-dlp and removes partial files; a shutdown keeps them so the
  * next run resumes. Every yt-dlp run is logged to the job log.
  */
 @Injectable()
@@ -87,13 +88,22 @@ export class DownloadRunner implements JobRunner {
     const network = networkOptions(settings.network);
     const url = `https://www.youtube.com/watch?v=${video.youtubeId}`;
     const format = videoFormat(settings.video.quality, settings.video.container);
+    // Shared by the probe and the download: the cookie order and the one diagnostic listing.
+    const session = new YtdlpSession();
     this.setStatus(video.id, 'downloading');
     let target: string | null = null;
     try {
       // The same format selector as the download, so yt-dlp reports the streams it will fetch
       // and their sizes: the progress bar knows the whole download's size up front.
-      const info = await this.runner.metadata(url, { format, network, signal, log: log.line });
-      const entry = info.entries.find((item) => item.id === video.youtubeId) ?? info.entries[0];
+      // A probe that finds no format does not fail the job (`probeForDownload`).
+      const { info, sized } = await probeForDownload(this.runner, url, {
+        format,
+        network,
+        session,
+        signal,
+        log: log.line,
+      });
+      const entry = info?.entries.find((item) => item.id === video.youtubeId) ?? info?.entries[0];
       const title = entry?.title ?? video.title;
       const date = entry?.uploadDate ?? video.publishedAt?.slice(0, 10) ?? null;
       this.db
@@ -121,12 +131,13 @@ export class DownloadRunner implements JobRunner {
       mkdirSync(dirname(target), { recursive: true });
       log.line(`target ${target}.<ext>`);
 
+      // The probe's entry (with or without `-f`) carries the captions either way.
       const { skipped } = subtitleLanguages(settings.video, entry?.captions);
       if (skipped.length > 0) {
         log.line(`subtitles: no ${skipped.join(', ')} (only machine translations on YouTube)`);
       }
 
-      const tracker = new DownloadProgressTracker(entry?.expectedStreams);
+      const tracker = new DownloadProgressTracker(sized ? entry?.expectedStreams : undefined);
       progress(tracker.start());
       const result = await this.runner.download(
         url,
@@ -137,6 +148,7 @@ export class DownloadRunner implements JobRunner {
           mergeOutputFormat: settings.video.container,
           extraArgs: videoExtraArgs(settings.video, entry?.captions),
           network,
+          session,
           signal,
           log: log.line,
         },
@@ -180,7 +192,8 @@ export class DownloadRunner implements JobRunner {
         throw error;
       }
       const reason = error instanceof YtdlpError ? error.reason : null;
-      if (isUnavailableReason(reason)) {
+      const noFormat = noDownloadableFormat(error);
+      if (noFormat || isUnavailableReason(reason)) {
         this.db
           .update(videos)
           .set({
@@ -190,7 +203,7 @@ export class DownloadRunner implements JobRunner {
           })
           .where(eq(videos.id, video.id))
           .run();
-        throw new PermanentJobError(reason ?? message);
+        throw new PermanentJobError(noFormat ? NO_DOWNLOADABLE_FORMAT : (reason ?? message));
       }
       this.setStatus(video.id, 'wanted');
       throw error;

@@ -40,7 +40,14 @@ describe('TrackDownloadRunner (fake binary)', () => {
   });
 
   afterEach(() => {
-    for (const name of ['FAKE_YTDLP_FAIL', 'FAKE_YTDLP_DELAY_MS', 'FAKE_YTDLP_ARGS_FILE']) {
+    for (const name of [
+      'FAKE_YTDLP_FAIL',
+      'FAKE_YTDLP_DELAY_MS',
+      'FAKE_YTDLP_ARGS_FILE',
+      'FAKE_YTDLP_FORMAT_ERROR',
+      'FAKE_YTDLP_BOT_CHECK',
+      'FAKE_YTDLP_FORMATS',
+    ]) {
       delete process.env[name];
     }
     rmSync(root, { recursive: true, force: true });
@@ -304,6 +311,83 @@ describe('TrackDownloadRunner (fake binary)', () => {
     expect(row()).toMatchObject({ status: 'skipped', skipReason: 'unavailable' });
   });
 
+  describe('when no format is available', () => {
+    const DIAGNOSTIC = '--- formats (diagnostic) ---';
+
+    it('retries the size probe without -f and downloads', async () => {
+      const { runner, enqueue, row, logs } = setup();
+      process.env.FAKE_YTDLP_FORMAT_ERROR = 'probe';
+      const job = enqueue();
+      const { ctx, reports } = context();
+      const outcome = await runner.run(job, ctx);
+      expect(outcome?.result).toBe('done');
+      expect(row().status).toBe('on_disk');
+      // The probe without -f resolves yt-dlp's default selection: its sizes are not used.
+      expect(reports[0]).toEqual({});
+      const log = readFileSync(logs.path(job.id), 'utf8');
+      expect(count(log, DIAGNOSTIC)).toBe(1);
+      expect(log).toContain(
+        'size probe: no format matches -f bestaudio[ext=m4a]/bestaudio/best; probing again without -f (sizes unknown)',
+      );
+    });
+
+    it('runs every call without the cookies file when YouTube does not ask for it', async () => {
+      const { runner, enqueue, row, settings, args, logs } = setup();
+      settings.patch({ network: { cookiesFile: join(root, 'cookies.txt') } });
+      // A signed-in session would lose every format (the PO-token case): not used.
+      process.env.FAKE_YTDLP_FORMAT_ERROR = 'cookies';
+      const job = enqueue();
+      await runner.run(job, context().ctx);
+      expect(row().status).toBe('on_disk');
+      expect(args()).not.toContain('--cookies');
+      const log = readFileSync(logs.path(job.id), 'utf8');
+      expect(log).not.toContain('--cookies');
+      expect(count(log, 'yt-dlp: succeeded without cookies')).toBe(2);
+      expect(log).not.toContain(DIAGNOSTIC);
+    });
+
+    it('uses the cookies after a bot check, for the rest of the job', async () => {
+      const { runner, enqueue, row, settings, logs } = setup();
+      settings.patch({ network: { cookiesFile: join(root, 'cookies.txt') } });
+      process.env.FAKE_YTDLP_BOT_CHECK = '1';
+      const job = enqueue();
+      await runner.run(job, context().ctx);
+      expect(row().status).toBe('on_disk');
+      const log = readFileSync(logs.path(job.id), 'utf8');
+      expect(count(log, 'retrying with cookies: [youtube] trk00000001: Sign in to confirm')).toBe(
+        1,
+      );
+      expect(count(log, 'yt-dlp: succeeded with cookies')).toBe(2);
+    });
+
+    it('fails for good with no downloadable format when there is none at all', async () => {
+      const { runner, enqueue, row, logs } = setup();
+      process.env.FAKE_YTDLP_FORMAT_ERROR = 'always';
+      process.env.FAKE_YTDLP_FORMATS = 'none';
+      const job = enqueue();
+      const error = await runner.run(job, context().ctx).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(PermanentJobError);
+      expect(error).toMatchObject({ message: 'no downloadable format' });
+      expect(row()).toMatchObject({ status: 'skipped', skipReason: 'unavailable' });
+      const log = readFileSync(logs.path(job.id), 'utf8');
+      expect(count(log, DIAGNOSTIC)).toBe(1);
+      expect(log).toContain('No video formats found!');
+      expect(log).toContain(
+        'size probe: no format without -f either; downloading without the metadata',
+      );
+    });
+
+    it('stays retryable when formats exist or were skipped', async () => {
+      const { runner, enqueue, row } = setup();
+      process.env.FAKE_YTDLP_FORMAT_ERROR = 'always';
+      process.env.FAKE_YTDLP_FORMATS = 'storyboards';
+      const error = await runner.run(enqueue(), context().ctx).catch((e: unknown) => e);
+      expect(error).not.toBeInstanceOf(PermanentJobError);
+      expect(error).toMatchObject({ failure: 'format_unavailable' });
+      expect(row().status).toBe('wanted');
+    });
+  });
+
   it('cancels: removes the partial files and the source stream, keeps the track wanted', async () => {
     const { runner, enqueue, row, config } = setup();
     const folder = join(config.musicDir, 'Test Artist/First Light');
@@ -347,6 +431,10 @@ describe('TrackDownloadRunner (fake binary)', () => {
     ).rejects.toBeInstanceOf(PermanentJobError);
   });
 });
+
+function count(text: string, needle: string): number {
+  return text.split(needle).length - 1;
+}
 
 async function waitFor(check: () => boolean, timeoutMs = 5000): Promise<void> {
   const start = Date.now();

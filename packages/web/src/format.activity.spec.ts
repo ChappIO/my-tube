@@ -2,6 +2,7 @@ import type { Job } from '@mytube/shared';
 import { describe, expect, it } from 'vitest';
 import { summaryPollMs } from './api/activity';
 import {
+  errorHint,
   errorTail,
   formatElapsed,
   formatSpeed,
@@ -112,6 +113,17 @@ describe('queue rows', () => {
       'ERROR: [youtube] abc: Video unavailable',
     );
     expect(errorTail(null)).toBeNull();
+  });
+
+  it('hints at the cookies for a format error while a cookies file is set', () => {
+    const error =
+      'yt-dlp exited with 1: [youtube] abc: Requested format is not available. Use --list-formats for a list of available formats';
+    expect(errorHint(error, true)).toBe(
+      'Cookies may be the cause: try Remove in Settings → Advanced → Network → Cookies.',
+    );
+    expect(errorHint(error, false)).toBeNull();
+    expect(errorHint('yt-dlp exited with 1: [youtube] abc: Video unavailable', true)).toBeNull();
+    expect(errorHint(null, true)).toBeNull();
   });
 });
 

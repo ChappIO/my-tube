@@ -2,11 +2,19 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
 import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import { z } from 'zod';
-import { buildArgs, describeArgs, type DownloadArgs, type MetadataArgs } from './args.js';
+import {
+  buildArgs,
+  describeArgs,
+  withoutCookies,
+  type DownloadArgs,
+  type MetadataArgs,
+  type NetworkOptions,
+} from './args.js';
+import { countFormats, listingLogLines, type FormatListing } from './formats.js';
 import { parseSourceMetadata, type SourceMetadata } from './metadata.js';
 import { parseOutputLine, type DownloadProgress } from './progress.js';
 import { YTDLP_BINARY, type YtdlpBinaryLocator } from './ytdlp-binary.js';
-import { YtdlpError } from './ytdlp-error.js';
+import { cookiesMayHelp, isYtdlpFailure, YtdlpError } from './ytdlp-error.js';
 
 /**
  * Receives the full output of one yt-dlp run for a job log: first the command line (`$ …`,
@@ -15,10 +23,22 @@ import { YtdlpError } from './ytdlp-error.js';
  */
 export type YtdlpLogSink = (line: string) => void;
 
+/**
+ * What the calls of one job share (see `YtdlpRunner.withCookieFallback`): whether they start
+ * with the cookies file, and the diagnostic format listing, made at most once.
+ */
+export class YtdlpSession {
+  /** An earlier call needed the signed-in session, so later ones start with it. */
+  cookies = false;
+  listing: FormatListing | null = null;
+}
+
 interface CallOptions {
   signal?: AbortSignal;
   /** Job log sink; see `YtdlpLogSink`. */
   log?: YtdlpLogSink;
+  /** Shared by the calls of one job; a fresh one per call when omitted. */
+  session?: YtdlpSession;
 }
 
 export type MetadataOptions = Omit<MetadataArgs, 'url'> & CallOptions;
@@ -68,14 +88,134 @@ export class YtdlpRunner implements OnModuleDestroy {
     return version;
   }
 
-  /** Lists a channel, playlist or video without downloading anything. */
+  /**
+   * Runs one yt-dlp call in MyTube's cookie order. Without a cookies file in `network` it is
+   * just `call(network)`. With one:
+   *
+   * 1. The call runs **without** cookies first (a signed-in web session loses every format that
+   *    needs a GVS PO token, which yt-dlp cannot make), unless an earlier call of the same
+   *    `session` needed them, in which case it starts with them.
+   * 2. A bot check or a sign-in refusal (members-only, age, "use --cookies") → the same call
+   *    once **with** cookies (`retrying with cookies: <reason>`); the session then keeps them.
+   * 3. `Requested format is not available` while the cookies were on → the same call once
+   *    **without** them (`retrying without cookies: …`). If that passes, the cookies file is
+   *    named as the likely cause; if it hits a bot check, the original error stands.
+   *
+   * Every `Requested format is not available` gets the session's diagnostic listing
+   * (`listFormats`, once per session, written to the log) on `error.listing`. The log says which
+   * path succeeded.
+   */
+  async withCookieFallback<T>(
+    network: NetworkOptions | undefined,
+    call: (network: NetworkOptions | undefined) => Promise<T>,
+    options: CallOptions & { url: string },
+  ): Promise<T> {
+    const { log, signal, url } = options;
+    const session = options.session ?? new YtdlpSession();
+    const signedIn = network;
+    const signedOut = withoutCookies(network);
+    const attempt = async (withCookies: boolean): Promise<T> => {
+      const active = withCookies ? signedIn : signedOut;
+      try {
+        return await call(active);
+      } catch (error) {
+        if (isYtdlpFailure(error, 'format_unavailable')) {
+          session.listing ??= await this.diagnose(url, active, { signal, log });
+          error.listing = session.listing;
+        }
+        throw error;
+      }
+    };
+    if (!network?.cookiesFile) return attempt(false);
+
+    const first = session.cookies;
+    try {
+      const result = await attempt(first);
+      log?.(`yt-dlp: succeeded ${first ? 'with' : 'without'} cookies`);
+      return result;
+    } catch (error) {
+      if (!(error instanceof YtdlpError) || signal?.aborted) throw error;
+      if (!first && cookiesMayHelp(error.failure)) {
+        log?.(`retrying with cookies: ${error.reason ?? error.message}`);
+        const result = await attempt(true);
+        session.cookies = true;
+        log?.('yt-dlp: succeeded with cookies');
+        return result;
+      }
+      if (first && error.failure === 'format_unavailable') {
+        log?.('retrying without cookies: no downloadable format with the signed-in session');
+        try {
+          const result = await attempt(false);
+          session.cookies = false;
+          log?.(
+            'yt-dlp: succeeded without cookies; the cookies file is the likely cause of ' +
+              '"Requested format is not available"',
+          );
+          return result;
+        } catch (retryError) {
+          if (isYtdlpFailure(retryError, 'bot_check')) {
+            log?.('the retry without cookies hit a bot check; keeping the original error');
+            throw error;
+          }
+          throw retryError;
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * `yt-dlp -F <url>` with warnings on, for a job log: why no format matched. Never rejects
+   * (a failed listing is reported as `mediaFormats: null`), except when aborted.
+   */
+  async listFormats(
+    url: string,
+    options: { network?: NetworkOptions; signal?: AbortSignal } = {},
+  ): Promise<FormatListing> {
+    const lines: string[] = [];
+    try {
+      await this.run(buildArgs({ kind: 'formats', url, network: options.network }), {
+        signal: options.signal,
+        log: (line) => lines.push(line),
+      });
+    } catch (error) {
+      if (error instanceof YtdlpError && error.kind === 'aborted') throw error;
+      // The command, the output and `exit <code>` are in `lines` already, except for a spawn error.
+      if (error instanceof YtdlpError && error.kind === 'spawn') lines.push(error.message);
+    }
+    return {
+      lines,
+      ...countFormats(lines),
+      withCookies: Boolean(options.network?.cookiesFile),
+    };
+  }
+
+  private async diagnose(
+    url: string,
+    network: NetworkOptions | undefined,
+    options: CallOptions,
+  ): Promise<FormatListing> {
+    const listing = await this.listFormats(url, { network, signal: options.signal });
+    for (const line of listingLogLines(listing)) options.log?.(line);
+    return listing;
+  }
+
+  /**
+   * Lists a channel, playlist or video without downloading anything. Runs through
+   * `withCookieFallback`.
+   */
   async metadata(url: string, options: MetadataOptions = {}): Promise<SourceMetadata> {
-    const { signal, log, ...rest } = options;
-    const { stdout } = await this.run(buildArgs({ kind: 'metadata', url, ...rest }), {
-      signal,
-      log,
-      collectStdout: true,
-    });
+    const { signal, log, session, network, ...rest } = options;
+    const { stdout } = await this.withCookieFallback(
+      network,
+      (active) =>
+        this.run(buildArgs({ kind: 'metadata', url, ...rest, network: active }), {
+          signal,
+          log,
+          collectStdout: true,
+        }),
+      { url, signal, log, session },
+    );
     let json: unknown;
     try {
       json = JSON.parse(stdout);
@@ -101,17 +241,22 @@ export class YtdlpRunner implements OnModuleDestroy {
     options: DownloadOptions,
     onProgress?: (progress: DownloadProgress) => void,
   ): Promise<DownloadResult> {
-    const { signal, log, ...rest } = options;
+    const { signal, log, session, network, ...rest } = options;
     let filePath: string | null = null;
-    await this.run(buildArgs({ kind: 'download', url, ...rest }), {
-      signal,
-      log,
-      onLine: (line) => {
-        const parsed = parseOutputLine(line);
-        if (parsed.type === 'file') filePath = parsed.path;
-        else if (parsed.type === 'progress') onProgress?.(parsed.progress);
-      },
-    });
+    await this.withCookieFallback(
+      network,
+      (active) =>
+        this.run(buildArgs({ kind: 'download', url, ...rest, network: active }), {
+          signal,
+          log,
+          onLine: (line) => {
+            const parsed = parseOutputLine(line);
+            if (parsed.type === 'file') filePath = parsed.path;
+            else if (parsed.type === 'progress') onProgress?.(parsed.progress);
+          },
+        }),
+      { url, signal, log, session },
+    );
     if (!filePath) throw new YtdlpError('yt-dlp did not report a file path', 'output', 0, []);
     return { filePath };
   }

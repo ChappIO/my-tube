@@ -40,6 +40,7 @@ describe('DownloadRunner (fake binary)', () => {
       'FAKE_YTDLP_DELAY_MS',
       'FAKE_YTDLP_STDOUT',
       'FAKE_YTDLP_STREAMS',
+      'FAKE_YTDLP_FORMAT_ERROR',
     ]) {
       delete process.env[name];
     }
@@ -192,6 +193,25 @@ describe('DownloadRunner (fake binary)', () => {
     expect(log).toContain('[mytube-progress]');
     expect(log).toContain('subtitles: no nl (only machine translations on YouTube)');
     expect(log).toContain(`saved ${path} (10 bytes)`);
+  });
+
+  it('retries the size probe without -f and still narrows the subtitles to its captions', async () => {
+    const { runner, job, row, logs } = setup();
+    const argsFile = join(root, 'args.json');
+    process.env.FAKE_YTDLP_ARGS_FILE = argsFile;
+    process.env.FAKE_YTDLP_FORMAT_ERROR = 'probe';
+    const { ctx, reports } = context();
+    const outcome = await runner.run(job, ctx);
+    expect(outcome?.result).toBe('done');
+    expect(row().status).toBe('on_disk');
+    // Sizes unknown: the probe without -f resolved yt-dlp's default selection.
+    expect(reports[0]).toEqual({});
+    const args = z.array(z.string()).parse(JSON.parse(readFileSync(argsFile, 'utf8')));
+    expect(args[args.indexOf('--sub-langs') + 1]).toBe('en');
+    const log = readFileSync(logs.path(job.id), 'utf8');
+    expect(log.split('--- formats (diagnostic) ---')).toHaveLength(2);
+    expect(log).toContain('probing again without -f (sizes unknown)');
+    expect(log).toContain('subtitles: no nl (only machine translations on YouTube)');
   });
 
   it('marks a removed video unavailable and fails for good', async () => {
