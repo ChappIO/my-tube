@@ -11,6 +11,7 @@ import {
   setPlaying,
   usePlayerState,
 } from '../../player-state';
+import { connectAnalyser } from './useAnalyser';
 
 /** The bar's error line when a file does not load or decode. */
 export const PLAYBACK_ERROR = 'This file could not be played. Skipping.';
@@ -23,8 +24,8 @@ export const PLAYBACK_ERROR = 'This file could not be played. Skipping.';
  * next item after 2 s) and the end of an item (auto-advance through `next`). A pause from outside
  * the app (a headset unplugged) pauses the store too.
  *
- * Slice B hangs the visualizer's `AnalyserNode` on this element; slice C adds a `<video>`
- * engine beside it for `kind: 'video'`.
+ * Every play also calls `connectAnalyser` (the visualizer's `AnalyserNode`, built once on the
+ * first play from a user gesture); slice C adds a `<video>` engine beside it for `kind: 'video'`.
  */
 export function AudioEngine() {
   const ref = useRef<HTMLAudioElement>(null);
@@ -54,6 +55,8 @@ export function AudioEngine() {
     if (!audio || src === null) return;
     if (playing && audio.paused) {
       reportBuffering(audio.readyState < HTMLMediaElement.HAVE_FUTURE_DATA);
+      // The visualizer's analyser: built on the first play from a click, resumed on every play.
+      connectAnalyser(audio);
       audio.play().catch((reason: unknown) => {
         // A newer load interrupted this play (AbortError): the next effect plays again.
         if (reason instanceof DOMException && reason.name === 'NotAllowedError') setPlaying(false);

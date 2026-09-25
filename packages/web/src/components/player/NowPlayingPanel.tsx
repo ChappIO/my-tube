@@ -29,7 +29,7 @@ export function NowPlayingPanel({ item }: { item: PlayerItem }) {
             className="absolute -inset-10 size-[calc(100%+80px)] scale-110 object-cover blur-[40px] brightness-[0.45] saturate-[1.2]"
           />
         )}
-        <VisualizerCanvas className="absolute inset-0" />
+        <VisualizerCanvas artUrl={item.artUrl} className="absolute inset-0" />
         <div className="absolute inset-x-0 bottom-0 flex items-end gap-[18px] bg-linear-to-t from-player-fade-panel to-transparent px-5 pt-16 pb-5 text-white wide:px-7 wide:pb-6">
           <CoverLink item={item} />
           <div className="grid min-w-0 gap-1">
