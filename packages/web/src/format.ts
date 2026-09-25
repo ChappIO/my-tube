@@ -182,6 +182,20 @@ export function errorTail(error: string | null): string | null {
   return lines.at(-1)?.trim() || null;
 }
 
+/** The hint a failed queue row adds after `Requested format is not available` with cookies set. */
+export const COOKIES_FORMAT_HINT =
+  'Cookies may be the cause: try Remove in Settings → Advanced → Network → Cookies.';
+
+/**
+ * A muted hint after a failed job's error: for yt-dlp's `Requested format is not available`
+ * while a cookies file is set (a signed-in session loses formats without a PO token), the
+ * cookies hint. Null otherwise.
+ */
+export function errorHint(error: string | null, cookiesSet: boolean): string | null {
+  if (!cookiesSet || !error) return null;
+  return /requested format is not available/i.test(error) ? COOKIES_FORMAT_HINT : null;
+}
+
 function localDay(date: Date): number {
   return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY);
 }

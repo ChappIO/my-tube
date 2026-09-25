@@ -20,11 +20,12 @@ import { type TrackTags, ytdlpTagArgs } from '../metadata/ytdlp-tags.js';
 import { SettingsService } from '../settings/settings.service.js';
 import type { SourceEntry } from '../ytdlp/metadata.js';
 import { networkOptions } from '../ytdlp/network.js';
-import { YtdlpError } from '../ytdlp/ytdlp-error.js';
-import { YtdlpRunner } from '../ytdlp/ytdlp-runner.js';
+import { noDownloadableFormat, YtdlpError } from '../ytdlp/ytdlp-error.js';
+import { YtdlpRunner, YtdlpSession } from '../ytdlp/ytdlp-runner.js';
 import { insideLibrary } from './download.runner.js';
 import { audioFormat, musicExtraArgs } from './music-options.js';
 import { removePartials } from './partials.js';
+import { NO_DOWNLOADABLE_FORMAT, probeForDownload } from './probe.js';
 import { DownloadProgressTracker, isUnavailableReason } from './video-options.js';
 
 type TrackRow = typeof tracks.$inferSelect;
@@ -71,7 +72,8 @@ export function trackUrl(youtubeId: string): string {
  * 6. Marks the track `on_disk` with its path (relative to `MUSIC_DIR`), size and time, and adds
  *    the size to its source. History: `{ kind: 'music', result: 'done', details: path }`.
  *
- * Failures, unavailable tracks, cancels and shutdowns behave as for videos.
+ * Failures, unavailable tracks (and those with no downloadable format), cancels and shutdowns
+ * behave as for videos.
  */
 @Injectable()
 export class TrackDownloadRunner implements JobRunner {
@@ -106,11 +108,20 @@ export class TrackDownloadRunner implements JobRunner {
     this.setStatus(track.id, 'downloading');
     let target: string | null = null;
     const format = audioFormat(settings.music.container, settings.music.loudnessNormalization);
+    // Shared by the probe and the download: the cookie order and the one diagnostic listing.
+    const session = new YtdlpSession();
     try {
       // The same format selector as the download, so yt-dlp reports the stream it will fetch
-      // and its size: the progress bar knows the total from the start.
-      const info = await this.runner.metadata(url, { format, network, signal, log: log.line });
-      const entry = info.entries.find((item) => item.id === track.youtubeId) ?? info.entries[0];
+      // and its size: the progress bar knows the total from the start. A probe that finds no
+      // format does not fail the job (`probeForDownload`).
+      const { info, sized } = await probeForDownload(this.runner, url, {
+        format,
+        network,
+        session,
+        signal,
+        log: log.line,
+      });
+      const entry = info?.entries.find((item) => item.id === track.youtubeId) ?? info?.entries[0];
       const { current, album } = this.applyMetadata(track, entry, this.artistName(track.artistId));
       const artist = this.artistName(album?.artistId ?? current.artistId);
       const trackArtist = this.artistName(current.artistId);
@@ -142,7 +153,7 @@ export class TrackDownloadRunner implements JobRunner {
         year: values.year,
       };
       const embedCoverArt = this.embedCoverArt(current);
-      const tracker = new DownloadProgressTracker(entry?.expectedStreams);
+      const tracker = new DownloadProgressTracker(sized ? entry?.expectedStreams : undefined);
       progress(tracker.start());
       const result = await this.runner.download(
         url,
@@ -151,6 +162,7 @@ export class TrackDownloadRunner implements JobRunner {
           format,
           extraArgs: [...musicExtraArgs(settings.music), ...ytdlpTagArgs(tags, { embedCoverArt })],
           network,
+          session,
           signal,
           log: log.line,
         },
@@ -221,7 +233,8 @@ export class TrackDownloadRunner implements JobRunner {
         throw error;
       }
       const reason = error instanceof YtdlpError ? error.reason : null;
-      if (isUnavailableReason(reason)) {
+      const noFormat = noDownloadableFormat(error);
+      if (noFormat || isUnavailableReason(reason)) {
         this.db
           .update(tracks)
           .set({
@@ -231,7 +244,7 @@ export class TrackDownloadRunner implements JobRunner {
           })
           .where(eq(tracks.id, track.id))
           .run();
-        throw new PermanentJobError(reason ?? message);
+        throw new PermanentJobError(noFormat ? NO_DOWNLOADABLE_FORMAT : (reason ?? message));
       }
       this.setStatus(track.id, 'wanted');
       throw error;

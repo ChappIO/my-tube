@@ -1,5 +1,5 @@
 import type { Job } from '@mytube/shared';
-import { errorTail, queueMeta, queuePercent, queueState } from '../../format';
+import { errorHint, errorTail, queueMeta, queuePercent, queueState } from '../../format';
 import { openJobLog } from '../../ui-state';
 import { CloseIcon } from '../icons';
 import { IconButton } from '../ui/IconButton';
@@ -14,24 +14,28 @@ export interface QueueRowProps {
   onRetry: (id: number) => void;
   /** An action on this row is in flight. */
   busy?: boolean;
+  /** A cookies file is set (Settings → Network): a format error then gets the cookies hint. */
+  cookiesSet?: boolean;
 }
 
 /**
  * One queue row: title Archivo 600 15, meta Space Mono 12 muted, state Space
  * Mono 700 13 (`downloading 64%` red, `queued` muted), and a full-width 4px bar (`surface`
  * track, red fill). Also: a small × to cancel (or dismiss a failed row), on
- * failed rows the error's last line in red with Retry, after the download the post-processing
+ * failed rows the error's last line in red (then, muted, the cookies hint for a format error
+ * while a cookies file is set: `errorHint`) with Retry, after the download the post-processing
  * step as the state (`processing · merging`) while the bar runs from 90 to 99, and on running
  * and failed rows **View log**, which opens the log viewer (`openJobLog`, `LogViewerModal`,
  * live while the job runs). Queued rows have no log yet.
  */
-export function QueueRow({ job, onCancel, onRetry, busy }: QueueRowProps) {
+export function QueueRow({ job, onCancel, onRetry, busy, cookiesSet = false }: QueueRowProps) {
   const state = queueState(job);
   const percent = queuePercent(job);
   const meta = queueMeta(job);
   const failed = job.status === 'failed';
   const running = job.status === 'running';
   const error = failed ? errorTail(job.error) : null;
+  const hint = failed ? errorHint(job.error, cookiesSet) : null;
   const hasLog = running || failed;
   return (
     <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 rounded-tile border border-line px-4 py-[14px]">
@@ -49,6 +53,7 @@ export function QueueRow({ job, onCancel, onRetry, busy }: QueueRowProps) {
                 {error}
               </Meta>
             )}
+            {hint && <Meta className="min-w-0 break-words">{hint}</Meta>}
             {failed && (
               <ActivityLink onClick={() => onRetry(job.id)} disabled={busy}>
                 Retry

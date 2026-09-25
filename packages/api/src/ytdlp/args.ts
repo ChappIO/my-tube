@@ -44,8 +44,15 @@ export interface DownloadArgs {
   network?: NetworkOptions;
 }
 
+/** `-F` for one video: the diagnostic format table, warnings included. */
+export interface FormatsArgs {
+  url: string;
+  network?: NetworkOptions;
+}
+
 export type YtdlpCommand =
   | { kind: 'version' }
+  | ({ kind: 'formats' } & FormatsArgs)
   | ({ kind: 'metadata' } & MetadataArgs)
   | ({ kind: 'download' } & DownloadArgs);
 
@@ -105,12 +112,31 @@ export function networkArgs(network: NetworkOptions | undefined): string[] {
   return args;
 }
 
+/** `network` without the cookies file (a signed-out call); the same object when it has none. */
+export function withoutCookies(network: NetworkOptions | undefined): NetworkOptions | undefined {
+  if (!network?.cookiesFile) return network;
+  const { cookiesFile: _cookies, ...rest } = network;
+  return rest;
+}
+
 // Shared by every call: never read user or system config files (the container is the
 // only config), and never colour output we parse.
 const BASE_ARGS = ['--ignore-config', '--color', 'never'];
 
 export function buildArgs(command: YtdlpCommand): string[] {
   if (command.kind === 'version') return ['--version'];
+  if (command.kind === 'formats') {
+    // No `--no-warnings`: the warnings (formats skipped for want of a PO token, …) are the
+    // point of this call.
+    return [
+      ...BASE_ARGS,
+      '-F',
+      '--no-playlist',
+      ...networkArgs(command.network),
+      '--',
+      command.url,
+    ];
+  }
   if (command.kind === 'metadata') {
     const args = [
       ...BASE_ARGS,

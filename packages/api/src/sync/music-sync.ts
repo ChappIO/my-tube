@@ -171,6 +171,7 @@ export class MusicSync {
       const metadata = await this.runner.metadata(source.url, {
         limit,
         network,
+        session: ctx.session,
         signal: ctx.signal,
         log: ctx.log,
       });
@@ -192,6 +193,7 @@ export class MusicSync {
       const metadata = await this.runner.metadata(releasesUrl(source.youtubeId), {
         limit,
         network,
+        session: ctx.session,
         signal: ctx.signal,
         log: ctx.log,
       });
@@ -208,6 +210,7 @@ export class MusicSync {
       const metadata = await this.runner.metadata(uploadsUrl(source.youtubeId), {
         limit,
         network,
+        session: ctx.session,
         signal: ctx.signal,
         log: ctx.log,
       });
@@ -234,6 +237,7 @@ export class MusicSync {
         metadata = await this.runner.metadata(albumUrl(release.id), {
           limit: ALBUM_TRACK_LIMIT,
           network,
+          session: ctx.session,
           signal: ctx.signal,
           log: ctx.log,
         });

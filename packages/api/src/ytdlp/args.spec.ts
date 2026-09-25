@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildArgs, describeArgs, networkArgs } from './args.js';
+import { buildArgs, describeArgs, networkArgs, withoutCookies } from './args.js';
 
 describe('buildArgs', () => {
   it('builds the version call', () => {
@@ -125,6 +125,30 @@ describe('networkArgs', () => {
   it('is used by metadata calls too', () => {
     const args = buildArgs({ kind: 'metadata', url: 'u', network: { proxy: 'http://p:1' } });
     expect(args.slice(-4)).toEqual(['--proxy', 'http://p:1', '--', 'u']);
+  });
+
+  it('is used by the diagnostic format listing, which keeps the warnings', () => {
+    const args = buildArgs({ kind: 'formats', url: 'u', network: { cookiesFile: '/c.txt' } });
+    expect(args).toEqual([
+      '--ignore-config',
+      '--color',
+      'never',
+      '-F',
+      '--no-playlist',
+      '--cookies',
+      '/c.txt',
+      '--',
+      'u',
+    ]);
+  });
+
+  it('drops only the cookies for a signed-out call', () => {
+    expect(withoutCookies({ proxy: 'http://p:1', cookiesFile: '/c.txt' })).toEqual({
+      proxy: 'http://p:1',
+    });
+    const plain = { proxy: 'http://p:1' };
+    expect(withoutCookies(plain)).toBe(plain);
+    expect(withoutCookies(undefined)).toBeUndefined();
   });
 });
 

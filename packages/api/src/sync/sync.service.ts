@@ -8,7 +8,7 @@ import { JobsService } from '../jobs/jobs.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import type { SourceEntry, SourceMetadata } from '../ytdlp/metadata.js';
 import { networkOptions } from '../ytdlp/network.js';
-import { YtdlpRunner, type YtdlpLogSink } from '../ytdlp/ytdlp-runner.js';
+import { YtdlpRunner, YtdlpSession, type YtdlpLogSink } from '../ytdlp/ytdlp-runner.js';
 import { wantedElsewhere } from './claims.js';
 import { MusicSync } from './music-sync.js';
 import { entryContext, evaluateItem } from './rules.js';
@@ -32,6 +32,11 @@ export interface CheckContext {
   signal?: AbortSignal;
   /** Job log sink for the yt-dlp output. */
   log?: YtdlpLogSink;
+  /**
+   * Shared by every yt-dlp call of the check (`withCookieFallback`): once one call needed the
+   * cookies, the next ones start with them. `checkSource` makes one when omitted.
+   */
+  session?: YtdlpSession;
 }
 
 /** What one check found. */
@@ -140,7 +145,9 @@ export class SyncService {
   }
 
   /** Fetches, diffs and enqueues for one source. Throws `SourceGoneError` for a removed one. */
-  async checkSource(sourceId: number, ctx: CheckContext = {}): Promise<CheckResult> {
+  async checkSource(sourceId: number, options: CheckContext = {}): Promise<CheckResult> {
+    // One session for the whole check: an artist that needs cookies fails once, not per call.
+    const ctx: CheckContext = { ...options, session: options.session ?? new YtdlpSession() };
     const source = this.db.select().from(sources).where(eq(sources.id, sourceId)).get();
     if (!source) throw new SourceGoneError(`Source ${sourceId} no longer exists`);
 
@@ -167,6 +174,7 @@ export class SyncService {
     const metadata = await this.runner.metadata(source.url, {
       limit: source.lastCheckedAt === null ? FIRST_CHECK_LIMIT : CHECK_LIMIT,
       network: networkOptions(settings.network),
+      session: ctx.session,
       signal: ctx.signal,
       log: ctx.log,
     });

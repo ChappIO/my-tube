@@ -9,8 +9,8 @@ import { ConfigModule } from '../config/config.module.js';
 import { DatabaseModule } from '../database/database.module.js';
 import type { DownloadProgress } from './progress.js';
 import { YTDLP_BINARY, type YtdlpBinaryLocator } from './ytdlp-binary.js';
-import { YtdlpError } from './ytdlp-error.js';
-import { lineSplitter, YtdlpRunner } from './ytdlp-runner.js';
+import { noDownloadableFormat, YtdlpError } from './ytdlp-error.js';
+import { lineSplitter, YtdlpRunner, YtdlpSession } from './ytdlp-runner.js';
 import { YtdlpModule } from './ytdlp.module.js';
 
 const FAKE = join(import.meta.dirname, '../../test/fixtures/fake-yt-dlp');
@@ -22,6 +22,9 @@ const FAKE_ENV = [
   'FAKE_YTDLP_STDOUT',
   'FAKE_YTDLP_ARGS_FILE',
   'FAKE_YTDLP_VERSION',
+  'FAKE_YTDLP_FORMAT_ERROR',
+  'FAKE_YTDLP_BOT_CHECK',
+  'FAKE_YTDLP_FORMATS',
 ] as const;
 
 describe('YtdlpRunner (fake binary)', () => {
@@ -46,7 +49,7 @@ describe('YtdlpRunner (fake binary)', () => {
     await expect(runner.version()).resolves.toBe('2099.01.01');
   });
 
-  it('fetches channel metadata and passes network options', async () => {
+  it('fetches channel metadata and passes network options, cookies only when asked', async () => {
     process.env.FAKE_YTDLP_ARGS_FILE = join(dir, 'args.json');
     const source = await runner.metadata('https://www.youtube.com/@NASA', {
       limit: 5,
@@ -55,10 +58,19 @@ describe('YtdlpRunner (fake binary)', () => {
     expect(source.kind).toBe('channel');
     expect(source.entries).toHaveLength(9);
 
+    // The cookies file is not passed: no sign-in was asked for (see withCookieFallback).
     const args = receivedArgs();
     expect(args).toContain('--dump-single-json');
     expect(args.join(' ')).toContain(
-      '--playlist-items 1:5 --extractor-args youtubetab:approximate_date --limit-rate 1M --proxy http://proxy:3128 --cookies /c/cookies.txt -- https://www.youtube.com/@NASA',
+      '--playlist-items 1:5 --extractor-args youtubetab:approximate_date --limit-rate 1M --proxy http://proxy:3128 -- https://www.youtube.com/@NASA',
+    );
+
+    process.env.FAKE_YTDLP_BOT_CHECK = '1';
+    await runner.metadata('https://www.youtube.com/@NASA', {
+      network: { proxy: 'http://proxy:3128', cookiesFile: '/c/cookies.txt' },
+    });
+    expect(receivedArgs().join(' ')).toContain(
+      '--proxy http://proxy:3128 --cookies /c/cookies.txt -- https://www.youtube.com/@NASA',
     );
   });
 
@@ -157,6 +169,128 @@ describe('YtdlpRunner (fake binary)', () => {
       runner.metadata('https://www.youtube.com/@NASA', { signal: AbortSignal.abort() }),
     ).rejects.toMatchObject({ kind: 'aborted' });
     expect(existsSync(join(dir, 'args.json'))).toBe(false);
+  });
+});
+
+describe('YtdlpRunner cookie order and format diagnostics (fake binary)', () => {
+  const TRACK = 'https://music.youtube.com/watch?v=trk00000001';
+  const COOKIES = { cookiesFile: '/c/cookies.txt' };
+  let dir: string;
+  let runner: YtdlpRunner;
+  let log: string[];
+  const sink = (line: string) => log.push(line);
+  const headers = () => log.filter((line) => line === '--- formats (diagnostic) ---').length;
+  const commands = () => log.filter((line) => line.startsWith('$ '));
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'mytube-ytdlp-cookies-'));
+    runner = new YtdlpRunner({ path: () => FAKE });
+    log = [];
+  });
+
+  afterEach(() => {
+    for (const key of FAKE_ENV) delete process.env[key];
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('runs without cookies first and retries with them on a bot check', async () => {
+    process.env.FAKE_YTDLP_BOT_CHECK = '1';
+    const session = new YtdlpSession();
+    const info = await runner.metadata(TRACK, { network: COOKIES, session, log: sink });
+    expect(info.entries[0]?.id).toBe('trk00000001');
+    const [first, second] = commands();
+    expect(first).not.toContain('--cookies');
+    expect(second).toContain('--cookies <redacted>');
+    expect(log).toContainEqual(
+      expect.stringMatching(/^retrying with cookies: \[youtube\] trk00000001: Sign in to confirm/),
+    );
+    expect(log).toContain('yt-dlp: succeeded with cookies');
+    // The session remembers: the next call of the job starts with the cookies.
+    expect(session.cookies).toBe(true);
+    log = [];
+    await runner.metadata(TRACK, { network: COOKIES, session, log: sink });
+    expect(commands()).toHaveLength(1);
+    expect(commands()[0]).toContain('--cookies <redacted>');
+  });
+
+  it('does not retry without a cookies file', async () => {
+    process.env.FAKE_YTDLP_BOT_CHECK = '1';
+    const error = await runner.metadata(TRACK, { log: sink }).catch((e: unknown) => e);
+    expect(error).toMatchObject({ failure: 'bot_check' });
+    expect(commands()).toHaveLength(1);
+  });
+
+  it('drops the cookies when the signed-in session has no format, and names them', async () => {
+    process.env.FAKE_YTDLP_FORMAT_ERROR = 'cookies';
+    process.env.FAKE_YTDLP_FORMATS = 'storyboards';
+    const session = new YtdlpSession();
+    session.cookies = true;
+    const info = await runner.metadata(TRACK, {
+      format: 'bestaudio',
+      network: COOKIES,
+      session,
+      log: sink,
+    });
+    expect(info.entries).toHaveLength(1);
+    expect(session.cookies).toBe(false);
+    expect(log).toContain(
+      'retrying without cookies: no downloadable format with the signed-in session',
+    );
+    expect(log).toContainEqual(expect.stringContaining('the cookies file is the likely cause'));
+    // One diagnostic listing, with the same network options, warnings on.
+    expect(headers()).toBe(1);
+    const listing = commands().find((line) => line.includes(' -F '));
+    expect(listing).toContain('--cookies <redacted>');
+    expect(listing).not.toContain('--no-warnings');
+    expect(log).toContainEqual(expect.stringContaining('Some web client https formats'));
+    expect(log).toContain(
+      '--- end of formats (diagnostic): 0 downloadable formats (and 2 storyboards), with cookies ---',
+    );
+  });
+
+  it('keeps the original error when the retry without cookies hits a bot check', async () => {
+    process.env.FAKE_YTDLP_FORMAT_ERROR = 'cookies';
+    process.env.FAKE_YTDLP_BOT_CHECK = '1';
+    const session = new YtdlpSession();
+    session.cookies = true;
+    const error = await runner
+      .metadata(TRACK, { network: COOKIES, session, log: sink })
+      .catch((e: unknown) => e);
+    expect(error).toMatchObject({ failure: 'format_unavailable' });
+    expect(noDownloadableFormat(error)).toBe(false);
+    // Both diagnostics stay in the log: the listing and the bot check of the retry.
+    expect(headers()).toBe(1);
+    expect(log).toContainEqual(expect.stringContaining('Sign in to confirm you'));
+    expect(log).toContain('the retry without cookies hit a bot check; keeping the original error');
+  });
+
+  it('lists the formats once per session and attaches the listing to every format error', async () => {
+    process.env.FAKE_YTDLP_FORMAT_ERROR = 'always';
+    process.env.FAKE_YTDLP_FORMATS = 'none';
+    const session = new YtdlpSession();
+    const first = await runner
+      .metadata(TRACK, { format: 'bestaudio', session, log: sink })
+      .catch((e: unknown) => e);
+    const second = await runner
+      .download(TRACK, { output: join(dir, '%(id)s.%(ext)s'), session, log: sink })
+      .catch((e: unknown) => e);
+    expect(headers()).toBe(1);
+    for (const error of [first, second]) {
+      if (!(error instanceof YtdlpError)) throw error;
+      expect(error.listing).toMatchObject({ mediaFormats: 0, withCookies: false });
+      expect(noDownloadableFormat(error)).toBe(true);
+    }
+    expect(log).toContain(
+      '--- end of formats (diagnostic): 0 downloadable formats, without cookies ---',
+    );
+  });
+
+  it('keeps a missed selector retryable when formats exist', async () => {
+    process.env.FAKE_YTDLP_FORMAT_ERROR = 'always';
+    const error = await runner.metadata(TRACK, { log: sink }).catch((e: unknown) => e);
+    if (!(error instanceof YtdlpError)) throw error;
+    expect(error.listing?.mediaFormats).toBe(3);
+    expect(noDownloadableFormat(error)).toBe(false);
   });
 });
 

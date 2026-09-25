@@ -184,6 +184,7 @@ describe('MusicSync (fake binary)', () => {
 
   afterEach(() => {
     delete process.env.FAKE_YTDLP_NO_RELEASES;
+    delete process.env.FAKE_YTDLP_BOT_CHECK;
     if (root) rmSync(root, { recursive: true, force: true });
     root = null;
   });
@@ -235,6 +236,27 @@ describe('MusicSync (fake binary)', () => {
     expect(
       lines.some((line) => line.includes('music.youtube.com/playlist?list=OLAK5uy_album1')),
     ).toBe(true);
+  });
+
+  it('keeps the cookies for the rest of a check once a bot check asked for them', async () => {
+    const { sync, addArtist, settings } = setup();
+    settings.patch({ network: { cookiesFile: '/config/cookies.txt' } });
+    process.env.FAKE_YTDLP_BOT_CHECK = '1';
+    const source = addArtist();
+    const lines: string[] = [];
+    const result = await sync.checkSource(source.id, { log: (line) => lines.push(line) });
+    expect(result.synced).toBe(true);
+    const commands = lines.filter((line) => line.startsWith('$ '));
+    // The releases listing: without cookies, the bot check, then with them.
+    expect(commands[0]).toContain('/releases');
+    expect(commands[0]).not.toContain('--cookies');
+    expect(commands[1]).toContain('/releases');
+    expect(commands[1]).toContain('--cookies <redacted>');
+    // Every album listing after it starts with the cookies: no second retry.
+    const albums = commands.slice(2);
+    expect(albums.length).toBeGreaterThan(1);
+    for (const command of albums) expect(command).toContain('--cookies <redacted>');
+    expect(lines.filter((line) => line.startsWith('retrying with cookies:'))).toHaveLength(1);
   });
 
   it('fetches only new releases on later checks', async () => {
