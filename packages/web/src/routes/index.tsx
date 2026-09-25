@@ -1,8 +1,4 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { PlaceholderPage } from '../components/PlaceholderPage';
+import { HomeScreen } from '../components/library/HomeScreen';
 
-export const Route = createFileRoute('/')({ component: HomePage });
-
-function HomePage() {
-  return <PlaceholderPage title="What's new" sub="Across music and video, newest first." />;
-}
+export const Route = createFileRoute('/')({ component: HomeScreen });

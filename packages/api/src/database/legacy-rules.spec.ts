@@ -93,7 +93,8 @@ describe('matcher rules migration', () => {
     setting('music.skipLiveRecordings', true);
     setting('general.theme', 'dark');
 
-    expect(upgrade().applied).toEqual([
+    // Later migrations follow these two; only the order of the 3b pair matters here.
+    expect(upgrade().applied.slice(0, 2)).toEqual([
       '20260926090000_matcher_rules.sql',
       '20260926090100_drop_sources_rules.sql',
     ]);

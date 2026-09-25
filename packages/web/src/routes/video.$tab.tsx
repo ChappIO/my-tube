@@ -1,10 +1,10 @@
 import { createFileRoute, linkOptions, redirect } from '@tanstack/react-router';
-import { useSources } from '../api/sources';
+import { useLibrarySummary } from '../api/library';
+import { VideosTab } from '../components/library/VideosTab';
 import { ChannelsTab } from '../components/sources/ChannelsTab';
 import { videoLibrarySummary } from '../components/sources/source-text';
 import { PageHeader } from '../components/ui/PageHeader';
 import { TabPillLinks } from '../components/ui/TabPills';
-import { Body } from '../components/ui/typography';
 import {
   DEFAULT_VIDEO_TAB,
   TAB_ICONS,
@@ -38,16 +38,15 @@ export const Route = createFileRoute('/video/$tab')({
 
 function VideoPage() {
   const { tab } = Route.useParams();
-  const sources = useSources('video');
+  const summary = useLibrarySummary();
   return (
     <>
       <PageHeader
         title="Video"
-        sub={sources.data ? videoLibrarySummary(sources.data) : undefined}
+        sub={summary.data ? videoLibrarySummary(summary.data.videos) : undefined}
         actions={<TabPillLinks label="Video view" items={videoTabItems} value={tab} />}
       />
-      {/* The Videos grid arrives in Stage 5. */}
-      {tab === 'channels' ? <ChannelsTab /> : <Body muted>Nothing downloaded yet.</Body>}
+      {tab === 'channels' ? <ChannelsTab /> : <VideosTab />}
     </>
   );
 }

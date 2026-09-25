@@ -380,7 +380,8 @@ type VideoStatus = (typeof videos.$inferSelect)['status'];
 
 /**
  * The status of a known video after a check. Items on disk, downloading or missing are never
- * changed by a check; `unavailable` (a removed video) waits for an explicit retry.
+ * changed by a check; `unavailable` (a removed video) waits for an explicit retry, and a file
+ * deleted in Preview (`deleted_by_user`) is never downloaded again by a check.
  */
 export function nextStatus(
   current: VideoStatus,
@@ -390,7 +391,10 @@ export function nextStatus(
   if (current === 'on_disk' || current === 'downloading' || current === 'missing') {
     return { status: current, skipReason };
   }
-  if (current === 'skipped' && skipReason === 'unavailable') return { status: current, skipReason };
+  // A removed video waits for an explicit retry; a file the user deleted stays deleted.
+  if (current === 'skipped' && (skipReason === 'unavailable' || skipReason === 'deleted_by_user')) {
+    return { status: current, skipReason };
+  }
   if (verdict.accept) return { status: 'wanted', skipReason: null };
   return { status: 'skipped', skipReason: verdict.reason };
 }

@@ -284,3 +284,24 @@ export interface JobPayload {
   historyKind?: HistoryKind;
   [field: string]: unknown;
 }
+
+/**
+ * The artwork cache's bookkeeping (migration 20260927090000_artwork_cache). One row per cached
+ * file under `CONFIG_DIR/cache/artwork`; owned by `ArtworkService`.
+ */
+export const artworkCache = sqliteTable(
+  'artwork_cache',
+  {
+    /** `<kind>/<row id>`. */
+    key: text('key').primaryKey(),
+    sourceUrl: text('source_url').notNull(),
+    /** Relative to `cache/artwork`. */
+    file: text('file').notNull(),
+    contentType: text('content_type').notNull(),
+    etag: text('etag'),
+    size: integer('size').notNull(),
+    fetchedAt: text('fetched_at').notNull().default(now),
+    usedAt: text('used_at').notNull().default(now),
+  },
+  (table) => [index('artwork_cache_used_at').on(table.usedAt)],
+);

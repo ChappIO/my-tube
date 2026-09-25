@@ -17,6 +17,8 @@ const colors = [
   { name: 'white', light: '#FFFFFF', dark: '#FFFFFF', use: 'text and glyphs on red' },
   { name: 'scrim', light: 'ink @ 0.45', dark: 'ink @ 0.45', use: 'modal overlay' },
   { name: 'scrim-strong', light: 'ink @ 0.7', dark: 'ink @ 0.7', use: 'preview overlay' },
+  { name: 'player', light: '#0F1012', dark: '#0F1012', use: 'preview player area' },
+  { name: 'player-glyph', light: 'white @ 0.12', dark: 'white @ 0.12', use: 'preview play circle' },
 ] as const;
 
 const motions = [
