@@ -1,5 +1,6 @@
 import {
   type CreateSource,
+  Job,
   type Library,
   type Matcher,
   ResolvedSource,
@@ -156,6 +157,18 @@ export function useSetSubscribed() {
       if (queryClient.isMutating({ mutationKey: subscribeMutationKey }) > 1) return;
       writeSource(queryClient, source);
     },
+  });
+}
+
+/**
+ * Checks one source for new content now (`POST /api/sources/:id/check`, 202 with the job): the
+ * album page's Check for changes. Refreshes the Activity queue and badge.
+ */
+export function useCheckSource() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => apiPost(`/api/sources/${id}/check`, undefined, Job),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['activity'] }),
   });
 }
 

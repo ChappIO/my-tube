@@ -1,3 +1,4 @@
+import { Link, type LinkOptions } from '@tanstack/react-router';
 import type { KeyboardEvent } from 'react';
 import { BellIcon } from '../icons';
 import { cx, focusRing } from '../ui/cx';
@@ -22,8 +23,13 @@ export interface MusicTileProps {
   covers?: readonly string[];
   /** Placeholder seed when there is no art. */
   seed?: string;
-  /** Opens the item. */
+  /** Opens the item (Preview). */
   onOpen?: () => void;
+  /**
+   * The item's page, built with `linkOptions` (albums: the album page). The tile renders as a
+   * link instead of a button; `onOpen` is ignored.
+   */
+  link?: LinkOptions;
   /** Layout placement only. */
   className?: string;
 }
@@ -43,6 +49,7 @@ export function MusicTile({
   covers,
   seed,
   onOpen,
+  link,
   className,
 }: MusicTileProps) {
   const artist = kind === 'artist';
@@ -55,22 +62,16 @@ export function MusicTile({
     }
   }
 
-  // Without `onOpen` (artists: there is no artist page) the tile is plain content, not a button.
-  const interactive = onOpen !== undefined;
-  return (
-    <div
-      role={interactive ? 'button' : undefined}
-      tabIndex={interactive ? 0 : undefined}
-      onClick={onOpen}
-      onKeyDown={interactive ? handleKeyDown : undefined}
-      className={cx(
-        'grid min-w-0 content-start gap-3 rounded-card hover:scale-[1.03] hover:bg-surface',
-        'motion-tile',
-        interactive && cx('cursor-pointer', focusRing),
-        artist ? 'p-3 text-center' : 'p-2.5 text-left',
-        className,
-      )}
-    >
+  const tileClass = (interactive: boolean) =>
+    cx(
+      'grid min-w-0 content-start gap-3 rounded-card hover:scale-[1.03] hover:bg-surface',
+      'motion-tile',
+      interactive && cx('cursor-pointer', focusRing),
+      artist ? 'p-3 text-center' : 'p-2.5 text-left',
+      className,
+    );
+  const content = (
+    <>
       <div className="relative">
         {kind === 'playlist' ? (
           <PlaylistStack covers={covers} seed={seed} />
@@ -90,6 +91,29 @@ export function MusicTile({
           </div>
         )}
       </div>
+    </>
+  );
+
+  // With `link` the tile is a link to a page (albums open the album page).
+  if (link) {
+    return (
+      <Link {...link} className={tileClass(true)}>
+        {content}
+      </Link>
+    );
+  }
+
+  // Without `onOpen` (artists: there is no artist page) the tile is plain content, not a button.
+  const interactive = onOpen !== undefined;
+  return (
+    <div
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onClick={onOpen}
+      onKeyDown={interactive ? handleKeyDown : undefined}
+      className={tileClass(interactive)}
+    >
+      {content}
     </div>
   );
 }

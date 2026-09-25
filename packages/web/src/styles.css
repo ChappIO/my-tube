@@ -191,6 +191,18 @@
   }
 }
 
+/* The album page's title next to the large cover. */
+@utility text-display {
+  font-family: var(--font-sans);
+  font-size: 48px;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  @media (width < 760px) {
+    font-size: 32px;
+  }
+}
+
 @utility text-modal-title {
   font-family: var(--font-sans);
   font-size: 22px;

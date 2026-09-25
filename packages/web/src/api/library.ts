@@ -1,7 +1,9 @@
 import {
+  AlbumDetail,
   AlbumListItem,
   ArtistListItem,
   type ArtworkKind,
+  DownloadMissingResult,
   HomeFeed,
   LibrarySummary,
   PlaylistListItem,
@@ -24,7 +26,7 @@ import {
 import { useEffect, useRef } from 'react';
 import { z } from 'zod';
 import { useActivitySummary } from './activity';
-import { ApiError, apiDelete, apiGet } from './client';
+import { ApiError, apiDelete, apiGet, apiPost } from './client';
 
 /*
  * The library read models (`/api/library/*`, backend skill "Library"): the videos grid, the
@@ -44,6 +46,7 @@ export const libraryKeys = {
   summary: ['library', 'summary'] as const,
   artists: ['library', 'artists'] as const,
   albums: (artistId: number | undefined) => ['library', 'albums', artistId ?? 'all'] as const,
+  album: (id: number) => ['library', 'album', id] as const,
   playlists: ['library', 'playlists'] as const,
   track: (id: number) => ['library', 'track', id] as const,
   tracks: (filter: TrackFilterState) => ['library', 'tracks', filter] as const,
@@ -166,6 +169,35 @@ export function useAlbums(artistId?: number) {
         artistId === undefined ? '/api/library/albums' : `/api/library/albums?artistId=${artistId}`,
         z.array(AlbumListItem),
       ),
+  });
+}
+
+/**
+ * The album page (`GET /api/library/albums/:id`). A 404 is not retried; ids below 1 never fetch.
+ * It refreshes with the rest of `['library']` when a download finishes.
+ */
+export function useAlbum(id: number) {
+  return useQuery({
+    queryKey: libraryKeys.album(id),
+    enabled: id > 0,
+    queryFn: () => apiGet(`/api/library/albums/${id}`, AlbumDetail),
+    retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 2,
+  });
+}
+
+/**
+ * Download missing on the album page (`POST /api/library/albums/:id/download-missing`, 202
+ * `{ queued }`). Afterwards the album (its queued count) and the Activity badge refresh.
+ */
+export function useDownloadMissing() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (albumId: number) =>
+      apiPost(`/api/library/albums/${albumId}/download-missing`, undefined, DownloadMissingResult),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: libraryKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ['activity'] });
+    },
   });
 }
 

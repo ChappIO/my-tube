@@ -19,6 +19,11 @@ export function PageTitle({ as: Tag = 'h1', className, ...props }: TextProps) {
   return <Tag className={cx('text-h1', className)} {...props} />;
 }
 
+/** Display title (h1) of a detail page with large art (the album page): Archivo 800, 48px, 32px narrow. */
+export function DisplayTitle({ as: Tag = 'h1', className, ...props }: TextProps) {
+  return <Tag className={cx('text-display', className)} {...props} />;
+}
+
 /** Modal title: Archivo 800, 22px. */
 export function ModalTitle({ as: Tag = 'h2', className, ...props }: TextProps) {
   return <Tag className={cx('text-modal-title', className)} {...props} />;
