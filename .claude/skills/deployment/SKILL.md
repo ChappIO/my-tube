@@ -42,7 +42,7 @@ What lives in `/config` (user docs: `README.md`, "Where things are"):
 
 The entrypoint only chowns `/config`. Media mounts are left alone because they can be huge and belong to the host user.
 
-yt-dlp is not in the image. The app downloads it into `/config` on first boot and updates it on a schedule, so the image does not need rebuilding when yt-dlp changes.
+yt-dlp is not in the image. The app downloads it into `/config` on first boot and updates it on a schedule, so the image does not need rebuilding when yt-dlp changes. Its JavaScript runtime (needed for YouTube extraction) is the image's own Node: the runner passes `--js-runtimes node:<process.execPath>`, so no deno is installed.
 
 ## Local run
 
