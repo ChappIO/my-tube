@@ -7,3 +7,4 @@ node_modules
 **/dist
 docker-compose.yml
 *.md
+docs

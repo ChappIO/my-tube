@@ -13,6 +13,8 @@ MyTube is a pnpm workspace. Node and pnpm versions are pinned; use nvm (`.nvmrc`
 | `@mytube/api`    | `packages/api`    | NestJS backend. Serves `/api/*` and, in production, the built web app.  | backend           |
 | `@mytube/web`    | `packages/web`    | Vite + React SPA.                                                       | frontend          |
 
+`docs/` is not a package: it holds the logo and screenshots the root `README.md` embeds (deployment skill, "README assets").
+
 ## Commands (run from the repo root)
 
 - `pnpm dev`: runs `scripts/dev.mjs`, which builds shared once, then runs shared (`tsc --watch`), api (`nest start --watch`) and web (Vite, proxies `/api` to the api) with prefixed output, and prints the URLs. Ctrl-C stops all three. If one process exits, the others are stopped too. Open http://localhost:5173.

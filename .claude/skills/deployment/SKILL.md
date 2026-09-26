@@ -40,6 +40,10 @@ What lives in `/config` (user docs: `README.md`, "Where things are"):
 
 `TZ` sets the container's time zone, which the nightly backup (04:00) and rescan (04:30) follow; without it they run in UTC. `README.md` at the repository root is the user-facing install guide (compose example, mounts, PUID/PGID, no-authentication note, restore, update); keep it in step with this skill.
 
+## README assets
+
+`docs/` holds what the README embeds: `logo.svg` (the 96px mark, values from `geometry.ts`), `logo-light.png` and `logo-dark.png` (the mark beside the Archivo wordmark, rendered at 3x with a transparent background, swapped with `<picture>` for the reader's colour scheme) and `screenshots/` (2x PNGs of the app at 1440 × 900, compressed with pngquant). The screenshots come from a seeded demo library with fictional channels, artists and albums; the README says so. To refresh them, seed a dev stack with plenty of content (sources, albums, tracks, videos, a few running and queued jobs, history) and capture the same screens at the same size, light and dark for Home and Now Playing. `docs/` is excluded from the Docker build context (`.dockerignore`).
+
 The entrypoint only chowns `/config`. Media mounts are left alone because they can be huge and belong to the host user.
 
 yt-dlp is not in the image. The app downloads it into `/config` on first boot and updates it on a schedule, so the image does not need rebuilding when yt-dlp changes.
