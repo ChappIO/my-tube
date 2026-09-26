@@ -12,6 +12,7 @@ import {
   usePlayerState,
 } from '../../player-state';
 import { analyserOutput, applyAudioVolume } from './audio-output';
+import { resumeMedia } from './resume';
 import { connectAnalyser } from './useAnalyser';
 
 /** The bar's error line when a file does not load or decode. */
@@ -35,20 +36,39 @@ export function AudioEngine() {
   const item = currentItem(player);
   const src = item?.kind === 'music' ? item.fileUrl : null;
   const playing = player?.playing ?? false;
+  // Until the restore's seek is done the element's clock (0) is not the position.
+  const seekPending = useRef(false);
 
   // A new queue, jump, next or prev: (re)load from the start. Setting `src` runs the element's
   // load algorithm even when the URL is the same, so replaying an item restarts it.
   useEffect(() => {
     const audio = ref.current;
-    if (!audio) return;
+    if (!audio) return undefined;
     if (src === null) {
       audio.pause();
       audio.removeAttribute('src');
       audio.load();
-      return;
+      return undefined;
     }
+    // A restored session's load: loaded paused at the saved position (see `resumeMedia`).
+    const { resume } = playerState();
+    const resuming = resume !== null && resume.load === load ? resume : null;
+    audio.preload = resuming ? 'metadata' : 'auto';
     audio.src = src;
     applyAudioVolume(audio, playerState(), analyserOutput);
+    if (!resuming) {
+      seekPending.current = false;
+      return undefined;
+    }
+    seekPending.current = true;
+    return resumeMedia(audio, {
+      seekTo: () => playerState().player?.pos ?? null,
+      autoplay: resuming.autoplay,
+      current: () => playerState().load === load,
+      onReady: () => {
+        seekPending.current = false;
+      },
+    });
     // `load` is the trigger: it bumps when the same URL has to start over.
     // oxlint-disable-next-line react/exhaustive-effect-dependencies
   }, [load, src]);
@@ -102,7 +122,9 @@ export function AudioEngine() {
       preload="auto"
       aria-hidden="true"
       className="hidden"
-      onTimeUpdate={(event) => reportPosition(event.currentTarget.currentTime)}
+      onTimeUpdate={(event) => {
+        if (!seekPending.current) reportPosition(event.currentTarget.currentTime);
+      }}
       onDurationChange={(event) => reportDuration(event.currentTarget.duration)}
       onWaiting={() => reportBuffering(true)}
       onPlaying={() => {

@@ -3,6 +3,7 @@ import { RouterProvider, createRouter } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouteError } from './components/shell/RouteError';
+import { restorePlayerSession, startPlayerSessionPersistence } from './player-session';
 import { routeTree } from './routeTree.gen';
 import '@fontsource-variable/archivo/wght.css';
 import '@fontsource/space-mono/400.css';
@@ -10,6 +11,10 @@ import '@fontsource/space-mono/700.css';
 import './styles.css';
 
 const queryClient = new QueryClient();
+
+// A reload picks up the player where it was (paused), before the shell renders the bar.
+restorePlayerSession();
+startPlayerSessionPersistence();
 
 const router = createRouter({
   routeTree,
