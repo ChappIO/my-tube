@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildArgs, describeArgs, networkArgs, withoutCookies } from './args.js';
+import { buildArgs, describeArgs, JS_RUNTIME_ARG, networkArgs, withoutCookies } from './args.js';
 
 describe('buildArgs', () => {
   it('builds the version call', () => {
@@ -12,6 +12,8 @@ describe('buildArgs', () => {
       '--ignore-config',
       '--color',
       'never',
+      '--js-runtimes',
+      JS_RUNTIME_ARG,
       '--dump-single-json',
       '--flat-playlist',
       '--skip-download',
@@ -64,6 +66,8 @@ describe('buildArgs', () => {
       '--ignore-config',
       '--color',
       'never',
+      '--js-runtimes',
+      JS_RUNTIME_ARG,
       '--no-playlist',
       '--newline',
       '--progress',
@@ -133,6 +137,8 @@ describe('networkArgs', () => {
       '--ignore-config',
       '--color',
       'never',
+      '--js-runtimes',
+      JS_RUNTIME_ARG,
       '-F',
       '--no-playlist',
       '--cookies',

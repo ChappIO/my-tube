@@ -3,7 +3,7 @@ import { countFormats, LISTING_MAX_LINES, listingLogLines } from './formats.js';
 
 // `yt-dlp -F` output shapes (2026.08.19, --color never).
 const TABLE = [
-  '$ yt-dlp --ignore-config --color never -F --no-playlist -- https://music.youtube.com/watch?v=x',
+  '$ yt-dlp --ignore-config --color never --js-runtimes node:/usr/local/bin/node -F --no-playlist -- https://music.youtube.com/watch?v=x',
   '[youtube] Extracting URL: https://music.youtube.com/watch?v=x',
   'WARNING: [youtube] x: Some web client https formats have been skipped as they are missing a url.',
   '[info] Available formats for x:',

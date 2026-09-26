@@ -87,6 +87,7 @@ export const RESERVED_FLAGS: ReadonlySet<string> = new Set([
   '--dump-single-json',
   '--exec',
   '--config-locations',
+  '--js-runtimes',
   '--cookies',
   '--cookies-from-browser',
   '--proxy',
@@ -119,9 +120,16 @@ export function withoutCookies(network: NetworkOptions | undefined): NetworkOpti
   return rest;
 }
 
+/**
+ * The JavaScript runtime yt-dlp's YouTube extractor needs to solve challenges (without one
+ * formats go missing and extraction is deprecated). yt-dlp only enables deno by default;
+ * we point it at the Node binary running this process, which every install has.
+ */
+export const JS_RUNTIME_ARG = `node:${process.execPath}`;
+
 // Shared by every call: never read user or system config files (the container is the
-// only config), and never colour output we parse.
-const BASE_ARGS = ['--ignore-config', '--color', 'never'];
+// only config), never colour output we parse, and solve YouTube's JS challenges with Node.
+const BASE_ARGS = ['--ignore-config', '--color', 'never', '--js-runtimes', JS_RUNTIME_ARG];
 
 export function buildArgs(command: YtdlpCommand): string[] {
   if (command.kind === 'version') return ['--version'];
