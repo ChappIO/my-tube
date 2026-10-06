@@ -28,6 +28,8 @@ export interface MetadataArgs {
    * entry's `expectedBytes`. Omitted: yt-dlp's default selection.
    */
   format?: string;
+  /** Format sort (`-S`) the download uses with `format`, so the probe resolves the same streams. */
+  formatSort?: string;
   network?: NetworkOptions;
 }
 
@@ -37,6 +39,8 @@ export interface DownloadArgs {
   output: string;
   /** Format selector (`-f`). yt-dlp's default when omitted. */
   format?: string;
+  /** Format sort (`-S`): the order `bestvideo`/`bestaudio` pick from. yt-dlp's default when omitted. */
+  formatSort?: string;
   /** Container to merge separate video and audio streams into (`--merge-output-format`). */
   mergeOutputFormat?: string;
   /** Further flags such as `--embed-thumbnail` or `--write-subs`. See `RESERVED_FLAGS`. */
@@ -163,6 +167,7 @@ export function buildArgs(command: YtdlpCommand): string[] {
       args.push('--extractor-args', 'youtubetab:approximate_date');
     }
     if (command.format) args.push('-f', command.format);
+    if (command.formatSort) args.push('-S', command.formatSort);
     args.push(...networkArgs(command.network), '--', command.url);
     return args;
   }
@@ -190,6 +195,7 @@ export function buildArgs(command: YtdlpCommand): string[] {
     command.output,
   ];
   if (command.format) args.push('-f', command.format);
+  if (command.formatSort) args.push('-S', command.formatSort);
   if (command.mergeOutputFormat) {
     args.push('--merge-output-format', command.mergeOutputFormat);
   }

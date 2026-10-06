@@ -9,6 +9,7 @@ import {
   subtitleLanguages,
   videoExtraArgs,
   videoFormat,
+  videoFormatSort,
 } from './video-options.js';
 
 describe('videoFormat', () => {
@@ -20,13 +21,25 @@ describe('videoFormat', () => {
     expect(videoFormat('best', 'mkv')).toBe('bestvideo+bestaudio/best');
   });
 
-  it('prefers streams that fit mp4 and webm without re-encoding', () => {
-    expect(videoFormat('720p', 'mp4')).toBe(
-      'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]',
-    );
+  it('prefers streams that fit webm without re-encoding', () => {
     expect(videoFormat('best', 'webm')).toBe(
       'bestvideo[ext=webm]+bestaudio[ext=webm]/bestvideo+bestaudio/best',
     );
+  });
+
+  it('leaves mp4 to the format sort, not an [ext=mp4] filter that would take AV1', () => {
+    expect(videoFormat('720p', 'mp4')).toBe('bestvideo[height<=720]+bestaudio/best[height<=720]');
+    expect(videoFormat('best', 'mp4')).toBe('bestvideo+bestaudio/best');
+  });
+});
+
+describe('videoFormatSort', () => {
+  it('compatible: resolution, then mp4/m4a streams, then H.264 before VP9 before AV1', () => {
+    expect(videoFormatSort('compatible')).toBe('res,ext,+vcodec:h264');
+  });
+
+  it("efficient: resolution, then yt-dlp's codec order (AV1 first), then mp4/m4a", () => {
+    expect(videoFormatSort('efficient')).toBe('res,vcodec,ext');
   });
 });
 

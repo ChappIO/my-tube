@@ -5,19 +5,46 @@ import type { JobProgress } from '../jobs/job-runner.js';
 
 type Quality = VideoSettings['quality'];
 type Container = VideoSettings['container'];
+type Codec = VideoSettings['codec'];
 
 /**
  * yt-dlp format selector for Settings → Video → Quality and Container: the best video stream
  * up to the chosen height plus the best audio, falling back to the best single file up to that
- * height. `mp4` and `webm` prefer streams that already fit the container (no re-encoding;
- * H.264/AAC for mp4, VP9/Opus for webm); `mkv` takes whatever is best.
+ * height. `webm` prefers streams that already fit the container (VP9/Opus, no re-encoding);
+ * `mp4` and `mkv` take whatever is best in the order `videoFormatSort` gives.
  */
 export function videoFormat(quality: Quality, container: Container): string {
   const height = quality === 'best' ? '' : `[height<=${Number.parseInt(quality, 10)}]`;
   const any = `bestvideo${height}+bestaudio/best${height}`;
-  if (container === 'mp4') return `bestvideo${height}[ext=mp4]+bestaudio[ext=m4a]/${any}`;
   if (container === 'webm') return `bestvideo${height}[ext=webm]+bestaudio[ext=webm]/${any}`;
   return any;
+}
+
+/**
+ * yt-dlp format sort (`-S`) for Settings → Video → Codec: the order `bestvideo` and `bestaudio`
+ * pick from. `res` comes first in both, so the quality cap and "best available" keep their
+ * meaning; the codec only decides between streams of the same resolution.
+ *
+ * - `compatible` ("plays everywhere"): `res,ext,+vcodec:h264`. `ext` puts mp4 streams first
+ *   (YouTube ships H.264, AV1 and a VP9 variant as mp4, the usual VP9 as webm; m4a before opus
+ *   for the audio), then `+vcodec:h264` takes the worst codec no worse than H.264: H.264, then
+ *   VP9, then AV1. Up to 1080p, where YouTube still encodes H.264, the file is H.264/AAC, which
+ *   every Plex client direct plays; above it, where YouTube only has VP9 and AV1, VP9 in mp4
+ *   with AAC, which far more TVs and sticks decode than AV1. Verified with yt-dlp 2026.08.19:
+ *   a 1080p60 video resolves to avc1 + m4a, a 2160p60 one to vp09 mp4 + m4a.
+ * - `efficient` ("smallest files"): `res,vcodec,ext`. yt-dlp's own codec order (AV1, then VP9,
+ *   then H.264), with AAC audio over Opus so the audio still plays everywhere. Files are about
+ *   a quarter smaller, but a player without an AV1 decoder (every Apple TV, the Nvidia Shield,
+ *   most TVs and sticks from before 2021) makes Plex transcode.
+ *
+ * The container does not change the order: an mkv holds any of these, a webm only VP9/Opus
+ * (its own `[ext=webm]` filters in `videoFormat` leave nothing for the sort to decide).
+ * Before the setting the mp4 container filtered on `[ext=mp4]`, which took AV1 even at 1080p
+ * (yt-dlp ranks it above H.264 and YouTube serves both as mp4), so Apple TV made Plex
+ * transcode every video.
+ */
+export function videoFormatSort(codec: Codec): string {
+  return codec === 'efficient' ? 'res,vcodec,ext' : 'res,ext,+vcodec:h264';
 }
 
 /** Skips YouTube's machine-translated captions (yt-dlp README, youtube extractor `skip`). */

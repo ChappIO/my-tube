@@ -40,6 +40,11 @@ export const AUDIO_QUALITIES = ['best', '320k', '256k', '192k', '128k'] as const
 export const AUDIO_CONTAINERS = ['m4a', 'mp3', 'opus', 'flac'] as const;
 export const VIDEO_QUALITIES = ['best', '2160p', '1440p', '1080p', '720p', '480p'] as const;
 export const VIDEO_CONTAINERS = ['mkv', 'mp4', 'webm'] as const;
+/**
+ * Settings → Video → Codec: `compatible` ("plays everywhere": H.264 up to 1080p, VP9 above it)
+ * or `efficient` ("smallest files": AV1 wherever YouTube has it). See `videoFormatSort` (api).
+ */
+export const VIDEO_CODECS = ['compatible', 'efficient'] as const;
 export const LOG_LEVELS = ['error', 'warn', 'info', 'debug'] as const;
 
 /**
@@ -206,6 +211,8 @@ export const VideoSettings = z.object({
   /** Highest resolution to download; `best` ("best available") has no cap. */
   quality: z.enum(VIDEO_QUALITIES).default('best'),
   container: z.enum(VIDEO_CONTAINERS).default('mp4'),
+  /** Which streams to take at the chosen quality; see `VIDEO_CODECS`. */
+  codec: z.enum(VIDEO_CODECS).default('compatible'),
   /** Subtitle language codes in the order picked (`--sub-langs`); empty means no subtitles. */
   subtitleLanguages: z
     .array(SubtitleLanguageCode)
