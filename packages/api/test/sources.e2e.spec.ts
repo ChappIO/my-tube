@@ -373,6 +373,22 @@ describe('Sources (e2e)', () => {
     });
 
     it('previews what new rules would remove, changing nothing', async () => {
+      // Creating the channel queued its downloads in the background; wait until they have all
+      // landed so the on-disk count is settled (CI is slow enough for them to land mid-test).
+      const channelItems = () =>
+        catalog
+          .prepare('SELECT status, file_path FROM videos WHERE source_id = ? ORDER BY id')
+          .all(channelId) as { status: string; file_path: string | null }[];
+      await waitFor(() => {
+        const pending = channelItems().filter((item) =>
+          ['wanted', 'downloading'].includes(item.status),
+        );
+        return pending.length === 0 ? true : undefined;
+      });
+      const before = channelItems();
+      const onDisk = before.filter((item) => item.status === 'on_disk').length;
+      expect(onDisk).toBeGreaterThan(0);
+
       const preview = RulesPreview.parse(
         (
           await request(server())
@@ -381,8 +397,11 @@ describe('Sources (e2e)', () => {
             .expect(200)
         ).body,
       );
-      // Nothing of this source is on disk in this suite (the activity e2e covers removals).
-      expect(preview).toEqual({ wouldRemove: [], wouldKeep: 0 });
+      // The playlist (channel NASA, position under 3) still wants every file on disk, so the
+      // "shorts only" tree keeps them all (a match elsewhere wins); the activity e2e covers
+      // removals. The preview is read-only.
+      expect(preview).toEqual({ wouldRemove: [], wouldKeep: onDisk });
+      expect(channelItems()).toEqual(before);
       await request(server())
         .post('/api/sources/9999/rules/preview')
         .send({ matcher: and() })
@@ -398,7 +417,7 @@ describe('Sources (e2e)', () => {
       expect(playlistOnly.body.issues).toEqual([
         { path: ['matcher'], message: 'The channel condition only applies to playlists' },
       ]);
-    });
+    }, 15_000);
 
     it('deletes the source row only; the catalog row stays, unlinked', async () => {
       await request(server()).delete(`/api/sources/${channelId}`).expect(204);
@@ -412,3 +431,13 @@ describe('Sources (e2e)', () => {
     });
   });
 });
+
+async function waitFor<T>(probe: () => T | undefined, timeoutMs = 10_000): Promise<T> {
+  const start = Date.now();
+  for (;;) {
+    const value = probe();
+    if (value !== undefined) return value;
+    if (Date.now() - start > timeoutMs) throw new Error('Timed out waiting');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
