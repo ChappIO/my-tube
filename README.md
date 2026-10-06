@@ -11,8 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Beta" src="https://img.shields.io/badge/status-beta-EA333E?style=flat-square">
-  <a href="https://github.com/ChappIO/my-tube/releases"><img alt="Release" src="https://img.shields.io/github/v/release/ChappIO/my-tube?style=flat-square&color=555"></a>
+  <a href="https://github.com/ChappIO/my-tube/releases"><img alt="Release" src="https://img.shields.io/github/v/release/ChappIO/my-tube?style=flat-square&color=EA333E"></a>
   <a href="https://github.com/ChappIO/my-tube/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/ChappIO/my-tube/ci.yml?branch=main&style=flat-square&label=CI"></a>
   <a href="https://github.com/ChappIO/my-tube/pkgs/container/my-tube"><img alt="Image" src="https://img.shields.io/badge/ghcr.io-chappio%2Fmy--tube-2496ED?style=flat-square&logo=docker&logoColor=white"></a>
   <img alt="Platforms" src="https://img.shields.io/badge/linux-amd64%20%7C%20arm64-555?style=flat-square">
@@ -29,10 +28,9 @@
   <a href="#alternatives">Alternatives</a>
 </p>
 
-> [!NOTE]
-> **MyTube is in beta.** It has not seen enough time in production to be sure it is usable. By all means run it, and say what breaks or annoys you in the [issues](https://github.com/ChappIO/my-tube/issues).
-
-<br>
+<p align="center">
+  <a href="https://github.com/ChappIO/my-tube/issues"><img src="docs/brand/beta-banner.png" alt="Beta: not yet proven in production. Run it by all means, and say what breaks in the issues." width="900"></a>
+</p>
 
 <p align="center">
   <picture>

@@ -1,0 +1,65 @@
+<!doctype html><meta charset="utf-8" />
+<!-- Source of beta-banner.png (the README's beta banner). Render from the repo root with:
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu --hide-scrollbars \
+    --default-background-color=00000000 --force-device-scale-factor=2 --window-size=900,64 \
+    --screenshot=docs/brand/beta-banner.png "file://$PWD/docs/brand/beta-banner.html"
+  Archivo comes from the web package's node_modules (pnpm install first). -->
+<style>
+  @font-face {
+    font-family: Archivo;
+    src: url('../../packages/web/node_modules/@fontsource-variable/archivo/files/archivo-latin-wght-normal.woff2')
+      format('woff2');
+    font-weight: 100 900;
+  }
+  html,
+  body {
+    margin: 0;
+    background: transparent;
+  }
+  .b {
+    box-sizing: border-box;
+    width: 900px;
+    height: 64px;
+    background: #ea333e;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 20px;
+    color: #fff;
+    font:
+      500 15px/1 Archivo,
+      system-ui,
+      sans-serif;
+    letter-spacing: -0.005em;
+    white-space: nowrap;
+  }
+  .tag {
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: #fff;
+    color: #ea333e;
+    border-radius: 6px;
+    padding: 7px 9px 6px;
+  }
+  .t strong {
+    font-weight: 700;
+  }
+  .go {
+    margin-left: auto;
+    font-weight: 700;
+    opacity: 0.95;
+  }
+</style>
+<div class="b">
+  <svg width="32" height="32" viewBox="0 0 96 96">
+    <rect width="96" height="96" rx="22" fill="#fff" />
+    <path d="M31 31.5H65L48 53.5Z" fill="#EA333E" />
+    <rect x="29" y="58.5" width="38" height="6" rx="3" fill="#EA333E" />
+  </svg>
+  <span class="tag">Beta</span>
+  <span class="t">Not yet proven in production. Run it by all means, and say what breaks.</span>
+  <span class="go">Feedback → Issues</span>
+</div>
