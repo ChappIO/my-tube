@@ -81,9 +81,10 @@ export function subtitleLanguages(
 
 // yt-dlp prints these (after `ERROR: [youtube] <id>: `) when a video is gone for good. Bot
 // checks ("Sign in to confirm you're not a bot"), network errors and throttling are not here:
-// those may pass on a retry.
+// those may pass on a retry. "Only available to Music Premium members" is a track YouTube sells
+// on its own; without a Premium session it never downloads.
 const UNAVAILABLE =
-  /video unavailable|private video|has been removed|no longer available|account associated with this video has been terminated|members[- ]only|members on level|join this channel|copyright claim/i;
+  /video unavailable|private video|has been removed|no longer available|account associated with this video has been terminated|members[- ]only|members on level|join this channel|premium members|premium[- ]only|copyright claim/i;
 
 /** Whether a yt-dlp error reason means the video will never download (removed, private, …). */
 export function isUnavailableReason(reason: string | null | undefined): boolean {

@@ -151,6 +151,14 @@ describe('isUnavailableReason', () => {
     expect(isUnavailableReason('[youtube] abc: members-only content')).toBe(true);
   });
 
+  it('recognises tracks only Music Premium members can play', () => {
+    expect(
+      isUnavailableReason(
+        '[youtube] hwXJDhKaV6M: This video is only available to Music Premium members',
+      ),
+    ).toBe(true);
+  });
+
   it('leaves bot checks, network errors and missing reasons retryable', () => {
     expect(isUnavailableReason("[youtube] abc: Sign in to confirm you're not a bot")).toBe(false);
     expect(isUnavailableReason('Unable to download webpage: HTTP Error 503')).toBe(false);
