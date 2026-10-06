@@ -50,6 +50,11 @@ export interface TrackInput {
 }
 
 /** Tracks of one fallback listing, grouped by yt-dlp's `album` field (null: no album). */
+/** What the sync does with a freshly recorded album (`AlbumCoverService.warm`). */
+export interface AlbumCovers {
+  warm(albumId: number): void;
+}
+
 export interface AlbumGroup {
   album: string | null;
   entries: SourceEntry[];
@@ -159,6 +164,8 @@ export class MusicSync {
     private readonly jobs: JobsService,
     private readonly logger: Logger,
     private readonly nextStatus: NextStatus,
+    /** Warms the artwork cache for a recorded album; null in unit tests without a cache. */
+    private readonly covers: AlbumCovers | null = null,
   ) {}
 
   async check(
@@ -256,6 +263,8 @@ export class MusicSync {
       if (!listing.title || listing.title === release.id)
         listing.title = release.title ?? release.id;
       const result = this.applyAlbum(source, artistId, listing, new Date());
+      // The cover URL expires within hours: download it now, not on its first request.
+      this.covers?.warm(result.albumId);
       total.entries += result.entries;
       total.added += result.added;
       total.wantedIds.push(...result.wantedIds);
@@ -270,7 +279,12 @@ export class MusicSync {
    * Records one album of an artist source: the `albums` row (by playlist id) and its tracks in
    * album order. Pure database work in one transaction; `now` is the rules' clock.
    */
-  applyAlbum(source: SourceRow, artistId: number, album: AlbumListing, now: Date): ListingResult {
+  applyAlbum(
+    source: SourceRow,
+    artistId: number,
+    album: AlbumListing,
+    now: Date,
+  ): ListingResult & { albumId: number } {
     return this.db.transaction((tx) => {
       const stamp = now.toISOString();
       const values = {
@@ -302,7 +316,7 @@ export class MusicSync {
         trackNumber: index + 1,
         playlistPosition: null,
       }));
-      return this.applyTracks(tx, source, inputs, now);
+      return { ...this.applyTracks(tx, source, inputs, now), albumId };
     });
   }
 

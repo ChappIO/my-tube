@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type { SkipReason } from '@mytube/shared';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { DATABASE, type Database } from '../database/database.module.js';
@@ -10,6 +10,7 @@ import type { SourceEntry, SourceMetadata } from '../ytdlp/metadata.js';
 import { networkOptions } from '../ytdlp/network.js';
 import { YtdlpRunner, YtdlpSession, type YtdlpLogSink } from '../ytdlp/ytdlp-runner.js';
 import { wantedElsewhere } from './claims.js';
+import { AlbumCoverService } from './album-covers.service.js';
 import { MusicSync } from './music-sync.js';
 import { entryContext, evaluateItem } from './rules.js';
 
@@ -85,8 +86,10 @@ export class SyncService {
     private readonly runner: YtdlpRunner,
     private readonly settings: SettingsService,
     private readonly jobs: JobsService,
+    /** Optional so unit tests can build the service without the artwork cache. */
+    @Optional() covers: AlbumCoverService | null = null,
   ) {
-    this.music = new MusicSync(db, runner, settings, jobs, this.logger, nextStatus);
+    this.music = new MusicSync(db, runner, settings, jobs, this.logger, nextStatus, covers);
   }
 
   /**

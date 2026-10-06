@@ -20,6 +20,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { z } from 'zod';
 import { AppModule } from '../src/app.module.js';
 import { DATABASE, type Database } from '../src/database/database.module.js';
+import { AlbumCoverService } from '../src/sync/album-covers.service.js';
 import {
   albums,
   artists,
@@ -414,6 +415,38 @@ describe('Music library (e2e)', () => {
         .expect(200);
       expect(bytes(sidecar).toString()).toBe('sidecar');
       await request(server()).get('/api/artwork/album/9999').expect(404);
+    });
+
+    it('falls back to a track sidecar for an expired cover and lists the album again', async () => {
+      // The signed cover URL of an album playlist expires: YouTube answers 404.
+      const fresh = 'https://i9.ytimg.com/s_p/OLAK5uy_single1/sddefault.jpg?sqp=signed';
+      const fetchMock = vi.fn<typeof fetch>(async (input) =>
+        input === fresh
+          ? new Response(PNG, { headers: { 'content-type': 'image/png' } })
+          : new Response('gone', { status: 404 }),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+      const heat = albumIds.Heatwave!;
+      // list-OLAK5uy_single1.json is the fake yt-dlp's listing of this album.
+      db.update(albums).set({ youtubeId: 'OLAK5uy_single1' }).where(eq(albums.id, heat)).run();
+      file('Test Artist/Heatwave/01 Track single.jpg', 'sidecar');
+
+      const sidecar = await request(server())
+        .get(`/api/artwork/album/${heat}`)
+        .responseType('blob')
+        .expect(200);
+      expect(bytes(sidecar).toString()).toBe('sidecar');
+      expect(JSON.stringify(fetchMock.mock.calls[0]?.[0])).toContain('OLAKheat');
+
+      // The stale URL made the sync list the album again and cache the fresh cover.
+      await app.get(AlbumCoverService).idle();
+      expect(db.select().from(albums).where(eq(albums.id, heat)).get()?.coverUrl).toBe(fresh);
+      const cover = await request(server())
+        .get(`/api/artwork/album/${heat}`)
+        .responseType('blob')
+        .expect(200);
+      expect(cover.headers['content-type']).toBe('image/png');
+      expect(Buffer.compare(bytes(cover), PNG)).toBe(0);
     });
   });
 
