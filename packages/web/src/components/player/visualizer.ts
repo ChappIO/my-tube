@@ -22,6 +22,27 @@ export const MIN_HZ = 30;
 export const MAX_HZ = 16_000;
 /** The low band that drives `beat`. */
 export const BEAT_MAX_HZ = 150;
+/**
+ * The canvas backing store holds at most this many pixels (a 1920×1080 frame). The per-frame
+ * cost is fill rate, not bars: fullscreen on a HiDPI screen would otherwise be ten times the
+ * pixels of the in-page panel. Above the cap the browser scales the canvas up.
+ */
+export const MAX_CANVAS_PIXELS = 1920 * 1080;
+
+/**
+ * The backing-store scale for a canvas `width` × `height` CSS pixels at `devicePixelRatio`
+ * `dpr`: the ratio, lowered so the store stays under `maxPixels`.
+ */
+export function backingRatio(
+  width: number,
+  height: number,
+  dpr: number,
+  maxPixels = MAX_CANVAS_PIXELS,
+): number {
+  const area = width * height;
+  if (area <= 0) return dpr;
+  return Math.min(dpr, Math.sqrt(maxPixels / area));
+}
 
 /** The gap between bars: `max(3px, w/220)`. */
 export function barGap(width: number): number {
@@ -303,8 +324,9 @@ export interface BarRenderer {
  * (`globalCompositeOperation = 'lighter'`) so they glow over the blurred cover:
  *
  * 1. bloom: only the `c1` glow of the bars (their shapes drawn off-surface, the shadow offset
- *    back on), rendered on a surface at `GLOW_SCALE` and scaled up, which keeps a wide blur cheap
- *    at HiDPI; without an offscreen surface, a `BLOOM_BLUR` shadow on the panel itself;
+ *    back on), rendered on a surface at `GLOW_SCALE` and scaled up (`medium` smoothing: a blur
+ *    needs no better), which keeps a wide blur cheap at HiDPI; without an offscreen surface, a
+ *    `BLOOM_BLUR` shadow on the panel itself;
  * 2. core: each bar in the vertical gradient `c1` (bottom half) → `c2` (near-white top);
  * 3. highlight: a thin near-white line down the middle of every bar, one path.
  *
@@ -391,7 +413,8 @@ export function createBarRenderer(
       context.globalAlpha = BLOOM_ALPHA;
       if (glow) {
         context.imageSmoothingEnabled = true;
-        context.imageSmoothingQuality = 'high';
+        // A blur is upscaled: bilinear is enough, and 'high' is a full-surface resample per frame.
+        context.imageSmoothingQuality = 'medium';
         context.drawImage(
           glow.canvas,
           0,
