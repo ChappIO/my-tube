@@ -3,6 +3,7 @@ import { useRef } from 'react';
 import type { PlayerItem } from '../../player-state';
 import { Artwork } from '../media';
 import { cx, focusRing } from '../ui/cx';
+import { BlurredCover } from './BlurredCover';
 import { FullscreenButton } from './ControlStrip';
 import { barSubLine } from './PlayerBar';
 import { VisualizerCanvas } from './VisualizerCanvas';
@@ -10,8 +11,9 @@ import { useFullscreen } from './useFullscreen';
 
 /**
  * Now Playing's music panel: 16/10 (1/1 narrow), radius 18, `player` black. Layers, bottom to
- * top: the cover blurred and darkened as the background (inset −40px and scaled so the blur's
- * soft edges stay outside), the visualizer canvas, and the overlay along the bottom (the 72px
+ * top: the cover blurred and darkened as the background (`BlurredCover`: baked once into a small
+ * canvas, not a CSS filter the compositor would redo every frame), the visualizer canvas, and
+ * the overlay along the bottom (the 72px
  * cover, a link to the album page, beside the title and `artist · album` in white over a dark
  * fade). The Fullscreen pill sits under the panel, right-aligned: fullscreen is the panel (cover,
  * visualizer, overlay); the bar stays outside, and the keyboard still plays.
@@ -30,15 +32,7 @@ export function NowPlayingPanel({ item }: { item: PlayerItem }) {
             : 'aspect-square rounded-modal wide:aspect-[16/10]',
         )}
       >
-        {item.artUrl && (
-          <img
-            src={item.artUrl}
-            alt=""
-            aria-hidden="true"
-            draggable={false}
-            className="absolute -inset-10 size-[calc(100%+80px)] scale-110 object-cover blur-[40px] brightness-[0.45] saturate-[1.2]"
-          />
-        )}
+        <BlurredCover artUrl={item.artUrl} />
         <VisualizerCanvas artUrl={item.artUrl} className="absolute inset-0" />
         <div className="absolute inset-x-0 bottom-0 flex items-end gap-[18px] bg-linear-to-t from-player-fade-panel to-transparent px-5 pt-16 pb-5 text-white wide:px-7 wide:pb-6">
           <CoverLink item={item} />

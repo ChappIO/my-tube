@@ -3,7 +3,9 @@ import { FALLBACK_PALETTE, glowPalette } from './palette';
 import { runVisualizer } from './VisualizerCanvas';
 import {
   BAR_COUNT,
+  MAX_CANVAS_PIXELS,
   PAUSED_TIME_SCALE,
+  backingRatio,
   barHeight,
   barLayout,
   binAmplitudes,
@@ -33,6 +35,14 @@ describe('bar geometry', () => {
     expect(envelope(0)).toBeCloseTo(0.3);
     expect(envelope(14)).toBeCloseTo(1 - 0.7 * 0.25);
     expect(envelope(20)).toBeGreaterThan(envelope(10));
+  });
+
+  it('caps the backing store at MAX_CANVAS_PIXELS, so fullscreen costs no more than the panel', () => {
+    expect(backingRatio(900, 560, 2)).toBe(2);
+    const ratio = backingRatio(2560, 1440, 2);
+    expect(ratio).toBeLessThan(2);
+    expect(ratio * 2560 * ratio * 1440).toBeCloseTo(MAX_CANVAS_PIXELS);
+    expect(backingRatio(0, 0, 2)).toBe(2);
   });
 
   it('never draws a bar shorter than its width', () => {

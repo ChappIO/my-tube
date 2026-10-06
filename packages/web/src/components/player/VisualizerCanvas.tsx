@@ -6,6 +6,7 @@ import { useAnalyser } from './useAnalyser';
 import { useCoverPalette } from './useCoverPalette';
 import {
   type FrameInput,
+  backingRatio,
   createAmplitudeState,
   createBarRenderer,
   createFrameLoop,
@@ -14,7 +15,8 @@ import {
 /**
  * The visualizer's layer in the Now Playing panel: a full-size canvas over the blurred cover,
  * under the overlay (frontend skill "Player", "Visualizer"). It sizes the canvas to the panel at
- * `devicePixelRatio` (a `ResizeObserver`) and redraws it on one `requestAnimationFrame` loop: the
+ * `devicePixelRatio`, capped at `MAX_CANVAS_PIXELS` so fullscreen costs no more per frame than
+ * the panel (a `ResizeObserver`), and redraws it on one `requestAnimationFrame` loop: the
  * vignette and 56 bars in the cover's colours (`useCoverPalette`), driven by the analyser on the
  * app's `<audio>` (`useAnalyser`) while playing and by a slow synthetic drift while paused.
  * Nothing re-renders per frame. The loop stops while the page is hidden and when the panel
@@ -51,7 +53,8 @@ export interface VisualizerSource {
 }
 
 /**
- * Runs the visualizer on a canvas until the returned cleanup: sizing (HiDPI, resize observer),
+ * Runs the visualizer on a canvas until the returned cleanup: sizing (HiDPI under the pixel cap,
+ * resize observer),
  * the frame loop, and stopping it while the document is hidden. The bars are lit in
  * `glowPalette` of the cover's colours: the rendered pair shows as `data-c1` / `data-c2` on the
  * canvas, the extracted one as `data-raw-c1` / `data-raw-c2`.
@@ -67,9 +70,9 @@ export function runVisualizer(
   let ratio = 1;
   const resize = () => {
     const rect = canvas.getBoundingClientRect();
-    ratio = window.devicePixelRatio || 1;
     width = rect.width;
     height = rect.height;
+    ratio = backingRatio(width, height, window.devicePixelRatio || 1);
     canvas.width = Math.max(1, Math.round(width * ratio));
     canvas.height = Math.max(1, Math.round(height * ratio));
   };

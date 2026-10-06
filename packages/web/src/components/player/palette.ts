@@ -262,9 +262,13 @@ export function createPaletteCache(load: PixelLoader): PaletteCache {
 
 /**
  * The browser loader: the cover (same-origin `/api/artwork/...`, `crossOrigin` set anyway so a
- * remote one fails cleanly instead of tainting) drawn into a `PALETTE_SAMPLE_SIZE` canvas.
+ * remote one fails cleanly instead of tainting) drawn into a `size` square canvas
+ * (`PALETTE_SAMPLE_SIZE` for the palette; the blurred background samples larger).
  */
-export function loadCoverPixels(url: string): Promise<Uint8ClampedArray> {
+export function loadCoverPixels(
+  url: string,
+  size = PALETTE_SAMPLE_SIZE,
+): Promise<Uint8ClampedArray> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.crossOrigin = 'anonymous';
@@ -272,12 +276,12 @@ export function loadCoverPixels(url: string): Promise<Uint8ClampedArray> {
     image.addEventListener('load', () => {
       try {
         const canvas = document.createElement('canvas');
-        canvas.width = PALETTE_SAMPLE_SIZE;
-        canvas.height = PALETTE_SAMPLE_SIZE;
+        canvas.width = size;
+        canvas.height = size;
         const context = canvas.getContext('2d', { willReadFrequently: true });
         if (!context) throw new Error('No 2D context');
-        context.drawImage(image, 0, 0, PALETTE_SAMPLE_SIZE, PALETTE_SAMPLE_SIZE);
-        resolve(context.getImageData(0, 0, PALETTE_SAMPLE_SIZE, PALETTE_SAMPLE_SIZE).data);
+        context.drawImage(image, 0, 0, size, size);
+        resolve(context.getImageData(0, 0, size, size).data);
       } catch (error) {
         reject(error instanceof Error ? error : new Error(String(error)));
       }
