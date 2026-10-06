@@ -1,5 +1,7 @@
 # MyTube
 
+> **Beta.** MyTube has not seen enough time in production to be sure it is usable. By all means run it; feedback is welcome in the [issues](https://github.com/chappio/my-tube/issues).
+
 MyTube is for breaking free from the algorithmic YouTube feed. You decide which channels, artists and playlists you follow; MyTube checks them on a schedule, downloads what your rules let through with [yt-dlp](https://github.com/yt-dlp/yt-dlp), and files it into two plain folders: a Music library (artist, album, track, tagged, with cover art) and a Video library (channel, video, with a sidecar thumbnail). Nothing is recommended, nothing trends, nothing plays next. Watch and listen with Plex (or anything else that reads folders); the web app is for managing subscriptions, the queue, the history and the settings, plus an in-browser player.
 
 It is one Docker container with three mounts.
