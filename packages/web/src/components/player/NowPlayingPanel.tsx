@@ -3,15 +3,11 @@ import { useRef } from 'react';
 import type { PlayerItem } from '../../player-state';
 import { Artwork } from '../media';
 import { cx, focusRing } from '../ui/cx';
-import { Meta } from '../ui/typography';
 import { BlurredCover } from './BlurredCover';
 import { FullscreenButton } from './ControlStrip';
 import { barSubLine } from './PlayerBar';
 import { VisualizerCanvas } from './VisualizerCanvas';
 import { useFullscreen } from './useFullscreen';
-
-/** The caption under the panel. */
-export const VISUALIZER_CAPTION = 'Visualizer · colours picked from the cover';
 
 /**
  * Now Playing's music panel: 16/10 (1/1 narrow), radius 18, `player` black. Layers, bottom to
@@ -19,8 +15,8 @@ export const VISUALIZER_CAPTION = 'Visualizer · colours picked from the cover';
  * canvas, not a CSS filter the compositor would redo every frame), the visualizer canvas, and
  * the overlay along the bottom (the 72px
  * cover, a link to the album page, beside the title and `artist · album` in white over a dark
- * fade). The caption sits under the panel, the Fullscreen pill right of it: fullscreen is the
- * panel (cover, visualizer, overlay); the bar stays outside, and the keyboard still plays.
+ * fade). The Fullscreen pill sits under the panel, right-aligned: fullscreen is the panel (cover,
+ * visualizer, overlay); the bar stays outside, and the keyboard still plays.
  */
 export function NowPlayingPanel({ item }: { item: PlayerItem }) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -48,8 +44,7 @@ export function NowPlayingPanel({ item }: { item: PlayerItem }) {
           </div>
         </div>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Meta as="p">{VISUALIZER_CAPTION}</Meta>
+      <div className="flex justify-end">
         <FullscreenButton
           supported={fullscreen.supported}
           active={fullscreen.active}

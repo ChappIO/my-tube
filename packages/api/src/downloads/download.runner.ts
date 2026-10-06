@@ -25,6 +25,7 @@ import {
   subtitleLanguages,
   videoExtraArgs,
   videoFormat,
+  videoFormatSort,
 } from './video-options.js';
 
 /** Media containers a finished download can have; a name with one of these is not a partial. */
@@ -88,6 +89,7 @@ export class DownloadRunner implements JobRunner {
     const network = networkOptions(settings.network);
     const url = `https://www.youtube.com/watch?v=${video.youtubeId}`;
     const format = videoFormat(settings.video.quality, settings.video.container);
+    const formatSort = videoFormatSort(settings.video.codec);
     // Shared by the probe and the download: the cookie order and the one diagnostic listing.
     const session = new YtdlpSession();
     this.setStatus(video.id, 'downloading');
@@ -98,6 +100,7 @@ export class DownloadRunner implements JobRunner {
       // A probe that finds no format does not fail the job (`probeForDownload`).
       const { info, sized } = await probeForDownload(this.runner, url, {
         format,
+        formatSort,
         network,
         session,
         signal,
@@ -145,6 +148,7 @@ export class DownloadRunner implements JobRunner {
           // `%` starts a yt-dlp output template field; the rendered path is literal.
           output: `${target.replaceAll('%', '%%')}.%(ext)s`,
           format,
+          formatSort,
           mergeOutputFormat: settings.video.container,
           extraArgs: videoExtraArgs(settings.video, entry?.captions),
           network,

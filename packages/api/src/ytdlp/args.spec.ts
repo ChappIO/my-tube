@@ -38,9 +38,10 @@ describe('buildArgs', () => {
   });
 
   it('passes a format selector to a metadata call so it reports the chosen streams', () => {
-    const args = buildArgs({ kind: 'metadata', url: 'u', format: 'bv+ba/b' });
-    expect(args.slice(-4)).toEqual(['-f', 'bv+ba/b', '--', 'u']);
+    const args = buildArgs({ kind: 'metadata', url: 'u', format: 'bv+ba/b', formatSort: 'res' });
+    expect(args.slice(-6)).toEqual(['-f', 'bv+ba/b', '-S', 'res', '--', 'u']);
     expect(buildArgs({ kind: 'metadata', url: 'u' })).not.toContain('-f');
+    expect(buildArgs({ kind: 'metadata', url: 'u' })).not.toContain('-S');
   });
 
   it('rejects a non-positive limit', () => {
@@ -58,6 +59,7 @@ describe('buildArgs', () => {
       url: 'https://www.youtube.com/watch?v=abc',
       output: '/media/video/%(channel)s/%(title)s.%(ext)s',
       format: 'bv*+ba/b',
+      formatSort: 'res,ext',
       mergeOutputFormat: 'mkv',
       extraArgs: ['--embed-thumbnail'],
       network: { rateLimit: '2M' },
@@ -83,6 +85,8 @@ describe('buildArgs', () => {
       '/media/video/%(channel)s/%(title)s.%(ext)s',
       '-f',
       'bv*+ba/b',
+      '-S',
+      'res,ext',
       '--merge-output-format',
       'mkv',
       '--embed-thumbnail',

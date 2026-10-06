@@ -1,3 +1,4 @@
+import type { VideoSettings } from '@mytube/shared';
 import type { z } from 'zod';
 
 /**
@@ -19,6 +20,18 @@ export function textOrNull(text: string): string | null {
 /** Labels for quality options: `best` reads "best available". */
 export function qualityLabel(value: string): string {
   return value === 'best' ? 'best available' : value;
+}
+
+/** Labels for Settings → Video → Codec: what each choice is for, not the codec names. */
+export function codecLabel(value: VideoSettings['codec']): string {
+  return value === 'efficient' ? 'smallest files' : 'plays everywhere';
+}
+
+/** The small note under the Format grid: what the chosen codec means for playback. */
+export function codecNote(value: VideoSettings['codec']): string {
+  return value === 'efficient'
+    ? 'AV1 wherever YouTube has it: files about a quarter smaller. Players without an AV1 decoder (every Apple TV, the Nvidia Shield, most TVs and sticks from before 2021) make Plex convert while playing, which buffers.'
+    : 'H.264 up to 1080p, VP9 above it, where YouTube has no H.264. Plays as is on Apple TV, older TVs and streaming sticks. Keep this unless disk space matters more.';
 }
 
 /** A setting's option list (`as const` array from shared) as `Select` options. */

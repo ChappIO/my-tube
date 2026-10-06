@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:f
 import { basename, dirname, extname, join } from 'node:path';
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { ArtworkKind } from '@mytube/shared';
-import { asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, sql } from 'drizzle-orm';
 import { AppConfig } from '../config/app-config.js';
 import { DATABASE, type Database } from '../database/database.module.js';
 import {
@@ -27,6 +27,10 @@ export const ARTWORK_MAX_CONCURRENT = 4;
 export const ARTWORK_NEGATIVE_TTL_MS = 30_000;
 /** `used_at` is written at most this often per image, so serving stays read-only. */
 const TOUCH_INTERVAL_MS = 3_600_000;
+/** Query parameters that only sign or expire a YouTube image URL, not choose the image. */
+const SIGNATURE_PARAMS = ['sqp', 'rs'];
+/** Tracks of an album looked at for a sidecar fallback, in album order. */
+const SIDECAR_CANDIDATES = 5;
 
 /** Sidecar thumbnails yt-dlp writes next to a video or track, in the order they are preferred. */
 const SIDECAR_EXTENSIONS = ['jpg', 'webp', 'png'] as const;
@@ -56,8 +60,33 @@ export interface ArtworkFile {
 interface ArtworkOrigin {
   /** The remote image stored on the row. */
   remoteUrl: string | null;
-  /** A thumbnail next to the video or track file, preferred over the remote one. */
+  /**
+   * A thumbnail next to the video or track file, preferred over the remote one. For an album:
+   * the sidecar of its first track on disk, the fallback when the cover cannot be fetched.
+   */
   sidecar: string | null;
+}
+
+/** Told when an album's stored cover URL answers 404 (YouTube's signed cover URLs expire). */
+export type StaleAlbumListener = (albumId: number) => void;
+
+/**
+ * Whether two remote URLs name the same image: equal once the signature parameters (`sqp`,
+ * `rs`) are dropped. A re-sync stores a freshly signed URL for the same cover; the cached file
+ * stays valid for it.
+ */
+export function sameImage(a: string, b: string): boolean {
+  return a === b || unsigned(a) === unsigned(b);
+}
+
+function unsigned(url: string): string {
+  try {
+    const parsed = new URL(url);
+    for (const name of SIGNATURE_PARAMS) parsed.searchParams.delete(name);
+    return parsed.toString();
+  } catch {
+    return url;
+  }
 }
 
 /**
@@ -65,11 +94,17 @@ interface ArtworkOrigin {
  * hosts itself; every avatar and thumbnail goes through here and is downloaded once.
  *
  * - A video or track on disk is served from its sidecar thumbnail (`<name>.jpg`) when there
- *   is one. An album is its cover (`albums.cover_url`), else its first track's thumbnail.
+ *   is one. An album is its cover (`albums.cover_url`), else its first track's thumbnail; when
+ *   that cannot be fetched, the sidecar of its first track on disk stands in.
  * - Otherwise the remote URL on the row (`avatar_url`, `thumbnail_url`) is downloaded into
  *   `CONFIG_DIR/cache/artwork/<kind>/<id>.<ext>` with a MyTube User-Agent, a 10 s timeout and
  *   at most 4 fetches at once (concurrent requests for the same image share one fetch), and
- *   recorded in `artwork_cache`. A changed remote URL is fetched again.
+ *   recorded in `artwork_cache`. A changed remote URL is fetched again, unless only its
+ *   signature changed (`sameImage`).
+ * - YouTube's signed album cover URLs (`i9.ytimg.com/s_p/…?sqp=…`) expire within hours. A
+ *   cover that answers 404 is reported to the `StaleAlbumListener` (the sync's
+ *   `AlbumCoverService`, which lists the album again for a fresh URL); `warm` lets the sync
+ *   download a cover right after it learns the URL.
  * - 429, 5xx, timeouts and network errors throw `ArtworkUnavailableError` (the controller
  *   answers 503 with `Retry-After: 5`); other failures are a 404. Either is remembered in
  *   memory for 30 s only, so a burst of tiles does not hammer a host that said no.
@@ -78,10 +113,14 @@ interface ArtworkOrigin {
 @Injectable()
 export class ArtworkService {
   private readonly logger = new Logger('Artwork');
-  private readonly negative = new Map<string, { until: number; unavailable: boolean }>();
+  private readonly negative = new Map<
+    string,
+    { url: string; until: number; unavailable: boolean }
+  >();
   private readonly inflight = new Map<string, Promise<ArtworkFile>>();
   private active = 0;
   private readonly waiting: (() => void)[] = [];
+  private staleAlbum: StaleAlbumListener | null = null;
 
   constructor(
     @Inject(DATABASE) private readonly db: Database,
@@ -99,16 +138,55 @@ export class ArtworkService {
    */
   async locate(kind: ArtworkKind, id: number): Promise<ArtworkFile> {
     const origin = this.origin(kind, id);
-    if (origin.sidecar) return { path: origin.sidecar, contentType: null };
+    const sidecar = origin.sidecar ? { path: origin.sidecar, contentType: null } : null;
     const remoteUrl = origin.remoteUrl;
-    if (!remoteUrl) throw new NotFoundException(`No artwork for ${kind} ${id}`);
+    if (kind !== 'album') {
+      if (sidecar) return sidecar;
+      if (!remoteUrl) throw new NotFoundException(`No artwork for ${kind} ${id}`);
+      return this.remote(`${kind}/${id}`, remoteUrl);
+    }
+    // An album: the cover first, the sidecar of its first track on disk when that fails.
+    if (!remoteUrl) {
+      if (sidecar) return sidecar;
+      throw new NotFoundException(`No artwork for ${kind} ${id}`);
+    }
+    try {
+      return await this.remote(`${kind}/${id}`, remoteUrl);
+    } catch (error) {
+      if (error instanceof NotFoundException) this.staleAlbum?.(id);
+      if (sidecar) return sidecar;
+      throw error;
+    }
+  }
 
-    const key = `${kind}/${id}`;
+  /** Called when an album's cover URL answers 404; one listener (the sync's cover refresh). */
+  onStaleAlbum(listener: StaleAlbumListener | null): void {
+    this.staleAlbum = listener;
+  }
+
+  /**
+   * Downloads a row's artwork into the cache now instead of on its first request. Resolves
+   * false when it could not be (already logged); never throws.
+   */
+  async warm(kind: ArtworkKind, id: number): Promise<boolean> {
+    try {
+      await this.locate(kind, id);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** The cached file for `key` from `remoteUrl`, else a download of it. */
+  private async remote(key: string, remoteUrl: string): Promise<ArtworkFile> {
     const cached = this.cached(key, remoteUrl);
     if (cached) return cached;
 
+    // A remembered failure is for one URL: a refreshed cover is tried at once.
     const failed = this.negative.get(key);
-    if (failed && failed.until > Date.now()) throw artworkError(failed.unavailable, key);
+    if (failed && failed.url === remoteUrl && failed.until > Date.now()) {
+      throw artworkError(failed.unavailable, key);
+    }
     this.negative.delete(key);
 
     let pending = this.inflight.get(key);
@@ -192,7 +270,8 @@ export class ArtworkService {
         .where(eq(albums.id, id))
         .get();
       if (!row) throw missing();
-      if (row.coverUrl) return { remoteUrl: row.coverUrl, sidecar: null };
+      const sidecar = this.albumSidecar(id);
+      if (row.coverUrl) return { remoteUrl: row.coverUrl, sidecar };
       // An album known only from track metadata has no cover of its own: its first track's.
       const first = this.db
         .select({ thumbnailUrl: tracks.thumbnailUrl })
@@ -201,7 +280,7 @@ export class ArtworkService {
         .orderBy(sql`${tracks.trackNumber} IS NULL`, asc(tracks.trackNumber), asc(tracks.id))
         .limit(1)
         .get();
-      return { remoteUrl: first?.thumbnailUrl ?? null, sidecar: null };
+      return { remoteUrl: first?.thumbnailUrl ?? null, sidecar };
     }
     const table = kind === 'channel' ? channels : kind === 'artist' ? artists : null;
     if (table) {
@@ -222,6 +301,30 @@ export class ArtworkService {
     return { remoteUrl: row.url, sidecar: null };
   }
 
+  /** The sidecar thumbnail of an album's first track on disk that has one, in album order. */
+  private albumSidecar(albumId: number): string | null {
+    const rows = this.db
+      .select({ filePath: tracks.filePath })
+      .from(tracks)
+      .where(
+        and(eq(tracks.albumId, albumId), eq(tracks.status, 'on_disk'), isNotNull(tracks.filePath)),
+      )
+      .orderBy(
+        sql`${tracks.discNumber} IS NULL`,
+        asc(tracks.discNumber),
+        sql`${tracks.trackNumber} IS NULL`,
+        asc(tracks.trackNumber),
+        asc(tracks.id),
+      )
+      .limit(SIDECAR_CANDIDATES)
+      .all();
+    for (const row of rows) {
+      const sidecar = this.sidecar(this.config.musicDir, row.filePath!);
+      if (sidecar) return sidecar;
+    }
+    return null;
+  }
+
   /** The sidecar thumbnail next to a media file (`<name>.jpg|webp|png`), if one exists. */
   private sidecar(root: string, filePath: string): string | null {
     try {
@@ -240,7 +343,7 @@ export class ArtworkService {
   /** The cached file for `key` when it came from `remoteUrl` and is still there. */
   private cached(key: string, remoteUrl: string): ArtworkFile | null {
     const row = this.db.select().from(artworkCache).where(eq(artworkCache.key, key)).get();
-    if (!row || row.sourceUrl !== remoteUrl) return null;
+    if (!row || !sameImage(row.sourceUrl, remoteUrl)) return null;
     const path = join(this.cacheDir, row.file);
     if (!existsSync(path)) return null;
     const now = Date.now();
@@ -257,6 +360,7 @@ export class ArtworkService {
   private async fetchAndStore(key: string, remoteUrl: string): Promise<ArtworkFile> {
     await this.acquire();
     try {
+      const fail = (unavailable: boolean) => this.fail(key, remoteUrl, unavailable);
       let response: Response;
       try {
         response = await fetch(remoteUrl, {
@@ -268,11 +372,11 @@ export class ArtworkService {
         });
       } catch (error) {
         this.logger.warn(`Could not fetch ${key}: ${String(error)}`);
-        throw this.fail(key, true);
+        throw fail(true);
       }
       if (!response.ok) {
         this.logger.warn(`Fetching ${key} answered ${response.status}`);
-        throw this.fail(key, response.status === 429 || response.status >= 500);
+        throw fail(response.status === 429 || response.status >= 500);
       }
       const contentType = (response.headers.get('content-type') ?? '')
         .split(';')[0]!
@@ -281,16 +385,16 @@ export class ArtworkService {
       const extension = EXTENSION_BY_TYPE[contentType];
       if (!extension) {
         this.logger.warn(`Fetching ${key} gave ${contentType || 'no content type'}, not an image`);
-        throw this.fail(key, false);
+        throw fail(false);
       }
       let body: Buffer;
       try {
         body = Buffer.from(await response.arrayBuffer());
       } catch (error) {
         this.logger.warn(`Could not read ${key}: ${String(error)}`);
-        throw this.fail(key, true);
+        throw fail(true);
       }
-      if (body.length === 0 || body.length > ARTWORK_MAX_BYTES) throw this.fail(key, false);
+      if (body.length === 0 || body.length > ARTWORK_MAX_BYTES) throw fail(false);
       return this.store(key, remoteUrl, contentType, extension, body, response.headers.get('etag'));
     } finally {
       this.release();
@@ -338,9 +442,9 @@ export class ArtworkService {
     return { path, contentType };
   }
 
-  /** Remembers a failure for 30 s and returns the error to throw. */
-  private fail(key: string, unavailable: boolean): Error {
-    this.negative.set(key, { until: Date.now() + ARTWORK_NEGATIVE_TTL_MS, unavailable });
+  /** Remembers a failure of `url` for 30 s and returns the error to throw. */
+  private fail(key: string, url: string, unavailable: boolean): Error {
+    this.negative.set(key, { url, until: Date.now() + ARTWORK_NEGATIVE_TTL_MS, unavailable });
     return artworkError(unavailable, key);
   }
 
