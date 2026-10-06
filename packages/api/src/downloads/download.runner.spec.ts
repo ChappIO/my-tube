@@ -159,7 +159,8 @@ describe('DownloadRunner (fake binary)', () => {
     const args = z.array(z.string()).parse(JSON.parse(readFileSync(argsFile, 'utf8')));
     const after = (flag: string) => args[args.indexOf(flag) + 1];
     // The default quality is "best available": no height cap; the default container is mp4.
-    expect(after('-f')).toBe('bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best');
+    expect(after('-f')).toBe('bestvideo+bestaudio/best');
+    expect(after('-S')).toBe('res,ext,+vcodec:h264');
     expect(after('--merge-output-format')).toBe('mp4');
     expect(after('--remux-video')).toBe('mp4');
     // video.json has automatic English captions; Dutch only as a machine translation.
@@ -188,7 +189,7 @@ describe('DownloadRunner (fake binary)', () => {
     ).toBe(true);
     // The metadata call resolves the same format selector as the download.
     expect(log).toMatch(
-      /^[\d:.]{12} \$ .* --dump-single-json .* -f bestvideo\[ext=mp4\]\+bestaudio\[ext=m4a\]\/bestvideo\+bestaudio\/best -- /m,
+      /^[\d:.]{12} \$ .* --dump-single-json .* -f bestvideo\+bestaudio\/best -S res,ext,\+vcodec:h264 -- /m,
     );
     expect(log).toContain('[mytube-progress]');
     expect(log).toContain('subtitles: no nl (only machine translations on YouTube)');

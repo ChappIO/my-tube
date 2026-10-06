@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { valueInputChars } from '../ui/TextValueInput';
-import { qualityLabel, textOrNull } from './fields';
+import { codecLabel, codecNote, qualityLabel, textOrNull } from './fields';
 import { discogsNote, validateDiscogsToken } from './MetadataProvidersCard';
 import { validateMusicTemplate } from './MusicSettings';
 import { validateNetworkField } from './NetworkCard';
@@ -15,6 +15,13 @@ describe('settings field helpers', () => {
   it('labels the best quality "best available"', () => {
     expect(qualityLabel('best')).toBe('best available');
     expect(qualityLabel('1080p')).toBe('1080p');
+  });
+
+  it('labels the codec by what it is for and explains it in plain words', () => {
+    expect(codecLabel('compatible')).toBe('plays everywhere');
+    expect(codecLabel('efficient')).toBe('smallest files');
+    expect(codecNote('compatible')).toMatch(/^H\.264 up to 1080p, VP9 above it/);
+    expect(codecNote('efficient')).toMatch(/^AV1 wherever YouTube has it/);
   });
 
   it('validates like the shared schema', () => {

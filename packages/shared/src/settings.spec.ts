@@ -30,6 +30,7 @@ describe('Settings', () => {
         pathTemplate: '{channel}/{title} ({date})',
         quality: 'best',
         container: 'mp4',
+        codec: 'compatible',
         subtitleLanguages: ['en', 'nl'],
         subtitlesEmbedded: true,
         autoSubtitles: true,

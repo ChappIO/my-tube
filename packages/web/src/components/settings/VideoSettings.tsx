@@ -1,5 +1,6 @@
 import {
   VIDEO_PATH_TAGS,
+  VIDEO_CODECS,
   VIDEO_CONTAINERS,
   VIDEO_QUALITIES,
   VideoSettings as VideoSettingsSchema,
@@ -10,15 +11,16 @@ import { useMaintenanceStatus, useSystemInfo } from '../../api/system';
 import { librarySizeText } from '../../format';
 import { KeyValueGrid, KeyValueRow } from '../ui/KeyValueGrid';
 import { Select } from '../ui/Select';
-import { SettingsCard } from '../ui/SettingsCard';
+import { SettingsCard, SettingsNote } from '../ui/SettingsCard';
 import { ToggleRow } from '../ui/Toggle';
 import { LibraryCard } from './LibraryCard';
-import { optionsOf, qualityLabel, schemaError } from './fields';
+import { codecLabel, codecNote, optionsOf, qualityLabel, schemaError } from './fields';
 import { SettingsTab } from './SettingsTab';
 import { DefaultRulesEditor } from './DefaultRulesEditor';
 import { AutoSubtitlesRow, SubtitlesControl } from './VideoControls';
 
 const qualityOptions = optionsOf(VIDEO_QUALITIES, qualityLabel);
+const codecOptions = optionsOf(VIDEO_CODECS, codecLabel);
 const containerOptions = optionsOf(VIDEO_CONTAINERS);
 
 /** Error message for a video folder structure that cannot be saved (unknown tags, `..`). */
@@ -60,6 +62,16 @@ export function VideoSettings() {
                   value={video.quality}
                   onChange={(quality) => save({ quality })}
                 />
+              </KeyValueRow>
+              <KeyValueRow label="Codec" align="start">
+                <div className="grid gap-2">
+                  <Select
+                    options={codecOptions}
+                    value={video.codec}
+                    onChange={(codec) => save({ codec })}
+                  />
+                  <SettingsNote size="small">{codecNote(video.codec)}</SettingsNote>
+                </div>
               </KeyValueRow>
               <KeyValueRow label="Container">
                 <Select

@@ -26,16 +26,17 @@ export async function probeForDownload(
   url: string,
   options: {
     format: string;
+    formatSort?: string;
     network: NetworkOptions;
     session: YtdlpSession;
     signal: AbortSignal;
     log: YtdlpLogSink;
   },
 ): Promise<ProbeResult> {
-  const { format, network, session, signal, log } = options;
+  const { format, formatSort, network, session, signal, log } = options;
   try {
     return {
-      info: await runner.metadata(url, { format, network, session, signal, log }),
+      info: await runner.metadata(url, { format, formatSort, network, session, signal, log }),
       sized: true,
     };
   } catch (error) {
