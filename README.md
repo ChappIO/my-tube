@@ -15,6 +15,7 @@
   <a href="https://github.com/ChappIO/my-tube/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/ChappIO/my-tube/ci.yml?branch=main&style=flat-square&label=CI"></a>
   <a href="https://github.com/ChappIO/my-tube/pkgs/container/my-tube"><img alt="Image" src="https://img.shields.io/badge/ghcr.io-chappio%2Fmy--tube-2496ED?style=flat-square&logo=docker&logoColor=white"></a>
   <img alt="Platforms" src="https://img.shields.io/badge/linux-amd64%20%7C%20arm64-555?style=flat-square">
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/ChappIO/my-tube?style=flat-square"></a>
 </p>
 
 <p align="center">
@@ -236,6 +237,10 @@ MyTube is opinionated: two libraries, a rule tree, plain folders, no accounts. I
 - [Tube Archivist](https://github.com/tubearchivist/tubearchivist): archive and index, with search and an in-app player, on Elasticsearch.
 - [ytdl-sub](https://github.com/jmbannon/ytdl-sub): config-file driven, extremely flexible, no web UI.
 - [TubeSync](https://github.com/meeb/tubesync): channel and playlist sync to a media server.
+
+## License
+
+[MIT](LICENSE).
 
 ## Contributing
 
