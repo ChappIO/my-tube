@@ -31,7 +31,10 @@
 <br>
 
 <p align="center">
-  <img src="docs/screenshots/activity.png" alt="The Activity screen: a queue of downloads with progress, speed and retries" width="900">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/activity-dark.png">
+    <img src="docs/screenshots/activity-light.png" alt="The Activity screen: a queue of downloads with progress, speed and retries" width="900">
+  </picture>
 </p>
 
 ## What it does
@@ -124,7 +127,10 @@ Only `/config` is chowned to `PUID:PGID` on start. The media folders are left al
 5. Point Plex, Jellyfin or your music player at the two library folders.
 
 <p align="center">
-  <img src="docs/screenshots/add-to-library.png" alt="The Add to library dialog: a pasted channel link resolved to its channel, Save to Video or Music, and the rule builder" width="900">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/add-to-library-dark.png">
+    <img src="docs/screenshots/add-to-library-light.png" alt="The Add to library dialog: a pasted channel link resolved to its channel, Save to Video or Music, and the rule builder" width="900">
+  </picture>
 </p>
 
 ## Rules
@@ -149,7 +155,10 @@ Most conditions are used inside a **NOT**: the default Video rules are "NOT a sh
 When rules get stricter, the files that no longer match are removed on the next check, and the Edit rules dialog tells you how many before you save. This is the only way MyTube ever deletes anything. Removing a source or turning its bell off never touches the disk.
 
 <p align="center">
-  <img src="docs/screenshots/channels.png" alt="The Channels list: each subscription with its rules as chips, when it was last checked, the subscription bell and an Edit button" width="900">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/channels-dark.png">
+    <img src="docs/screenshots/channels-light.png" alt="The Channels list: each subscription with its rules as chips, when it was last checked, the subscription bell and an Edit button" width="900">
+  </picture>
 </p>
 
 ## What ends up on disk
@@ -167,16 +176,28 @@ Files MyTube does not know about are left alone. Delete or move something outsid
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/home.png" alt="Home: what landed today, across music and video"></td>
-    <td width="50%"><img src="docs/screenshots/channel.png" alt="A channel page: the rules as chips, the subscription bell and the downloaded videos"></td>
+    <td width="50%"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/home-dark.png">
+    <img src="docs/screenshots/home-light.png" alt="Home: what landed today, across music and video">
+  </picture></td>
+    <td width="50%"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/channel-dark.png">
+    <img src="docs/screenshots/channel-light.png" alt="A channel page: the rules as chips, the subscription bell and the downloaded videos">
+  </picture></td>
   </tr>
   <tr>
     <td align="center"><sub>Home: what landed, newest first, with the queue and library totals.</sub></td>
     <td align="center"><sub>A channel: its rules, its bell, its videos on disk.</sub></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/screenshots/artist.png" alt="An artist page: albums on disk, missing tracks queued, the subscription card"></td>
-    <td width="50%"><img src="docs/screenshots/activity.png" alt="Activity: the download queue"></td>
+    <td width="50%"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/artist-dark.png">
+    <img src="docs/screenshots/artist-light.png" alt="An artist page: albums on disk, missing tracks queued, the subscription card">
+  </picture></td>
+    <td width="50%"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/activity-dark.png">
+    <img src="docs/screenshots/activity-light.png" alt="Activity: the download queue">
+  </picture></td>
   </tr>
   <tr>
     <td align="center"><sub>An artist from YouTube Music: albums on disk, missing tracks queued.</sub></td>
@@ -184,7 +205,7 @@ Files MyTube does not know about are left alone. Delete or move something outsid
   </tr>
 </table>
 
-The app follows your system theme; the screenshots are the dark one.
+The app follows your system theme, and so do these screenshots: GitHub shows the light or the dark set to match yours.
 
 ## Operating it
 
