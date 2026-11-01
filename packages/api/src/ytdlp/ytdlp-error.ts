@@ -17,12 +17,16 @@ export type YtdlpErrorKind = 'spawn' | 'exit' | 'aborted' | 'output';
  * - `bot_check`: `Sign in to confirm you're not a bot`. YouTube wants a signed-in session.
  * - `sign_in`: members-only, Premium-only, age-restricted, private or any other "sign in" /
  *   "use --cookies" refusal a signed-in session may get past.
+ * - `subtitles`: `Unable to download video subtitles for 'en': HTTP Error 429`. The video itself
+ *   is fine; yt-dlp fetches subtitles first and gives up on the whole download when a track
+ *   fails (`DownloadRunner` then downloads without subtitles).
  */
-export type YtdlpFailure = 'format_unavailable' | 'bot_check' | 'sign_in';
+export type YtdlpFailure = 'format_unavailable' | 'bot_check' | 'sign_in' | 'subtitles';
 
 const FAILURES: readonly [YtdlpFailure, RegExp][] = [
   ['format_unavailable', /requested format is not available/i],
   ['bot_check', /confirm you.re not a bot/i],
+  ['subtitles', /unable to download (?:video )?subtitles/i],
   [
     'sign_in',
     /sign in|log ?in required|--cookies|members[- ]only|members on level|join this channel|premium members|premium[- ]only|age[- ]restricted|confirm your age|inappropriate for some users/i,

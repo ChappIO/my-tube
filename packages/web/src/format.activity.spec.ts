@@ -147,6 +147,7 @@ describe('whenLabel', () => {
 describe('results and polling', () => {
   it('colours results by outcome', () => {
     expect(resultTone('done')).toBe('ok');
+    expect(resultTone('done, no subtitles')).toBe('ok');
     expect(resultTone('updated')).toBe('ok');
     expect(resultTone('installed')).toBe('ok');
     expect(resultTone('failed')).toBe('red');

@@ -28,6 +28,8 @@
 //                               PO-token loss of a signed-in session) or `probe` (only a
 //                               --dump-single-json call with -f)
 //   FAKE_YTDLP_BOT_CHECK=1      every call without --cookies fails with the bot check
+//   FAKE_YTDLP_SUBTITLE_ERROR=1 a download that asks for subtitles (--sub-langs) fails like
+//                               yt-dlp does on YouTube's HTTP 429 for a caption track
 //   FAKE_YTDLP_FORMATS=<table>  what -F prints: `table` (default: a PO-token warning, storyboards
 //                               and audio formats), `storyboards` (the warning and storyboards
 //                               only) or `none` (no formats at all: yt-dlp's `No video formats found!`)
@@ -153,6 +155,14 @@ if (args.includes('--dump-single-json')) {
 }
 
 // Download. The same line shapes the real binary prints with the runner's templates.
+const subLangs = option('--sub-langs')?.split(',') ?? [];
+if (env.FAKE_YTDLP_SUBTITLE_ERROR && subLangs.length > 0) {
+  process.stdout.write(`[info] ${videoId}: Downloading subtitles: ${subLangs.join(', ')}\n`);
+  process.stderr.write(
+    `ERROR: Unable to download video subtitles for '${subLangs[0]}': HTTP Error 429: Too Many Requests\n`,
+  );
+  process.exit(1);
+}
 const id = url.split('=').pop() || 'fake';
 const ext = args.includes('-x') ? (option('--audio-format') ?? 'm4a') : 'mp4';
 const output = (option('-o') ?? '%(id)s.%(ext)s')
@@ -215,4 +225,9 @@ if (env.FAKE_YTDLP_STREAMS === 'split') {
 }
 mkdirSync(dirname(output), { recursive: true });
 writeFileSync(output, 'fake media');
+// Sidecar subtitles, named as yt-dlp names them (`<stem>.<lang>.vtt`, the -orig suffix kept).
+if (args.includes('--write-subs')) {
+  const stem = output.slice(0, -(ext.length + 1));
+  for (const lang of subLangs) writeFileSync(`${stem}.${lang}.vtt`, 'WEBVTT\n');
+}
 process.stdout.write(`[mytube-file] ${output}\n`);

@@ -11,6 +11,12 @@ describe('ytdlpFailure', () => {
     expect(
       ytdlpFailure('[youtube] abc: Join this channel to get access to members-only content'),
     ).toBe('sign_in');
+    expect(
+      ytdlpFailure(
+        "Unable to download video subtitles for 'en': HTTP Error 429: Too Many Requests",
+      ),
+    ).toBe('subtitles');
+    expect(cookiesMayHelp('subtitles')).toBe(false);
     expect(ytdlpFailure('Unable to download webpage: HTTP Error 503')).toBeNull();
     expect(ytdlpFailure(null)).toBeNull();
   });

@@ -92,6 +92,8 @@ export const RawInfo = z.object({
   /** Total bitrate in kbit/s. */
   tbr: num,
   requested_formats: z.array(z.unknown()).nullish().catch(null),
+  // The spoken language (`en-US`), which yt-dlp reads off the original automatic captions.
+  language: str,
   // Subtitle tracks by language: uploaded ones, and YouTube's automatic captions (the spoken
   // language plus a machine translation into every other language). Single videos only.
   subtitles: z.record(z.string(), z.array(z.unknown())).nullish().catch(null),
@@ -163,8 +165,9 @@ export interface CaptionLanguages {
   /** Subtitles the uploader provided. */
   uploaded: string[];
   /**
-   * YouTube's automatic captions in the spoken language (also as `<lang>-orig`), without the
-   * machine translations into other languages that yt-dlp lists next to them.
+   * YouTube's automatic captions of the spoken language, as the `<lang>-orig` keys yt-dlp lists
+   * them under (`en-orig`): the only `automatic_captions` keys that hold nothing but the
+   * transcript of the original audio. See `captionLanguages`.
    */
   generated: string[];
 }
@@ -320,32 +323,36 @@ function toEntry(node: RawInfo, tab: ChannelTab | null): SourceEntry {
   };
 }
 
-const CaptionTrack = z.object({ url: z.string() });
-
 /**
  * The subtitle languages of a single video's metadata, or null when it lists none (flat
- * listings). A machine translation of the automatic captions is fetched from the original
- * track's URL with a `tlang` (target language) parameter; the spoken language has a track
- * without one, so that is what counts as generated. (yt-dlp's `youtube:skip=translated_subs`
- * only drops translations of uploaded subtitles, not these.) `live_chat` is not a subtitle.
+ * listings). `live_chat` is not a subtitle.
+ *
+ * YouTube auto-dubs videos into many languages and transcribes every dub, and yt-dlp lists all
+ * of that under the plain language keys of `automatic_captions`: `en` on an English video holds
+ * the English transcript and a machine translation back into English of every dub's transcript
+ * (URL `lang=bn&tlang=en`), and yt-dlp fetches one of the translations for `--sub-langs en`.
+ * YouTube answers those with HTTP 429 and, when it does not, the words are not the dialogue
+ * (English → dub → transcript → English). The `<lang>-orig` keys hold only a transcript of the
+ * audio in that language, so those are what `generated` names. A dub's transcript is such a key
+ * too (`nl-NL-orig` on an English video), so only the spoken language's (yt-dlp's `language`,
+ * matched on its base language) counts; without a `language` every `-orig` key does.
  */
 export function captionLanguages(node: RawInfo): CaptionLanguages | null {
   if (!node.subtitles && !node.automatic_captions) return null;
   const uploaded = Object.keys(node.subtitles ?? {}).filter((lang) => lang !== 'live_chat');
-  const generated = Object.entries(node.automatic_captions ?? {})
-    .filter(([, tracks]) => tracks.some(isUntranslatedTrack))
-    .map(([lang]) => lang);
+  const spoken = node.language ? baseLanguage(node.language) : null;
+  const generated = Object.keys(node.automatic_captions ?? {}).filter(
+    (key) => key.endsWith(ORIG_SUFFIX) && (spoken === null || baseLanguage(key) === spoken),
+  );
   return { uploaded, generated };
 }
 
-function isUntranslatedTrack(track: unknown): boolean {
-  const parsed = CaptionTrack.safeParse(track);
-  if (!parsed.success) return false;
-  try {
-    return !new URL(parsed.data.url, 'https://www.youtube.com').searchParams.has('tlang');
-  } catch {
-    return false;
-  }
+/** The suffix yt-dlp gives the original-audio transcript of a language (`en-orig`). */
+export const ORIG_SUFFIX = '-orig';
+
+/** The language without region or yt-dlp's suffix: `en-US` → `en`, `nl-NL-orig` → `nl`. */
+export function baseLanguage(tag: string): string {
+  return tag.split('-', 1)[0]!.toLowerCase();
 }
 
 /** A positive whole number, else null (yt-dlp sometimes reports 0 or floats). */
