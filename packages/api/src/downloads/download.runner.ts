@@ -1,7 +1,7 @@
-import { mkdirSync, readdirSync, rmdirSync, rmSync, statSync } from 'node:fs';
-import { basename, dirname, join, relative, resolve, sep } from 'node:path';
+import { mkdirSync, readdirSync, renameSync, rmdirSync, rmSync, statSync } from 'node:fs';
+import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { renderPathTemplate } from '@mytube/shared';
+import { renderPathTemplate, type VideoSettings } from '@mytube/shared';
 import { eq, sql } from 'drizzle-orm';
 import { AppConfig } from '../config/app-config.js';
 import { DATABASE, type Database } from '../database/database.module.js';
@@ -16,7 +16,8 @@ import {
 } from '../jobs/job-runner.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { networkOptions } from '../ytdlp/network.js';
-import { noDownloadableFormat, YtdlpError } from '../ytdlp/ytdlp-error.js';
+import { isYtdlpFailure, noDownloadableFormat, YtdlpError } from '../ytdlp/ytdlp-error.js';
+import { ORIG_SUFFIX } from '../ytdlp/metadata.js';
 import { YtdlpRunner, YtdlpSession } from '../ytdlp/ytdlp-runner.js';
 import { NO_DOWNLOADABLE_FORMAT, probeForDownload } from './probe.js';
 import {
@@ -40,9 +41,14 @@ const MEDIA_EXTENSIONS = new Set(['mkv', 'mp4', 'webm', 'm4a', 'mp3', 'opus', 'f
  *    fetch) and renders `video.pathTemplate` under `VIDEO_DIR`.
  * 3. Runs yt-dlp with the Settings → Video format, container, subtitles and thumbnail options
  *    and the network options, reporting progress (`DownloadProgressTracker`: 0 to 0.9 while
- *    downloading, 0.9 to 0.99 with the post-processor as the job's stage).
+ *    downloading, 0.9 to 0.99 with the post-processor as the job's stage). Subtitles are
+ *    narrowed to the tracks the video has (`subtitleLanguages`). When yt-dlp fails on a
+ *    subtitle track (`Unable to download video subtitles …`, YouTube's HTTP 429 on captions),
+ *    it runs once more without subtitles: the video matters more than its captions. The
+ *    outcome then says so (`done, no subtitles`, the reason in `details`).
  * 4. On success marks the video `on_disk` with its path (relative to `VIDEO_DIR`), size and
- *    time, and adds the size to its source.
+ *    time, and adds the size to its source. Sidecar subtitles of a generated track lose
+ *    yt-dlp's `-orig` suffix (`<name>.en.vtt`), so Plex and the player read the language.
  *
  * A failure puts the video back to `wanted` and rethrows (the worker retries). A video YouTube
  * refuses for good (removed, private, members-only) or that has no downloadable format at all
@@ -133,34 +139,53 @@ export class DownloadRunner implements JobRunner {
       target = insideLibrary(this.config.videoDir, path);
       mkdirSync(dirname(target), { recursive: true });
       log.line(`target ${target}.<ext>`);
+      // `%` starts a yt-dlp output template field; the rendered path is literal.
+      const output = `${target.replaceAll('%', '%%')}.%(ext)s`;
 
       // The probe's entry (with or without `-f`) carries the captions either way.
-      const { skipped } = subtitleLanguages(settings.video, entry?.captions);
+      const { languages, skipped } = subtitleLanguages(settings.video, entry?.captions);
       if (skipped.length > 0) {
-        log.line(`subtitles: no ${skipped.join(', ')} (only machine translations on YouTube)`);
+        log.line(
+          `subtitles: no ${skipped.join(', ')} (on YouTube only as a dub's transcript or a machine translation)`,
+        );
       }
+      if (languages.length > 0) log.line(`subtitles: ${languages.join(', ')}`);
 
-      const tracker = new DownloadProgressTracker(sized ? entry?.expectedStreams : undefined);
-      progress(tracker.start());
-      const result = await this.runner.download(
-        url,
-        {
-          // `%` starts a yt-dlp output template field; the rendered path is literal.
-          output: `${target.replaceAll('%', '%%')}.%(ext)s`,
-          format,
-          formatSort,
-          mergeOutputFormat: settings.video.container,
-          extraArgs: videoExtraArgs(settings.video, entry?.captions),
-          network,
-          session,
-          signal,
-          log: log.line,
-        },
-        (update) => {
-          const report = tracker.update(update);
-          if (report) progress(report);
-        },
-      );
+      const download = (videoSettings: VideoSettings) => {
+        const tracker = new DownloadProgressTracker(sized ? entry?.expectedStreams : undefined);
+        progress(tracker.start());
+        return this.runner.download(
+          url,
+          {
+            output,
+            format,
+            formatSort,
+            mergeOutputFormat: videoSettings.container,
+            extraArgs: videoExtraArgs(videoSettings, entry?.captions),
+            network,
+            session,
+            signal,
+            log: log.line,
+          },
+          (update) => {
+            const report = tracker.update(update);
+            if (report) progress(report);
+          },
+        );
+      };
+      let result;
+      let noSubtitles: string | null = null;
+      try {
+        result = await download(settings.video);
+      } catch (error) {
+        if (!isYtdlpFailure(error, 'subtitles') || languages.length === 0 || signal.aborted) {
+          throw error;
+        }
+        noSubtitles = error.reason ?? error.message;
+        log.line(`subtitles: ${noSubtitles}; downloading without subtitles`);
+        result = await download({ ...settings.video, subtitleLanguages: [] });
+      }
+      if (!settings.video.subtitlesEmbedded) renameOrigSidecars(result.filePath, log.line);
 
       const size = statSync(result.filePath).size;
       const filePath = relative(this.config.videoDir, result.filePath).split(sep).join('/');
@@ -185,6 +210,14 @@ export class DownloadRunner implements JobRunner {
         }
       });
       log.line(`saved ${filePath} (${size} bytes)`);
+      if (noSubtitles) {
+        return {
+          title,
+          result: 'done, no subtitles',
+          kind: 'video',
+          details: `${filePath} · ${noSubtitles}`,
+        };
+      }
       return { title, result: 'done', kind: 'video', details: filePath };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -256,6 +289,41 @@ export class DownloadRunner implements JobRunner {
     } catch (error) {
       this.logger.debug(`Could not remove ${dir}: ${String(error)}`);
     }
+  }
+}
+
+const ORIG_SIDECAR = new RegExp(
+  `^(.*\\.[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*)${ORIG_SUFFIX}(\\.(?:vtt|srt|ass|lrc))$`,
+);
+
+/**
+ * The name a subtitle sidecar yt-dlp wrote for a `<lang>-orig` track (`ORIG_SUFFIX`) should
+ * have: `<stem>.en-orig.vtt` → `<stem>.en.vtt`; null for any other name.
+ */
+export function withoutOrigSuffix(name: string): string | null {
+  const match = ORIG_SIDECAR.exec(name);
+  return match ? `${match[1]}${match[2]}` : null;
+}
+
+/**
+ * Renames the subtitle sidecars next to a downloaded video that carry yt-dlp's `-orig` suffix
+ * (see `withoutOrigSuffix`). A file with the plain name already there is left alone.
+ */
+function renameOrigSidecars(filePath: string, log: (line: string) => void): void {
+  const dir = dirname(filePath);
+  const stem = basename(filePath, extname(filePath));
+  let names: string[];
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    if (!name.startsWith(`${stem}.`)) continue;
+    const renamed = withoutOrigSuffix(name);
+    if (!renamed || names.includes(renamed)) continue;
+    renameSync(join(dir, name), join(dir, renamed));
+    log(`renamed ${name} to ${renamed}`);
   }
 }
 

@@ -100,15 +100,26 @@ describe('videoExtraArgs', () => {
     expect(args).not.toContain('--extractor-args');
   });
 
-  it('asks only for languages the video has, leaving machine translations out', () => {
-    const captions = { uploaded: ['de'], generated: ['en-orig', 'en'] };
+  it("asks for uploaded subtitles, else the spoken language's -orig captions, else nothing", () => {
+    const captions = { uploaded: ['de'], generated: ['en-orig'] };
     const video4 = { ...video, subtitleLanguages: ['en', 'nl', 'de'] };
     expect(subtitleLanguages(video4, captions)).toEqual({
-      languages: ['en', 'de'],
+      languages: ['en-orig', 'de'],
       skipped: ['nl'],
     });
     const args = videoExtraArgs(video4, captions);
-    expect(args[args.indexOf('--sub-langs') + 1]).toBe('en,de');
+    expect(args[args.indexOf('--sub-langs') + 1]).toBe('en-orig,de');
+    // Uploaded subtitles win over the generated track of the same language; the -orig key is
+    // matched on its base language (a regional transcript for a plain setting).
+    expect(
+      subtitleLanguages(
+        { ...video, subtitleLanguages: ['en', 'nl'] },
+        {
+          uploaded: ['en'],
+          generated: ['en-orig', 'nl-NL-orig'],
+        },
+      ).languages,
+    ).toEqual(['en', 'nl-NL-orig']);
     // Nothing left: no subtitle flags at all.
     const none = videoExtraArgs({ ...video4, subtitleLanguages: ['nl'] }, captions);
     expect(none).not.toContain('--sub-langs');

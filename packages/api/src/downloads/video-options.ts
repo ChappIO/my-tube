@@ -1,5 +1,5 @@
 import type { VideoSettings } from '@mytube/shared';
-import type { CaptionLanguages, ExpectedStream } from '../ytdlp/metadata.js';
+import { baseLanguage, type CaptionLanguages, type ExpectedStream } from '../ytdlp/metadata.js';
 import type { DownloadProgress } from '../ytdlp/progress.js';
 import type { JobProgress } from '../jobs/job-runner.js';
 
@@ -59,8 +59,9 @@ export const AUTO_SUBTITLES_EXTRACTOR_ARGS = 'youtube:skip=translated_subs';
  *   video), `--write-subs --sub-langs en,nl` for sidecar files. With generated subtitles on,
  *   `--write-auto-subs --extractor-args youtube:skip=translated_subs` as well: YouTube's
  *   automatic captions for a language without uploaded subtitles (uploaded ones win). With the
- *   video's `captions` known, `--sub-langs` keeps only the languages it really has (see
- *   `subtitleLanguages`), so machine translations are never fetched. No languages, no subtitles.
+ *   video's `captions` known, `--sub-langs` names the tracks it really has (`en` uploaded, else
+ *   `en-orig`; see `subtitleLanguages`), so machine translations are never fetched. No
+ *   languages, no subtitles.
  * - Thumbnails: `--write-thumbnail --convert-thumbnails jpg`, a `<name>.jpg` sidecar next to
  *   the video, which Plex picks up as the poster.
  */
@@ -74,8 +75,8 @@ export function videoExtraArgs(video: VideoSettings, captions?: CaptionLanguages
     args.push(video.subtitlesEmbedded ? '--embed-subs' : '--write-subs');
     // `--write-auto-subs` only adds automatic captions to what is fetched; embedding still
     // removes the files afterwards. `skip=translated_subs` drops yt-dlp's translations of
-    // uploaded subtitles (`nl-en`); machine translations of the automatic captions are listed
-    // under plain codes and are left out by `subtitleLanguages` instead. A separate
+    // uploaded subtitles (`nl-en`); machine translations of the automatic captions sit under
+    // the plain codes, which `subtitleLanguages` never asks for. A separate
     // `--extractor-args` per extractor combines with others, such as the metadata calls'
     // `youtubetab:approximate_date`.
     if (video.autoSubtitles) {
@@ -88,21 +89,29 @@ export function videoExtraArgs(video: VideoSettings, captions?: CaptionLanguages
 }
 
 /**
- * The languages to ask yt-dlp for. Without generated subtitles, or when the video's captions
- * are unknown, the setting as it is. With them, only languages the video has uploaded
- * subtitles or automatic captions in (its spoken language): yt-dlp would otherwise take
- * YouTube's machine translation of the automatic captions for every other language, which is
- * poor and often refused with HTTP 429, failing the whole download. `skipped` lists the
- * languages left out.
+ * The `--sub-langs` entries for the languages in Settings. Without generated subtitles, or
+ * when the video's captions are unknown, the setting as it is. With them, per language: the
+ * uploaded subtitles when the video has them, else the automatic captions of the spoken language
+ * under yt-dlp's `<lang>-orig` key (`en-orig`; matched on the base language, so `nl` takes
+ * `nl-NL-orig`), else nothing. The plain automatic key (`en`) is never asked for: on an
+ * auto-dubbed video it mixes the real transcript with machine translations of every dub's
+ * transcript, yt-dlp takes one of those, and YouTube answers them with HTTP 429 or words that
+ * are not the dialogue (see `captionLanguages`). `skipped` lists the languages left out: on
+ * YouTube only as a dub's transcript or a machine translation.
  */
 export function subtitleLanguages(
   video: VideoSettings,
   captions?: CaptionLanguages | null,
 ): { languages: string[]; skipped: string[] } {
   if (!video.autoSubtitles || !captions) return { languages: video.subtitleLanguages, skipped: [] };
-  const available = new Set([...captions.uploaded, ...captions.generated]);
-  const languages = video.subtitleLanguages.filter((lang) => available.has(lang));
-  const skipped = video.subtitleLanguages.filter((lang) => !available.has(lang));
+  const languages: string[] = [];
+  const skipped: string[] = [];
+  for (const lang of video.subtitleLanguages) {
+    const generated = captions.generated.find((key) => baseLanguage(key) === baseLanguage(lang));
+    const track = captions.uploaded.includes(lang) ? lang : generated;
+    if (track) languages.push(track);
+    else skipped.push(lang);
+  }
   return { languages, skipped };
 }
 

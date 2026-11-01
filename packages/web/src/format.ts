@@ -220,9 +220,12 @@ export function whenLabel(at: string, now: Date = new Date()): string {
 
 export type ResultTone = 'ok' | 'red' | 'muted';
 
-/** History result colour: `done`, `updated`, `installed` green; `failed` red; the rest muted. */
+/**
+ * History result colour: `done` (also `done, no subtitles`), `updated`, `installed` green;
+ * `failed` red; the rest muted.
+ */
 export function resultTone(result: string): ResultTone {
-  if (result === 'done' || result === 'updated' || result === 'installed') return 'ok';
+  if (result.startsWith('done') || result === 'updated' || result === 'installed') return 'ok';
   if (result === 'failed') return 'red';
   return 'muted';
 }

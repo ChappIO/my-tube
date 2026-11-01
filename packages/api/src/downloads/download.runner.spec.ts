@@ -11,7 +11,7 @@ import { channels, sources, videos } from '../database/schema.js';
 import { JobLogsService } from '../jobs/job-logs.service.js';
 import { PermanentJobError, type JobProgress, type JobRow } from '../jobs/job-runner.js';
 import { YtdlpRunner } from '../ytdlp/ytdlp-runner.js';
-import { DownloadRunner, insideLibrary } from './download.runner.js';
+import { DownloadRunner, insideLibrary, withoutOrigSuffix } from './download.runner.js';
 
 const FAKE = join(import.meta.dirname, '../../test/fixtures/fake-yt-dlp');
 // The fake serves video.json for watch URLs: "What It Takes", uploaded 2026-09-04 (approximate
@@ -41,6 +41,7 @@ describe('DownloadRunner (fake binary)', () => {
       'FAKE_YTDLP_STDOUT',
       'FAKE_YTDLP_STREAMS',
       'FAKE_YTDLP_FORMAT_ERROR',
+      'FAKE_YTDLP_SUBTITLE_ERROR',
     ]) {
       delete process.env[name];
     }
@@ -163,8 +164,9 @@ describe('DownloadRunner (fake binary)', () => {
     expect(after('-S')).toBe('res,ext,+vcodec:h264');
     expect(after('--merge-output-format')).toBe('mp4');
     expect(after('--remux-video')).toBe('mp4');
-    // video.json has automatic English captions; Dutch only as a machine translation.
-    expect(after('--sub-langs')).toBe('en');
+    // video.json has automatic English captions (asked for as yt-dlp's `en-orig`, the
+    // transcript of the spoken language); Dutch only as a machine translation.
+    expect(after('--sub-langs')).toBe('en-orig');
     expect(args).toEqual(
       expect.arrayContaining([
         '--write-auto-subs',
@@ -192,7 +194,10 @@ describe('DownloadRunner (fake binary)', () => {
       /^[\d:.]{12} \$ .* --dump-single-json .* -f bestvideo\+bestaudio\/best -S res,ext,\+vcodec:h264 -- /m,
     );
     expect(log).toContain('[mytube-progress]');
-    expect(log).toContain('subtitles: no nl (only machine translations on YouTube)');
+    expect(log).toContain(
+      "subtitles: no nl (on YouTube only as a dub's transcript or a machine translation)",
+    );
+    expect(log).toContain('subtitles: en-orig');
     expect(log).toContain(`saved ${path} (10 bytes)`);
   });
 
@@ -208,11 +213,51 @@ describe('DownloadRunner (fake binary)', () => {
     // Sizes unknown: the probe without -f resolved yt-dlp's default selection.
     expect(reports[0]).toEqual({});
     const args = z.array(z.string()).parse(JSON.parse(readFileSync(argsFile, 'utf8')));
-    expect(args[args.indexOf('--sub-langs') + 1]).toBe('en');
+    expect(args[args.indexOf('--sub-langs') + 1]).toBe('en-orig');
     const log = readFileSync(logs.path(job.id), 'utf8');
     expect(log.split('--- formats (diagnostic) ---')).toHaveLength(2);
     expect(log).toContain('probing again without -f (sizes unknown)');
-    expect(log).toContain('subtitles: no nl (only machine translations on YouTube)');
+    expect(log).toContain(
+      "subtitles: no nl (on YouTube only as a dub's transcript or a machine translation)",
+    );
+  });
+
+  it('downloads without subtitles when yt-dlp fails on a caption track, and says so', async () => {
+    const { runner, job, row, logs } = setup();
+    const argsFile = join(root, 'args.json');
+    process.env.FAKE_YTDLP_ARGS_FILE = argsFile;
+    process.env.FAKE_YTDLP_SUBTITLE_ERROR = '1';
+    const outcome = await runner.run(job, context().ctx);
+    expect(outcome).toMatchObject({
+      result: 'done, no subtitles',
+      details: expect.stringMatching(
+        /^NASA\/What It Takes \(2026-09-04\)\.mp4 · Unable to download video subtitles for 'en-orig': HTTP Error 429/,
+      ),
+    });
+    expect(row().status).toBe('on_disk');
+    // The second download asks for no subtitles at all.
+    const args = z.array(z.string()).parse(JSON.parse(readFileSync(argsFile, 'utf8')));
+    expect(args).not.toContain('--sub-langs');
+    expect(args).not.toContain('--embed-subs');
+    expect(args).not.toContain('--write-auto-subs');
+    const log = readFileSync(logs.path(job.id), 'utf8');
+    expect(log.match(/^[\d:.]{12} \$ /gm)).toHaveLength(3);
+    expect(log).toContain(
+      "subtitles: Unable to download video subtitles for 'en-orig': HTTP Error 429: Too Many Requests; downloading without subtitles",
+    );
+  });
+
+  it('drops the -orig suffix from sidecar subtitles', async () => {
+    const { runner, job, settings, config, logs } = setup();
+    settings.patch({ video: { subtitlesEmbedded: false } });
+    const outcome = await runner.run(job, context().ctx);
+    expect(outcome?.result).toBe('done');
+    const dir = join(config.videoDir, 'NASA');
+    expect(existsSync(join(dir, 'What It Takes (2026-09-04).en.vtt'))).toBe(true);
+    expect(existsSync(join(dir, 'What It Takes (2026-09-04).en-orig.vtt'))).toBe(false);
+    expect(readFileSync(logs.path(job.id), 'utf8')).toContain(
+      'renamed What It Takes (2026-09-04).en-orig.vtt to What It Takes (2026-09-04).en.vtt',
+    );
   });
 
   it('marks a removed video unavailable and fails for good', async () => {
@@ -272,6 +317,16 @@ describe('DownloadRunner (fake binary)', () => {
     const { runner, job } = setup();
     const orphan: JobRow = { ...job, payload: { ...job.payload, videoId: 999 } };
     await expect(runner.run(orphan, context().ctx)).rejects.toBeInstanceOf(PermanentJobError);
+  });
+});
+
+describe('withoutOrigSuffix', () => {
+  it('renames only subtitle sidecars of a -orig track', () => {
+    expect(withoutOrigSuffix('Title (2026).en-orig.vtt')).toBe('Title (2026).en.vtt');
+    expect(withoutOrigSuffix('Title.nl-NL-orig.srt')).toBe('Title.nl-NL.srt');
+    expect(withoutOrigSuffix('Title.en.vtt')).toBeNull();
+    expect(withoutOrigSuffix('Title-orig.mp4')).toBeNull();
+    expect(withoutOrigSuffix('Title.jpg')).toBeNull();
   });
 });
 

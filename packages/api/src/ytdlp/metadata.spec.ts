@@ -156,26 +156,38 @@ describe('parseSourceMetadata', () => {
     expect(channel.entries.every((entry) => entry.expectedBytes === null)).toBe(true);
   });
 
-  it('tells automatic captions from their machine translations', () => {
-    // video.json: automatic English captions (also as en-orig) and translations to de and nl,
-    // whose URLs carry `tlang` (trimmed from yt-dlp 2026.08.19 on qauPUNkEglQ).
+  it("names the spoken language's -orig captions, not the dubs' or the machine translations", () => {
+    // video.json: `language` en-US, automatic English captions (en-orig and en) and
+    // translations to de and nl (trimmed from yt-dlp 2026.08.19 on qauPUNkEglQ).
     expect(parseSourceMetadata(fixture('video.json')).entries[0]?.captions).toEqual({
       uploaded: [],
-      generated: ['en-orig', 'en'],
+      generated: ['en-orig'],
     });
     const video = { _type: 'video', id: 'v1', title: 'One' };
     const captions = (info: object) =>
       parseSourceMetadata({ ...video, ...info }).entries[0]?.captions;
+    // An auto-dubbed English video (yt-dlp 2026.10.26 on 8az9b0-kZ6E): `en` holds the real
+    // transcript next to translations of every dub's transcript, and every dub has its own
+    // `-orig` transcript. Only the spoken language's `-orig` key is a generated track.
     expect(
       captions({
-        subtitles: { en: track('&lang=en'), live_chat: [{ url: 'https://x' }] },
+        language: 'en-US',
+        subtitles: { de: track('&lang=de'), live_chat: [{ url: 'https://x' }] },
         automatic_captions: {
-          fr: track('&lang=fr&kind=asr'),
-          en: track('&lang=fr&tlang=en'),
+          en: [...track('&lang=bn&tlang=en'), ...track('&lang=en&kind=asr')],
+          'en-orig': track('&lang=en&kind=asr'),
+          'nl-NL-orig': track('&lang=nl-NL&kind=asr'),
+          nl: track('&lang=bn&tlang=nl'),
           bad: [{}],
         },
       }),
-    ).toEqual({ uploaded: ['en'], generated: ['fr'] });
+    ).toEqual({ uploaded: ['de'], generated: ['en-orig'] });
+    // Without a `language`, every `-orig` key counts.
+    expect(
+      captions({
+        automatic_captions: { 'fr-orig': track('&lang=fr&kind=asr'), en: track('&tlang=en') },
+      }),
+    ).toEqual({ uploaded: [], generated: ['fr-orig'] });
     // Flat listings and videos without the fields: unknown.
     expect(captions({})).toBeNull();
     const channel = parseSourceMetadata(fixture('channel.json'));
