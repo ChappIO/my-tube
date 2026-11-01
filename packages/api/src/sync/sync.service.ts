@@ -238,6 +238,16 @@ export class SyncService {
       const positions: number[] = [];
 
       for (const [index, entry] of entries.entries()) {
+        const existing = tx.select().from(videos).where(eq(videos.youtubeId, entry.id)).get();
+        // What the row already knows stands in for what the flat entry leaves out (a shorts
+        // listing has no dates), so the verdict is the one revalidation reaches too.
+        const known = existing
+          ? {
+              publishedAt: existing.publishedAt,
+              durationSeconds: existing.durationSeconds,
+              liveStatus: existing.liveStatus,
+            }
+          : undefined;
         const verdict = evaluateItem(entry, source.matcher, {
           now,
           // A channel's flat listing names no uploader: it is the channel itself. A playlist's
@@ -245,6 +255,7 @@ export class SyncService {
           channelName: playlist ? null : source.name,
           channelId: playlist ? null : source.youtubeId,
           playlistPosition: playlist ? index + 1 : null,
+          known,
         });
         if (!verdict.accept && verdict.transient) continue;
         const channelId =
@@ -254,7 +265,6 @@ export class SyncService {
           this.logger.warn(`Skipping ${entry.id} of ${source.name}: no channel in the listing`);
           continue;
         }
-        const existing = tx.select().from(videos).where(eq(videos.youtubeId, entry.id)).get();
         const fields = entryFields(entry);
         let id: number;
         let status = existing?.status;
@@ -289,6 +299,7 @@ export class SyncService {
                 channelName: playlist ? null : source.name,
                 channelId: playlist ? null : source.youtubeId,
                 playlistPosition: null,
+                known,
               }),
               playlistPosition: null,
             })

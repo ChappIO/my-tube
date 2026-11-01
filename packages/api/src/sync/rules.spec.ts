@@ -58,6 +58,28 @@ describe('evaluateItem', () => {
     ).toMatchObject({ reason: 'no_match', failing: ['not older than 90 days'] });
   });
 
+  it('fills what the entry lacks from the known item: a shorts listing has no dates', () => {
+    const known = { publishedAt: '2026-01-01', durationSeconds: 45, liveStatus: null };
+    const undated = entry({ isShort: true, uploadDate: null, duration: null });
+    // Without the stored facts the missing date is unknown and so a match; with them, the
+    // stored date decides, as it does in revalidation.
+    expect(evaluateItem(undated, and(not({ type: 'older_than_days', days: 90 })), CHANNEL)).toEqual(
+      accept,
+    );
+    expect(
+      evaluateItem(undated, and(not({ type: 'older_than_days', days: 90 })), { ...CHANNEL, known }),
+    ).toMatchObject({ accept: false, failing: ['not older than 90 days'] });
+    expect(entryContext(undated, { ...CHANNEL, known })).toMatchObject({
+      publishedAt: '2026-01-01',
+      durationSeconds: 45,
+    });
+    // The entry's own facts win over the stored ones.
+    expect(entryContext(entry(), { ...CHANNEL, known })).toMatchObject({
+      publishedAt: '2026-09-20',
+      durationSeconds: 600,
+    });
+  });
+
   it('skips members-only entries under the default video rules; no badge is a match', () => {
     expect(
       evaluateItem(entry({ availability: 'subscriber_only' }), DEFAULT_VIDEO_MATCHER, CHANNEL),

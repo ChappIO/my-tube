@@ -32,6 +32,21 @@ export interface EntryContext {
   channelId: string | null;
   /** 1-based position in a playlist source's listing; null for channels and artists. */
   playlistPosition: number | null;
+  /**
+   * What the library already knows about the item, for the facts a flat entry leaves out. A
+   * channel's shorts tab lists no dates at all, and the videos tab only approximate ones; the
+   * download stored the exact date. Without this a short removed by revalidation for its age
+   * comes back as wanted on the next check (unknown counts as a match) and is downloaded again,
+   * every six hours.
+   */
+  known?: KnownItem;
+}
+
+/** The stored facts of a known item that stand in for what its listing entry lacks. */
+export interface KnownItem {
+  publishedAt: string | null;
+  durationSeconds: number | null;
+  liveStatus: string | null;
 }
 
 /**
@@ -45,7 +60,8 @@ export interface EntryContext {
  *
  * Entries without a date or duration are not dropped for it: the matcher treats the missing
  * value as unknown, and unknown counts as a match (flat listings sometimes omit dates, and
- * yt-dlp's flat dates are approximate to the day).
+ * yt-dlp's flat dates are approximate to the day). A known item's stored facts fill the gaps
+ * first (`ctx.known`), so the check and revalidation judge it alike.
  */
 export function evaluateItem(entry: SourceEntry, matcher: Matcher, ctx: EntryContext): RuleVerdict {
   if (entry.liveStatus === 'is_upcoming') return reject('upcoming', true);
@@ -57,14 +73,18 @@ export function evaluateItem(entry: SourceEntry, matcher: Matcher, ctx: EntryCon
   return reject('no_match', false, result.failing);
 }
 
-/** The matcher's view of a fetched entry. */
+/**
+ * The matcher's view of a fetched entry. The entry's own facts first; what it lacks (no date in
+ * a shorts listing, no duration) comes from `ctx.known`, the stored row, when there is one.
+ */
 export function entryContext(entry: SourceEntry, ctx: EntryContext): MatcherContext {
   return {
     title: entry.title,
     isShort: entry.isShort,
-    publishedAt: entryDate(entry),
-    durationSeconds: entry.duration === null ? null : Math.round(entry.duration),
-    liveStatus: entry.liveStatus,
+    publishedAt: entryDate(entry) ?? ctx.known?.publishedAt ?? null,
+    durationSeconds:
+      entry.duration === null ? (ctx.known?.durationSeconds ?? null) : Math.round(entry.duration),
+    liveStatus: entry.liveStatus ?? ctx.known?.liveStatus ?? null,
     availability: entry.availability,
     channelName: entry.channel ?? ctx.channelName,
     channelId: entry.channelId ?? ctx.channelId,
