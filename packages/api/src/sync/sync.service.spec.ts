@@ -273,6 +273,53 @@ describe('SyncService', () => {
     expect(result.wantedIds).toHaveLength(1);
   });
 
+  it('judges a known video by its stored date when the listing has none', () => {
+    // A shorts tab lists no dates at all. Revalidation removed this short for its age
+    // (the download stored the exact date); the next check must not want it again.
+    const { sync, addSource, db, video } = setup();
+    const source = addSource('channel', and(not({ type: 'older_than_days', days: 14 })));
+    const channel = db.select().from(channels).where(eq(channels.youtubeId, NASA)).get()!;
+    db.insert(videos)
+      .values({
+        channelId: channel.id,
+        sourceId: source.id,
+        youtubeId: 'old',
+        title: 'old',
+        publishedAt: '2026-09-01',
+        isShort: true,
+        status: 'skipped',
+        skipReason: 'no_longer_matches',
+      })
+      .run();
+    const undated = (id: string) => ({
+      kind: 'video' as const,
+      id,
+      title: id,
+      url: `https://www.youtube.com/shorts/${id}`,
+      duration: 30,
+      uploadDate: null,
+      timestamp: null,
+      liveStatus: null,
+      availability: null,
+      isShort: true,
+      tab: 'shorts' as const,
+      channelId: null,
+      channel: null,
+      thumbnails: [],
+      expectedStreams: [],
+      expectedBytes: null,
+    });
+    const result = sync.applyListing(
+      source,
+      { ...listing([]), entries: [undated('new'), undated('old')] },
+      NOW,
+    );
+    expect(video('old')).toMatchObject({ status: 'skipped', publishedAt: '2026-09-01' });
+    // A new entry without a date is still not dropped for it: unknown counts as a match.
+    expect(video('new')?.status).toBe('wanted');
+    expect(result.wantedIds).toEqual([video('new')!.id]);
+  });
+
   it('skips members-only entries under the default video rules and keeps unavailable ones', () => {
     const { sync, addSource, video, db } = setup();
     const source = addSource('channel', DEFAULT_VIDEO_MATCHER);
