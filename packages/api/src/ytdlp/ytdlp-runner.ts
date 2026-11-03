@@ -9,6 +9,7 @@ import {
   type DownloadArgs,
   type MetadataArgs,
   type NetworkOptions,
+  type SubtitlesArgs,
 } from './args.js';
 import { countFormats, listingLogLines, type FormatListing } from './formats.js';
 import { parseSourceMetadata, type SourceMetadata } from './metadata.js';
@@ -43,6 +44,7 @@ interface CallOptions {
 
 export type MetadataOptions = Omit<MetadataArgs, 'url'> & CallOptions;
 export type DownloadOptions = Omit<DownloadArgs, 'url'> & CallOptions;
+export type SubtitlesOptions = Omit<SubtitlesArgs, 'url'> & CallOptions;
 
 export interface DownloadResult {
   /** Final path of the file after merging and moving, as yt-dlp reports it. */
@@ -259,6 +261,21 @@ export class YtdlpRunner implements OnModuleDestroy {
     );
     if (!filePath) throw new YtdlpError('yt-dlp did not report a file path', 'output', 0, []);
     return { filePath };
+  }
+
+  /**
+   * Fetches the captions of one video as `.srt` sidecar files next to `options.output`'s stem,
+   * without the media (`--skip-download`). Resolves once yt-dlp exits 0; the caller lists the files it
+   * wrote. A caption track YouTube refuses (HTTP 429) rejects with the `subtitles` failure.
+   */
+  async subtitles(url: string, options: SubtitlesOptions): Promise<void> {
+    const { signal, log, session, network, ...rest } = options;
+    await this.withCookieFallback(
+      network,
+      (active) =>
+        this.run(buildArgs({ kind: 'subtitles', url, ...rest, network: active }), { signal, log }),
+      { url, signal, log, session },
+    );
   }
 
   onModuleDestroy(): void {

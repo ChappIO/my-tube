@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createJobsHarness, deferred, flush } from '../../test/jobs-harness.js';
 import {
   PermanentJobError,
+  PostponeJobError,
   type JobContext,
   type JobOutcome,
   type JobRow,
@@ -202,6 +203,22 @@ describe('JobsWorker', () => {
     download.calls[0]!.fail(new PermanentJobError('removed by the uploader'));
     await flush();
     expect(jobs.get(job.id)).toMatchObject({ status: 'failed', attempts: 1 });
+  });
+
+  it('puts a postponed job back in the queue until its time, attempts unchanged', async () => {
+    const { worker, download, jobs, enqueue, now } = setup();
+    const job = enqueue('download', 'Rate limited');
+    worker.start();
+    const until = new Date(now().getTime() + 900_000);
+    download.calls[0]!.fail(new PostponeJobError(until, 'HTTP Error 429'));
+    await flush();
+    expect(jobs.get(job.id)).toMatchObject({
+      status: 'queued',
+      attempts: 0,
+      error: 'HTTP Error 429',
+      runAfter: until.toISOString(),
+    });
+    expect(download.calls).toHaveLength(1);
   });
 
   it('cancels a running job: aborts its runner and frees the slot', async () => {

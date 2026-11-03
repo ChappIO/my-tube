@@ -385,6 +385,62 @@ export class JobsService {
     return { activeDownloads: row?.activeDownloads ?? 0, queued: row?.queued ?? 0 };
   }
 
+  /**
+   * Puts a running job back in the queue until `until` without counting an attempt
+   * (`PostponeJobError`); `reason` is stored as the row's error so the queue can say why it
+   * waits. Returns the row, or undefined when the job is not running (cancelled meanwhile).
+   */
+  postpone(id: number, until: Date, reason: string): JobRow | undefined {
+    return this.db
+      .update(jobs)
+      .set({ ...requeued(this.now()), runAfter: until.toISOString(), error: reason })
+      .where(and(eq(jobs.id, id), eq(jobs.status, 'running')))
+      .returning()
+      .get();
+  }
+
+  /**
+   * Holds every queued job of `type` back until `until`, unless it already waits longer (a retry
+   * backoff): the spacing between caption fetches and the pause after a rate limit. Returns
+   * how many rows moved.
+   */
+  delayQueued(type: JobType, until: Date): number {
+    const runAfter = until.toISOString();
+    return this.db
+      .update(jobs)
+      .set({ runAfter, updatedAt: this.now() })
+      .where(
+        and(
+          eq(jobs.type, type),
+          eq(jobs.status, 'queued'),
+          or(isNull(jobs.runAfter), sql`${jobs.runAfter} < ${runAfter}`),
+        ),
+      )
+      .returning({ id: jobs.id })
+      .all().length;
+  }
+
+  /** The latest `run_after` among the queued jobs of a type, or null (the subtitle pause). */
+  queuedUntil(type: JobType): string | null {
+    return (
+      this.db
+        .select({ runAfter: sql<string | null>`max(${jobs.runAfter})` })
+        .from(jobs)
+        .where(and(eq(jobs.type, type), eq(jobs.status, 'queued')))
+        .get()?.runAfter ?? null
+    );
+  }
+
+  /** Number of queued and running jobs of a type. */
+  activeCountOf(type: JobType): number {
+    const row = this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(jobs)
+      .where(and(eq(jobs.type, type), inArray(jobs.status, ['queued', 'running'])))
+      .get();
+    return row?.count ?? 0;
+  }
+
   /** Puts a running job back in the queue without counting an attempt (shutdown). */
   requeue(id: number): void {
     this.db

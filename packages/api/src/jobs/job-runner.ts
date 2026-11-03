@@ -56,3 +56,19 @@ export interface JobRunner {
 export class PermanentJobError extends Error {
   override readonly name = 'PermanentJobError';
 }
+
+/**
+ * Throw from a runner to put the job back in the queue until `until` without counting an
+ * attempt: the work cannot run now for a reason that is not the job's own (YouTube's rate
+ * limit on captions). `reason` is kept on the row as its error, so the queue says why it waits.
+ */
+export class PostponeJobError extends Error {
+  override readonly name = 'PostponeJobError';
+
+  constructor(
+    readonly until: Date,
+    reason: string,
+  ) {
+    super(reason);
+  }
+}

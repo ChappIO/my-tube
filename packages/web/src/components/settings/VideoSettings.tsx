@@ -17,7 +17,7 @@ import { LibraryCard } from './LibraryCard';
 import { codecLabel, codecNote, optionsOf, qualityLabel, schemaError } from './fields';
 import { SettingsTab } from './SettingsTab';
 import { DefaultRulesEditor } from './DefaultRulesEditor';
-import { AutoSubtitlesRow, SubtitlesControl } from './VideoControls';
+import { AutoSubtitlesRow, SubtitlesCatchUpRow, SubtitlesControl } from './VideoControls';
 
 const qualityOptions = optionsOf(VIDEO_QUALITIES, qualityLabel);
 const codecOptions = optionsOf(VIDEO_CODECS, codecLabel);
@@ -93,6 +93,7 @@ export function VideoSettings() {
               disabled={video.subtitleLanguages.length === 0}
               onChange={save}
             />
+            <SubtitlesCatchUpRow languages={video.subtitleLanguages} />
           </SettingsCard>
           <SettingsCard title="Defaults for new channels">
             <DefaultRulesEditor

@@ -2,7 +2,6 @@ import { DEFAULT_SETTINGS } from '@mytube/shared';
 import { describe, expect, it } from 'vitest';
 import type { ExpectedStream } from '../ytdlp/metadata.js';
 import type { DownloadProgress } from '../ytdlp/progress.js';
-import { buildArgs } from '../ytdlp/args.js';
 import {
   DownloadProgressTracker,
   isUnavailableReason,
@@ -46,59 +45,34 @@ describe('videoFormatSort', () => {
 describe('videoExtraArgs', () => {
   const video = DEFAULT_SETTINGS.video;
 
-  it('maps the defaults: remux, embedded en/nl subtitles with generated ones, jpg thumbnail', () => {
+  it('maps the defaults: remux and the jpg thumbnail, never subtitles', () => {
     expect(videoExtraArgs(video)).toEqual([
       '--remux-video',
       'mp4',
-      '--embed-subs',
-      '--write-auto-subs',
-      '--extractor-args',
-      'youtube:skip=translated_subs',
-      '--sub-langs',
-      'en,nl',
       '--write-thumbnail',
       '--convert-thumbnails',
       'jpg',
     ]);
   });
 
-  it('keeps subtitles as sidecars, drops them without languages and skips thumbnails', () => {
-    expect(videoExtraArgs({ ...video, subtitlesEmbedded: false, saveThumbnails: false })).toEqual([
+  it('skips the remux for webm and the thumbnail when off', () => {
+    expect(videoExtraArgs({ ...video, container: 'webm', saveThumbnails: false })).toEqual([]);
+    expect(videoExtraArgs({ ...video, container: 'mkv', saveThumbnails: false })).toEqual([
       '--remux-video',
-      'mp4',
-      '--write-subs',
-      '--write-auto-subs',
-      '--extractor-args',
-      'youtube:skip=translated_subs',
-      '--sub-langs',
-      'en,nl',
+      'mkv',
     ]);
-    expect(
-      videoExtraArgs({ ...video, container: 'webm', subtitleLanguages: [], saveThumbnails: false }),
-    ).toEqual([]);
   });
 
-  it('leaves generated subtitles out when they are off, embedded or as sidecars', () => {
-    const off = { ...video, autoSubtitles: false, saveThumbnails: false };
-    expect(videoExtraArgs(off)).toEqual([
-      '--remux-video',
-      'mp4',
-      '--embed-subs',
-      '--sub-langs',
-      'en,nl',
-    ]);
-    expect(
-      videoExtraArgs({ ...off, subtitlesEmbedded: false, subtitleLanguages: ['pt-BR'] }),
-    ).toEqual(['--remux-video', 'mp4', '--write-subs', '--sub-langs', 'pt-BR']);
+  it('asks for no subtitles whatever the subtitle settings say (the subtitle job does)', () => {
+    const args = videoExtraArgs({ ...video, subtitleLanguages: ['en', 'nl'], autoSubtitles: true });
+    for (const flag of ['--sub-langs', '--embed-subs', '--write-subs', '--write-auto-subs']) {
+      expect(args).not.toContain(flag);
+    }
   });
+});
 
-  it('asks for no subtitles at all without languages, even with generated ones on', () => {
-    const args = videoExtraArgs({ ...video, subtitleLanguages: [], autoSubtitles: true });
-    expect(args).not.toContain('--write-auto-subs');
-    expect(args).not.toContain('--sub-langs');
-    expect(args).not.toContain('--embed-subs');
-    expect(args).not.toContain('--extractor-args');
-  });
+describe('subtitleLanguages', () => {
+  const video = DEFAULT_SETTINGS.video;
 
   it("asks for uploaded subtitles, else the spoken language's -orig captions, else nothing", () => {
     const captions = { uploaded: ['de'], generated: ['en-orig'] };
@@ -107,8 +81,6 @@ describe('videoExtraArgs', () => {
       languages: ['en-orig', 'de'],
       skipped: ['nl'],
     });
-    const args = videoExtraArgs(video4, captions);
-    expect(args[args.indexOf('--sub-langs') + 1]).toBe('en-orig,de');
     // Uploaded subtitles win over the generated track of the same language; the -orig key is
     // matched on its base language (a regional transcript for a plain setting).
     expect(
@@ -120,10 +92,11 @@ describe('videoExtraArgs', () => {
         },
       ).languages,
     ).toEqual(['en', 'nl-NL-orig']);
-    // Nothing left: no subtitle flags at all.
-    const none = videoExtraArgs({ ...video4, subtitleLanguages: ['nl'] }, captions);
-    expect(none).not.toContain('--sub-langs');
-    expect(none).not.toContain('--write-auto-subs');
+    // Nothing left.
+    expect(subtitleLanguages({ ...video4, subtitleLanguages: ['nl'] }, captions)).toEqual({
+      languages: [],
+      skipped: ['nl'],
+    });
     // Unknown captions, or generated subtitles off (no translations are asked for): as set.
     expect(subtitleLanguages(video4, null).languages).toEqual(['en', 'nl', 'de']);
     expect(subtitleLanguages({ ...video4, autoSubtitles: false }, captions).languages).toEqual([
@@ -131,21 +104,6 @@ describe('videoExtraArgs', () => {
       'nl',
       'de',
     ]);
-  });
-
-  it('passes the skip as its own --extractor-args pair through the download call', () => {
-    const args = buildArgs({
-      kind: 'download',
-      url: 'https://www.youtube.com/watch?v=abc',
-      output: '/media/video/x.%(ext)s',
-      extraArgs: videoExtraArgs(video),
-    });
-    const at = args.indexOf('--extractor-args');
-    expect(args[at + 1]).toBe('youtube:skip=translated_subs');
-    expect(args.filter((arg) => arg === '--extractor-args')).toHaveLength(1);
-    // A metadata call keeps its own, for another extractor; yt-dlp takes one flag per extractor.
-    const metadata = buildArgs({ kind: 'metadata', url: 'https://www.youtube.com/@x' });
-    expect(metadata[metadata.indexOf('--extractor-args') + 1]).toBe('youtubetab:approximate_date');
   });
 });
 

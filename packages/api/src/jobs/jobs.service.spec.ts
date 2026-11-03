@@ -181,6 +181,36 @@ describe('JobsService', () => {
     expect(jobs.listQueue()).toEqual([]);
   });
 
+  it('postpones a running job without counting an attempt and holds queued ones back', () => {
+    const { jobs, now, advance } = createJobsHarness();
+    const first = jobs.enqueue({ type: 'subtitles', key: 'video:a', payload: { title: 'a' } }).job;
+    const second = jobs.enqueue({ type: 'subtitles', key: 'video:b', payload: { title: 'b' } }).job;
+    const download = jobs.enqueue({ type: 'download', payload: { title: 'd' } }).job;
+    expect(jobs.activeCountOf('subtitles')).toBe(2);
+    expect(jobs.queuedUntil('subtitles')).toBeNull();
+
+    expect(jobs.claimNext(['subtitles'])?.id).toBe(first.id);
+    const until = new Date(now().getTime() + 900_000);
+    expect(jobs.postpone(first.id, until, 'HTTP Error 429')).toMatchObject({
+      status: 'queued',
+      attempts: 0,
+      error: 'HTTP Error 429',
+      runAfter: until.toISOString(),
+    });
+    // Only queued jobs of the type move, and only forward: a longer wait stays.
+    const far = new Date(now().getTime() + 3_600_000);
+    expect(jobs.delayQueued('subtitles', far)).toBe(2);
+    expect(jobs.delayQueued('subtitles', until)).toBe(0);
+    expect(jobs.get(second.id)?.runAfter).toBe(far.toISOString());
+    expect(jobs.get(download.id)?.runAfter).toBeNull();
+    expect(jobs.queuedUntil('subtitles')).toBe(far.toISOString());
+    expect(jobs.claimNext(['subtitles'])).toBeUndefined();
+    advance(3_600_000);
+    expect(jobs.claimNext(['subtitles'])?.id).toBe(first.id);
+    // Postponing a job that is not running does nothing.
+    expect(jobs.postpone(download.id, until, 'x')).toBeUndefined();
+  });
+
   it('fails at once when not retryable', () => {
     const { jobs, history } = createJobsHarness();
     const job = jobs.enqueue({ type: 'rescan', payload: { title: 'Rescan libraries' } }).job;

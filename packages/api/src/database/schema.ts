@@ -163,6 +163,10 @@ export const videos = sqliteTable(
     filePath: text('file_path'),
     fileSizeBytes: integer('file_size_bytes'),
     downloadedAt: text('downloaded_at'),
+    /** When the subtitle job last finished for this file (migration 20261103090000). */
+    subtitlesAt: text('subtitles_at'),
+    /** The Settings languages that job ran with, joined with `,` (`en,nl`). */
+    subtitleLanguages: text('subtitle_languages'),
     ...timestamps,
   },
   (table) => [

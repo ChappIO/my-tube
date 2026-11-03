@@ -48,6 +48,21 @@ export interface DownloadArgs {
   network?: NetworkOptions;
 }
 
+/**
+ * The captions of one video, without its media (`--skip-download --write-subs`): sidecar
+ * `.srt` files next to `output`'s stem. See `SubtitlesRunner`.
+ */
+export interface SubtitlesArgs {
+  url: string;
+  /** Output template (`-o`), the video's path template (`<stem>.%(ext)s`): the sidecars share its stem. */
+  output: string;
+  /** `--sub-langs` entries (`en`, `nl-NL-orig`), at least one. */
+  languages: readonly string[];
+  /** `--write-auto-subs` and the skip of machine translations (`AUTO_SUBTITLES_EXTRACTOR_ARGS`). */
+  generated: boolean;
+  network?: NetworkOptions;
+}
+
 /** `-F` for one video: the diagnostic format table, warnings included. */
 export interface FormatsArgs {
   url: string;
@@ -58,7 +73,11 @@ export type YtdlpCommand =
   | { kind: 'version' }
   | ({ kind: 'formats' } & FormatsArgs)
   | ({ kind: 'metadata' } & MetadataArgs)
+  | ({ kind: 'subtitles' } & SubtitlesArgs)
   | ({ kind: 'download' } & DownloadArgs);
+
+/** Skips YouTube's machine-translated captions (yt-dlp README, youtube extractor `skip`). */
+export const AUTO_SUBTITLES_EXTRACTOR_ARGS = 'youtube:skip=translated_subs';
 
 /** Prefix of the progress lines our template makes yt-dlp print. */
 export const PROGRESS_MARKER = '[mytube-progress] ';
@@ -168,6 +187,30 @@ export function buildArgs(command: YtdlpCommand): string[] {
     }
     if (command.format) args.push('-f', command.format);
     if (command.formatSort) args.push('-S', command.formatSort);
+    args.push(...networkArgs(command.network), '--', command.url);
+    return args;
+  }
+  if (command.kind === 'subtitles') {
+    if (command.languages.length === 0) throw new Error('No subtitle languages');
+    const args = [
+      ...BASE_ARGS,
+      '--no-playlist',
+      '--skip-download',
+      '--write-subs',
+      // `vtt` is what YouTube serves (`best` as a fallback); yt-dlp converts it to `.srt`, the
+      // sidecar format every Plex client plays as it is (the player converts it once itself).
+      '--sub-format',
+      'vtt/best',
+      '--convert-subs',
+      'srt',
+    ];
+    // `--write-auto-subs` adds the automatic captions; `skip=translated_subs` drops yt-dlp's
+    // translations of uploaded subtitles (`nl-en`). Machine translations of the automatic
+    // captions sit under the plain codes, which the caller never asks for (`subtitleLanguages`).
+    if (command.generated) {
+      args.push('--write-auto-subs', '--extractor-args', AUTO_SUBTITLES_EXTRACTOR_ARGS);
+    }
+    args.push('--sub-langs', command.languages.join(','), '-o', command.output);
     args.push(...networkArgs(command.network), '--', command.url);
     return args;
   }

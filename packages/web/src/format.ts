@@ -66,21 +66,41 @@ export function formatSpeed(bytesPerSec: number): string {
   return `${formatBytes(bytesPerSec)}/s`;
 }
 
+/** `HH:MM` in local time. */
+function clockTime(iso: string): string {
+  const date = new Date(iso);
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 /**
  * The queue row's meta line (`Deep Dive Podcast · 1080p · 1.2 GB · 4.1 MB/s`):
- * channel, quality, size and speed, each only when known. The speed shows while running.
+ * channel, quality, size and speed, each only when known. The speed shows while running. A
+ * queued job that waits (a retry's backoff, a postponed subtitle job) adds `until 14:35`, and a
+ * retry its attempt.
  */
-export function queueMeta(job: Job): string {
+export function queueMeta(job: Job, now: number = Date.now()): string {
   const parts: string[] = [];
   if (job.subtitle) parts.push(job.subtitle);
   if (job.detail) parts.push(job.detail);
   if (job.totalBytes) parts.push(formatBytes(job.totalBytes));
   if (job.status === 'running' && job.speedBytesPerSec)
     parts.push(formatSpeed(job.speedBytesPerSec));
+  if (job.status === 'queued' && job.runAfter && Date.parse(job.runAfter) > now) {
+    parts.push(`until ${clockTime(job.runAfter)}`);
+  }
   if (job.status === 'queued' && job.attempts > 0) {
     parts.push(`attempt ${job.attempts + 1} of ${job.maxAttempts}`);
   }
   return parts.join(' · ');
+}
+
+/**
+ * Why a queued job waits, when the queue should say so: a postponed job (no failed attempt, an
+ * error kept on the row: YouTube's rate limit on captions). A retry's error stays in the log.
+ */
+export function waitingReason(job: Job): string | null {
+  if (job.status !== 'queued' || job.attempts > 0) return null;
+  return errorTail(job.error);
 }
 
 export type QueueTone = 'red' | 'muted';
@@ -114,6 +134,7 @@ export function queueState(job: Job): { text: string; tone: QueueTone } {
   if (job.status === 'failed') return { text: 'failed', tone: 'red' };
   if (job.status !== 'running') return { text: 'queued', tone: 'muted' };
   if (job.type === 'check_source') return { text: 'checking', tone: 'red' };
+  if (job.type === 'subtitles') return { text: 'fetching subtitles', tone: 'red' };
   if (job.stage) return { text: `processing · ${stageLabel(job.stage)}`, tone: 'red' };
   if (job.type !== 'download') return { text: 'running', tone: 'red' };
   if (job.progress === null) return { text: 'starting', tone: 'red' };
@@ -221,11 +242,18 @@ export function whenLabel(at: string, now: Date = new Date()): string {
 export type ResultTone = 'ok' | 'red' | 'muted';
 
 /**
- * History result colour: `done` (also `done, no subtitles`), `updated`, `installed` green;
+ * History result colour: `done`, `subtitles` (a subtitle job's), `updated`, `installed` green;
  * `failed` red; the rest muted.
  */
 export function resultTone(result: string): ResultTone {
-  if (result.startsWith('done') || result === 'updated' || result === 'installed') return 'ok';
+  if (
+    result.startsWith('done') ||
+    result === 'subtitles' ||
+    result === 'updated' ||
+    result === 'installed'
+  ) {
+    return 'ok';
+  }
   if (result === 'failed') return 'red';
   return 'muted';
 }
