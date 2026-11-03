@@ -1,7 +1,7 @@
-import { mkdirSync, readdirSync, renameSync, rmdirSync, rmSync, statSync } from 'node:fs';
-import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
+import { mkdirSync, readdirSync, rmdirSync, rmSync, statSync } from 'node:fs';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { renderPathTemplate, type VideoSettings } from '@mytube/shared';
+import { renderPathTemplate } from '@mytube/shared';
 import { eq, sql } from 'drizzle-orm';
 import { AppConfig } from '../config/app-config.js';
 import { DATABASE, type Database } from '../database/database.module.js';
@@ -15,15 +15,14 @@ import {
   type JobRunner,
 } from '../jobs/job-runner.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { SubtitlesService } from '../subtitles/subtitles.service.js';
 import { networkOptions } from '../ytdlp/network.js';
-import { isYtdlpFailure, noDownloadableFormat, YtdlpError } from '../ytdlp/ytdlp-error.js';
-import { ORIG_SUFFIX } from '../ytdlp/metadata.js';
+import { noDownloadableFormat, YtdlpError } from '../ytdlp/ytdlp-error.js';
 import { YtdlpRunner, YtdlpSession } from '../ytdlp/ytdlp-runner.js';
 import { NO_DOWNLOADABLE_FORMAT, probeForDownload } from './probe.js';
 import {
   DownloadProgressTracker,
   isUnavailableReason,
-  subtitleLanguages,
   videoExtraArgs,
   videoFormat,
   videoFormatSort,
@@ -39,16 +38,15 @@ const MEDIA_EXTENSIONS = new Set(['mkv', 'mp4', 'webm', 'm4a', 'mp3', 'opus', 'f
  * 2. Reads the video's full metadata with the download's format selector (exact upload date
  *    and title: flat listings only carry an approximate date; the size of the streams it will
  *    fetch) and renders `video.pathTemplate` under `VIDEO_DIR`.
- * 3. Runs yt-dlp with the Settings → Video format, container, subtitles and thumbnail options
- *    and the network options, reporting progress (`DownloadProgressTracker`: 0 to 0.9 while
- *    downloading, 0.9 to 0.99 with the post-processor as the job's stage). Subtitles are
- *    narrowed to the tracks the video has (`subtitleLanguages`). When yt-dlp fails on a
- *    subtitle track (`Unable to download video subtitles …`, YouTube's HTTP 429 on captions),
- *    it runs once more without subtitles: the video matters more than its captions. The
- *    outcome then says so (`done, no subtitles`, the reason in `details`).
+ * 3. Runs yt-dlp with the Settings → Video format, container and thumbnail options and the
+ *    network options, reporting progress (`DownloadProgressTracker`: 0 to 0.9 while
+ *    downloading, 0.9 to 0.99 with the post-processor as the job's stage). Never with
+ *    subtitles: yt-dlp fetches captions before the media and gives the whole download up when
+ *    YouTube answers one with HTTP 429.
  * 4. On success marks the video `on_disk` with its path (relative to `VIDEO_DIR`), size and
- *    time, and adds the size to its source. Sidecar subtitles of a generated track lose
- *    yt-dlp's `-orig` suffix (`<name>.en.vtt`), so Plex and the player read the language.
+ *    time, adds the size to its source, and, when Settings → Video names subtitle languages,
+ *    queues the video's `subtitles` job (`SubtitlesRunner`), which fetches them on its own
+ *    schedule.
  *
  * A failure puts the video back to `wanted` and rethrows (the worker retries). A video YouTube
  * refuses for good (removed, private, members-only) or that has no downloadable format at all
@@ -66,6 +64,7 @@ export class DownloadRunner implements JobRunner {
     private readonly settings: SettingsService,
     private readonly config: AppConfig,
     private readonly logs: JobLogsService,
+    private readonly subtitles: SubtitlesService,
   ) {}
 
   async run(job: JobRow, { signal, progress }: JobContext): Promise<JobOutcome | null> {
@@ -142,50 +141,26 @@ export class DownloadRunner implements JobRunner {
       // `%` starts a yt-dlp output template field; the rendered path is literal.
       const output = `${target.replaceAll('%', '%%')}.%(ext)s`;
 
-      // The probe's entry (with or without `-f`) carries the captions either way.
-      const { languages, skipped } = subtitleLanguages(settings.video, entry?.captions);
-      if (skipped.length > 0) {
-        log.line(
-          `subtitles: no ${skipped.join(', ')} (on YouTube only as a dub's transcript or a machine translation)`,
-        );
-      }
-      if (languages.length > 0) log.line(`subtitles: ${languages.join(', ')}`);
-
-      const download = (videoSettings: VideoSettings) => {
-        const tracker = new DownloadProgressTracker(sized ? entry?.expectedStreams : undefined);
-        progress(tracker.start());
-        return this.runner.download(
-          url,
-          {
-            output,
-            format,
-            formatSort,
-            mergeOutputFormat: videoSettings.container,
-            extraArgs: videoExtraArgs(videoSettings, entry?.captions),
-            network,
-            session,
-            signal,
-            log: log.line,
-          },
-          (update) => {
-            const report = tracker.update(update);
-            if (report) progress(report);
-          },
-        );
-      };
-      let result;
-      let noSubtitles: string | null = null;
-      try {
-        result = await download(settings.video);
-      } catch (error) {
-        if (!isYtdlpFailure(error, 'subtitles') || languages.length === 0 || signal.aborted) {
-          throw error;
-        }
-        noSubtitles = error.reason ?? error.message;
-        log.line(`subtitles: ${noSubtitles}; downloading without subtitles`);
-        result = await download({ ...settings.video, subtitleLanguages: [] });
-      }
-      if (!settings.video.subtitlesEmbedded) renameOrigSidecars(result.filePath, log.line);
+      const tracker = new DownloadProgressTracker(sized ? entry?.expectedStreams : undefined);
+      progress(tracker.start());
+      const result = await this.runner.download(
+        url,
+        {
+          output,
+          format,
+          formatSort,
+          mergeOutputFormat: settings.video.container,
+          extraArgs: videoExtraArgs(settings.video),
+          network,
+          session,
+          signal,
+          log: log.line,
+        },
+        (update) => {
+          const report = tracker.update(update);
+          if (report) progress(report);
+        },
+      );
 
       const size = statSync(result.filePath).size;
       const filePath = relative(this.config.videoDir, result.filePath).split(sep).join('/');
@@ -210,13 +185,9 @@ export class DownloadRunner implements JobRunner {
         }
       });
       log.line(`saved ${filePath} (${size} bytes)`);
-      if (noSubtitles) {
-        return {
-          title,
-          result: 'done, no subtitles',
-          kind: 'video',
-          details: `${filePath} · ${noSubtitles}`,
-        };
+      if (settings.video.subtitleLanguages.length > 0) {
+        const queued = this.subtitles.enqueue(video.id);
+        log.line(queued ? 'subtitles: job queued' : 'subtitles: job already queued');
       }
       return { title, result: 'done', kind: 'video', details: filePath };
     } catch (error) {
@@ -289,41 +260,6 @@ export class DownloadRunner implements JobRunner {
     } catch (error) {
       this.logger.debug(`Could not remove ${dir}: ${String(error)}`);
     }
-  }
-}
-
-const ORIG_SIDECAR = new RegExp(
-  `^(.*\\.[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*)${ORIG_SUFFIX}(\\.(?:vtt|srt|ass|lrc))$`,
-);
-
-/**
- * The name a subtitle sidecar yt-dlp wrote for a `<lang>-orig` track (`ORIG_SUFFIX`) should
- * have: `<stem>.en-orig.vtt` → `<stem>.en.vtt`; null for any other name.
- */
-export function withoutOrigSuffix(name: string): string | null {
-  const match = ORIG_SIDECAR.exec(name);
-  return match ? `${match[1]}${match[2]}` : null;
-}
-
-/**
- * Renames the subtitle sidecars next to a downloaded video that carry yt-dlp's `-orig` suffix
- * (see `withoutOrigSuffix`). A file with the plain name already there is left alone.
- */
-function renameOrigSidecars(filePath: string, log: (line: string) => void): void {
-  const dir = dirname(filePath);
-  const stem = basename(filePath, extname(filePath));
-  let names: string[];
-  try {
-    names = readdirSync(dir);
-  } catch {
-    return;
-  }
-  for (const name of names) {
-    if (!name.startsWith(`${stem}.`)) continue;
-    const renamed = withoutOrigSuffix(name);
-    if (!renamed || names.includes(renamed)) continue;
-    renameSync(join(dir, name), join(dir, renamed));
-    log(`renamed ${name} to ${renamed}`);
   }
 }
 

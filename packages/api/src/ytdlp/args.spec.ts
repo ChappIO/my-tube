@@ -97,6 +97,47 @@ describe('buildArgs', () => {
     ]);
   });
 
+  it('builds the subtitle-only call: no media, the sidecars next to the output stem', () => {
+    const args = buildArgs({
+      kind: 'subtitles',
+      url: 'https://www.youtube.com/watch?v=abc',
+      output: '/v/Video.%(ext)s',
+      languages: ['en-orig', 'nl'],
+      generated: true,
+      network: { rateLimit: '1M' },
+    });
+    expect(args.slice(args.indexOf('--no-playlist'))).toEqual([
+      '--no-playlist',
+      '--skip-download',
+      '--write-subs',
+      '--sub-format',
+      'vtt/best',
+      '--write-auto-subs',
+      '--extractor-args',
+      'youtube:skip=translated_subs',
+      '--sub-langs',
+      'en-orig,nl',
+      '-o',
+      '/v/Video.%(ext)s',
+      '--limit-rate',
+      '1M',
+      '--',
+      'https://www.youtube.com/watch?v=abc',
+    ]);
+    const uploaded = buildArgs({
+      kind: 'subtitles',
+      url: 'https://www.youtube.com/watch?v=abc',
+      output: '/v/Video.%(ext)s',
+      languages: ['en'],
+      generated: false,
+    });
+    expect(uploaded).not.toContain('--write-auto-subs');
+    expect(uploaded).not.toContain('--extractor-args');
+    expect(() =>
+      buildArgs({ kind: 'subtitles', url: 'u', output: 'o', languages: [], generated: true }),
+    ).toThrow('No subtitle languages');
+  });
+
   it('refuses reserved flags in extraArgs', () => {
     for (const flag of ['--exec', '-o', '--print', '--cookies', '--proxy=x', '--']) {
       expect(() =>

@@ -17,6 +17,8 @@ import { SettingsModule } from './settings/settings.module.js';
 import { SourcesModule } from './sources/sources.module.js';
 import { CheckSourceRunner } from './sync/check-source.runner.js';
 import { RevalidateRunner } from './sync/revalidate.runner.js';
+import { SubtitlesModule } from './subtitles/subtitles.module.js';
+import { SubtitlesRunner } from './subtitles/subtitles.runner.js';
 import { SyncModule } from './sync/sync.module.js';
 import { SystemModule } from './system/system.module.js';
 import { TrackDownloadRunner } from './downloads/track-download.runner.js';
@@ -36,9 +38,10 @@ import { YtdlpModule } from './ytdlp/ytdlp.module.js';
     // jobs go to the dispatcher, which hands videos to DownloadRunner and tracks to
     // TrackDownloadRunner.
     JobsModule.forRoot({
-      imports: [YtdlpModule, SyncModule, MetadataModule, MaintenanceModule],
+      imports: [YtdlpModule, SyncModule, MetadataModule, MaintenanceModule, SubtitlesModule],
       runners: [
         CheckSourceRunner,
+        SubtitlesRunner,
         RevalidateRunner,
         DownloadDispatchRunner,
         RescanRunner,

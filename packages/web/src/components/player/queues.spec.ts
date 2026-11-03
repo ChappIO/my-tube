@@ -178,6 +178,8 @@ function videoRow(
     title: `Video ${id}`,
     durationSeconds: 60 * id,
     publishedAt: '2026-09-23',
+    subtitlesAt: null,
+    subtitleLanguages: null,
     thumbnailUrl: `/api/artwork/video/${id}`,
     status: 'on_disk',
     skipReason: null,

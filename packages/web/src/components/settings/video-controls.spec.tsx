@@ -5,7 +5,12 @@ import { apiPatch } from '../../api/client';
 import { withLanguage, withoutLanguage } from './language-select';
 import type { LanguageMultiSelectProps } from './LanguageMultiSelect';
 import type { ToggleRowProps } from '../ui/Toggle';
-import { AutoSubtitlesRow, type SubtitlePatch, SubtitlesControl } from './VideoControls';
+import {
+  AutoSubtitlesRow,
+  type SubtitlePatch,
+  SubtitlesControl,
+  subtitlesCatchUpText,
+} from './VideoControls';
 
 // Capture the props the controls hand to the picker and the toggle, to drive them without a DOM.
 const captured = vi.hoisted(() => ({
@@ -73,5 +78,23 @@ describe('Settings → Video subtitle controls', () => {
     captured.toggle!.onChange(false);
     expect(onChange).toHaveBeenCalledWith({ autoSubtitles: false });
     expect(await patchBody({ autoSubtitles: false })).toEqual({ video: { autoSubtitles: false } });
+  });
+
+  it('describes the videos without subtitles and the queue', () => {
+    expect(subtitlesCatchUpText(undefined, [])).toBe('No languages picked: nothing is fetched.');
+    expect(subtitlesCatchUpText(undefined, ['en'])).toBe('Counting videos without subtitles…');
+    expect(subtitlesCatchUpText({ missing: 0, queued: 0, pausedUntil: null }, ['en'])).toBe(
+      'Every video on disk had a subtitle run with these languages.',
+    );
+    expect(subtitlesCatchUpText({ missing: 123, queued: 0, pausedUntil: null }, ['en'])).toBe(
+      '123 videos on disk without a subtitle run for these languages.',
+    );
+    expect(subtitlesCatchUpText({ missing: 1, queued: 1, pausedUntil: null }, ['en'])).toBe(
+      '1 video on disk without a subtitle run for these languages. 1 subtitle job queued, one at a time.',
+    );
+    const until = new Date(2026, 10, 3, 14, 5).toISOString();
+    expect(subtitlesCatchUpText({ missing: 5, queued: 5, pausedUntil: until }, ['en'])).toBe(
+      '5 videos on disk without a subtitle run for these languages. YouTube rate-limited captions: the queue resumes at 14:05.',
+    );
   });
 });

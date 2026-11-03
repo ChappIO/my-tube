@@ -9,7 +9,7 @@ MyTube is one loop. Everything else hangs off it.
 
 1. **Sources.** A source is something on YouTube the user deliberately chose: a channel, an artist, or a playlist. Each source belongs to the Music or the Video library. A source can be subscribed (checked on a schedule) or not. Subscribing and unsubscribing never touches files.
 2. **Sync.** On a schedule, the sync service asks yt-dlp for a source's current item list (metadata only), evaluates the source's rules (one matcher tree) on each entry, records new items as known but not on disk, and enqueues download jobs for the ones the tree matches.
-3. **Queue.** One in-process worker pool takes jobs from the `jobs` table, runs yt-dlp with progress parsing, writes the file to its templated path, tags it, saves a sidecar thumbnail, and marks the item on disk. Concurrency is the "Downloads at once" setting.
+3. **Queue.** One in-process worker pool takes jobs from the `jobs` table, runs yt-dlp with progress parsing, writes the file to its templated path, tags it, saves a sidecar thumbnail, and marks the item on disk. Concurrency is the "Downloads at once" setting. A video's subtitles follow in a job of their own, one at a time and rate-limited locally.
 4. **Library.** The Music and Video screens are read models over items and files. "Missing" means known but not on disk. "Incomplete" is an album or playlist with missing items.
 5. **Revalidation.** Every 6 hours per subscribed source, and at once after its rules are saved, the source's items are evaluated again against its current tree. Files it no longer matches are removed (with their sidecars) and each removal is recorded in history. This is the only automatic deletion; it replaces the old "retention" job (keep the last 90 days is the rule `NOT older than 90 days`).
 6. **Maintenance.** The yt-dlp manager downloads the binary on first boot, checks GitHub for updates on a schedule, swaps it in, and records an event. Rescan walks the mounts and reconciles on-disk flags. Backups copy the database.
@@ -64,7 +64,9 @@ SQLite, one migration per change (see the database skill).
 
 Every item row (video, track) carries: youtube id, title, duration, published date, thumbnail, file path, file size, status. Status is one of `wanted`, `downloading`, `on_disk`, `missing`, `skipped`.
 
-Job types: `download`, `check_source`, `revalidate`, `rescan`, `backup`.
+Job types: `download`, `subtitles`, `check_source`, `revalidate`, `rescan`, `backup`.
+
+**Subtitles are a job of their own** (decided 2026-11-03). A video download never asks yt-dlp for captions: yt-dlp fetches them before the media and gives the whole download up when YouTube answers a caption track with HTTP 429. Once the file is on disk the download queues a `subtitles` job for it, which runs one at a time with a gap between fetches, fetches only the languages the file lacks, embeds them (or writes sidecars) and records the run on the video (`subtitles_at`, `subtitle_languages`). A 429 pauses the subtitle queue for a growing while (15 minutes to 6 hours) without touching video downloads. Settings → Video → "Videos without subtitles" counts the videos on disk without a run for the current languages and queues them (backend skill "Subtitles").
 
 Job statuses: `queued`, `running`, `done`, `failed`, `cancelled`. Retries back off 1, 5 and 25 minutes; the worker runs up to "Downloads at once" downloads and one job of each other type at a time (backend skill "Jobs").
 
@@ -77,7 +79,8 @@ One folder per module under `packages/api/src` (see the backend skill for conven
 - `ytdlp`: binary lifecycle (locate, download from GitHub, verify, update) and a runner wrapping spawn: `metadata(url)` returns parsed JSON, `download(item, options)` reports progress. Nothing else spawns yt-dlp.
 - `sources`: URL resolution (paste a link, get kind, name, avatar, counts), source records, rules, the subscribe toggle.
 - `sync`: the scheduler, the diff and revalidation. Which items a tree matches is a pure function in shared (`evaluateMatcher`), unit-tested without yt-dlp.
-- `jobs`: queue table, worker loop, concurrency, retries, progress, cancellation. Writes history rows for outcomes.
+- `jobs`: queue table, worker loop, concurrency, retries, postponing, progress, cancellation. Writes history rows for outcomes.
+- `subtitles`: the `subtitles` job (fetch a video's captions after its download, embed them, the local rate limit on caption fetches) and the catch-up for videos on disk without them.
 - `library`: music and video read models, filters, sorting, missing detection; the player's queues (a playlist's and an artist's tracks), the streams and video playback (ffprobe, the mkv remux, subtitles as WebVTT).
 - `artwork`: the artwork cache (`/api/artwork/:kind/:id`).
 - `files`: mount access, path templates, rescan, delete (`removeMediaFiles`: a file, its sidecars and empty folders), range streaming.

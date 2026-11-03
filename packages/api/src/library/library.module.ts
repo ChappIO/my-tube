@@ -18,5 +18,7 @@ import { PlaybackService } from './playback.service.js';
   imports: [SyncModule],
   controllers: [LibraryController, MusicLibraryController],
   providers: [LibraryService, MusicLibraryService, AlbumService, ArtistService, PlaybackService],
+  // The subtitle job asks ffprobe which languages a file already carries.
+  exports: [PlaybackService],
 })
 export class LibraryModule {}

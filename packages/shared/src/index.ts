@@ -13,3 +13,4 @@ export * from './library.js';
 export * from './format.js';
 export * from './cookies.js';
 export * from './playback.js';
+export * from './subtitles.js';

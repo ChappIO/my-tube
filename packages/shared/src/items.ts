@@ -46,7 +46,18 @@ export const SKIP_REASONS = [
 export const SkipReason = z.enum(SKIP_REASONS);
 export type SkipReason = z.infer<typeof SkipReason>;
 
-export const JOB_TYPES = ['download', 'check_source', 'revalidate', 'rescan', 'backup'] as const;
+/**
+ * Job types. `subtitles` follows a video `download`: it fetches the video's captions in a job of
+ * its own, so YouTube's rate limit on captions (HTTP 429) throttles subtitles, never videos.
+ */
+export const JOB_TYPES = [
+  'download',
+  'subtitles',
+  'check_source',
+  'revalidate',
+  'rescan',
+  'backup',
+] as const;
 export const JobType = z.enum(JOB_TYPES);
 export type JobType = z.infer<typeof JobType>;
 
@@ -125,6 +136,10 @@ export const Video = z.object({
   channelId: z.number().int().positive(),
   isShort: z.boolean(),
   liveStatus: z.string().nullable(),
+  /** When the subtitle job last finished for this file, or null (never, or a new download). */
+  subtitlesAt: Timestamp.nullable(),
+  /** The Settings languages that job ran with (`en,nl`), or null. */
+  subtitleLanguages: z.string().nullable(),
 });
 export type Video = z.infer<typeof Video>;
 

@@ -120,6 +120,13 @@ describe('Activity (e2e)', () => {
     expect(checked.lastCheckedAt).not.toBeNull();
     expect(checked.itemCount).toBe(1);
     expect(checked.sizeBytes).toBe(10);
+
+    // The download queued the video's subtitle job (no runner for it here, so it stays queued).
+    const queue = z.array(Job).parse((await request(server()).get('/api/activity/queue')).body);
+    expect(queue).toMatchObject([
+      { type: 'subtitles', title: 'What It Takes', subtitle: 'NASA', status: 'queued' },
+    ]);
+    app.get(JobsService).cancel(queue[0]!.id);
   });
 
   it('GET /api/activity/queue, /summary and /history answer the shared schemas', async () => {

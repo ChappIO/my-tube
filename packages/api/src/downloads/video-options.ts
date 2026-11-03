@@ -47,43 +47,21 @@ export function videoFormatSort(codec: Codec): string {
   return codec === 'efficient' ? 'res,vcodec,ext' : 'res,ext,+vcodec:h264';
 }
 
-/** Skips YouTube's machine-translated captions (yt-dlp README, youtube extractor `skip`). */
-export const AUTO_SUBTITLES_EXTRACTOR_ARGS = 'youtube:skip=translated_subs';
-
 /**
  * Extra yt-dlp flags from Settings → Video:
  * - `--remux-video <container>` so a single-file download also ends up in the chosen container
  *   (not for webm: H.264 cannot be remuxed into webm, so a fallback file keeps its own type).
  *   Merged downloads use `--merge-output-format`, which the caller passes separately.
- * - Subtitles: `--embed-subs --sub-langs en,nl` when embedded (no files are left next to the
- *   video), `--write-subs --sub-langs en,nl` for sidecar files. With generated subtitles on,
- *   `--write-auto-subs --extractor-args youtube:skip=translated_subs` as well: YouTube's
- *   automatic captions for a language without uploaded subtitles (uploaded ones win). With the
- *   video's `captions` known, `--sub-langs` names the tracks it really has (`en` uploaded, else
- *   `en-orig`; see `subtitleLanguages`), so machine translations are never fetched. No
- *   languages, no subtitles.
  * - Thumbnails: `--write-thumbnail --convert-thumbnails jpg`, a `<name>.jpg` sidecar next to
  *   the video, which Plex picks up as the poster.
+ *
+ * Never subtitles: yt-dlp fetches captions before the media and gives the whole download up
+ * when YouTube answers a caption track with HTTP 429, so they are fetched afterwards by the
+ * `subtitles` job (`SubtitlesRunner`), which the download queues once the file is on disk.
  */
-export function videoExtraArgs(video: VideoSettings, captions?: CaptionLanguages | null): string[] {
+export function videoExtraArgs(video: VideoSettings): string[] {
   const args: string[] = [];
   if (video.container !== 'webm') args.push('--remux-video', video.container);
-  const { languages } = subtitleLanguages(video, captions);
-  if (languages.length > 0) {
-    // `--embed-subs` alone fetches the subtitles, embeds them and deletes the files; adding
-    // `--write-subs` would keep the sidecar files as well.
-    args.push(video.subtitlesEmbedded ? '--embed-subs' : '--write-subs');
-    // `--write-auto-subs` only adds automatic captions to what is fetched; embedding still
-    // removes the files afterwards. `skip=translated_subs` drops yt-dlp's translations of
-    // uploaded subtitles (`nl-en`); machine translations of the automatic captions sit under
-    // the plain codes, which `subtitleLanguages` never asks for. A separate
-    // `--extractor-args` per extractor combines with others, such as the metadata calls'
-    // `youtubetab:approximate_date`.
-    if (video.autoSubtitles) {
-      args.push('--write-auto-subs', '--extractor-args', AUTO_SUBTITLES_EXTRACTOR_ARGS);
-    }
-    args.push('--sub-langs', languages.join(','));
-  }
   if (video.saveThumbnails) args.push('--write-thumbnail', '--convert-thumbnails', 'jpg');
   return args;
 }
@@ -100,10 +78,12 @@ export function videoExtraArgs(video: VideoSettings, captions?: CaptionLanguages
  * YouTube only as a dub's transcript or a machine translation.
  */
 export function subtitleLanguages(
-  video: VideoSettings,
+  video: Pick<VideoSettings, 'subtitleLanguages' | 'autoSubtitles'>,
   captions?: CaptionLanguages | null,
 ): { languages: string[]; skipped: string[] } {
-  if (!video.autoSubtitles || !captions) return { languages: video.subtitleLanguages, skipped: [] };
+  if (!video.autoSubtitles || !captions) {
+    return { languages: [...video.subtitleLanguages], skipped: [] };
+  }
   const languages: string[] = [];
   const skipped: string[] = [];
   for (const lang of video.subtitleLanguages) {

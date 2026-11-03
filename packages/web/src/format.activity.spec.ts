@@ -13,6 +13,7 @@ import {
   queueMeta,
   queuePercent,
   queueState,
+  waitingReason,
   stageLabel,
   resultTone,
   whenLabel,
@@ -56,6 +57,34 @@ describe('queue rows', () => {
     expect(queueMeta({ ...job, status: 'queued', attempts: 1, totalBytes: null })).toBe(
       'Deep Dive Podcast · 1080p · attempt 2 of 3',
     );
+  });
+
+  it('says until when a queued job waits, and why a postponed one does', () => {
+    const now = Date.parse('2026-11-03T10:00:00.000Z');
+    const later = new Date(now + 15 * 60_000);
+    const hhmm = `${String(later.getHours()).padStart(2, '0')}:${String(later.getMinutes()).padStart(2, '0')}`;
+    const paused = {
+      ...job,
+      type: 'subtitles' as const,
+      status: 'queued' as const,
+      detail: 'subtitles',
+      totalBytes: null,
+      speedBytesPerSec: null,
+      runAfter: later.toISOString(),
+      error: "Unable to download video subtitles for 'en': HTTP Error 429: Too Many Requests",
+    };
+    expect(queueMeta(paused, now)).toBe(`Deep Dive Podcast · subtitles · until ${hhmm}`);
+    expect(waitingReason(paused)).toBe(
+      "Unable to download video subtitles for 'en': HTTP Error 429: Too Many Requests",
+    );
+    // A time that has passed is not shown; a retry's error is not a waiting reason.
+    expect(queueMeta(paused, now + 3_600_000)).toBe('Deep Dive Podcast · subtitles');
+    expect(waitingReason({ ...paused, attempts: 1 })).toBeNull();
+    expect(waitingReason({ ...paused, error: null })).toBeNull();
+    expect(queueState({ ...paused, status: 'running' })).toEqual({
+      text: 'fetching subtitles',
+      tone: 'red',
+    });
   });
 
   it('names the state and the bar width', () => {
@@ -147,7 +176,8 @@ describe('whenLabel', () => {
 describe('results and polling', () => {
   it('colours results by outcome', () => {
     expect(resultTone('done')).toBe('ok');
-    expect(resultTone('done, no subtitles')).toBe('ok');
+    expect(resultTone('subtitles')).toBe('ok');
+    expect(resultTone('no subtitles')).toBe('muted');
     expect(resultTone('updated')).toBe('ok');
     expect(resultTone('installed')).toBe('ok');
     expect(resultTone('failed')).toBe('red');

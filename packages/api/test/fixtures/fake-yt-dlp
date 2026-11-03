@@ -11,6 +11,9 @@
 //                               list-<id>.json for a list= URL when it exists, track.json for
 //                               music.youtube.com/watch?v= URLs
 //   -x --audio-format <ext>     a download writes <output>.<ext> instead of .mp4
+//   --skip-download --write-subs
+//                               the subtitle job: writes a <stem>.<lang>.vtt sidecar per
+//                               --sub-langs entry (the -orig suffix kept) and no media file
 //   anything else               a download: progress lines on stdout, post-processor lines
 //                               on stderr, then the final file path; creates the file
 //
@@ -164,6 +167,19 @@ if (env.FAKE_YTDLP_SUBTITLE_ERROR && subLangs.length > 0) {
   process.exit(1);
 }
 const id = url.split('=').pop() || 'fake';
+if (args.includes('--skip-download')) {
+  // The subtitle job: the sidecars next to the output's stem, nothing else.
+  const stem = (option('-o') ?? '%(id)s.%(ext)s')
+    .replace(/\.%\(ext\)s$/, '')
+    .replaceAll('%(id)s', id)
+    .replaceAll('%%', '%');
+  mkdirSync(dirname(stem), { recursive: true });
+  for (const lang of subLangs) {
+    process.stdout.write(`[info] Writing video subtitles to: ${stem}.${lang}.vtt\n`);
+    writeFileSync(`${stem}.${lang}.vtt`, 'WEBVTT\n');
+  }
+  process.exit(0);
+}
 const ext = args.includes('-x') ? (option('--audio-format') ?? 'm4a') : 'mp4';
 const output = (option('-o') ?? '%(id)s.%(ext)s')
   .replaceAll('%(id)s', id)

@@ -15,6 +15,7 @@ import type { MetadataProvider, TrackLookup } from '../metadata/provider.js';
 import type { TrackTags } from '../metadata/ytdlp-tags.js';
 import { YtdlpRunner } from '../ytdlp/ytdlp-runner.js';
 import { DownloadDispatchRunner } from './download-dispatch.runner.js';
+import { SubtitlesService } from '../subtitles/subtitles.service.js';
 import { DownloadRunner } from './download.runner.js';
 import { TrackDownloadRunner } from './track-download.runner.js';
 
@@ -415,13 +416,14 @@ describe('TrackDownloadRunner (fake binary)', () => {
   });
 
   it('is what the download dispatcher runs for a job with a trackId', async () => {
-    const { enqueue, runner, config, logs, db, settings } = setup();
+    const { enqueue, runner, config, logs, db, settings, jobs } = setup();
     const videos = new DownloadRunner(
       db,
       new YtdlpRunner({ path: () => FAKE }),
       settings,
       config,
       logs,
+      new SubtitlesService(db, jobs, settings),
     );
     const dispatch = new DownloadDispatchRunner(videos, runner);
     const outcome = await dispatch.run(enqueue(), context().ctx);

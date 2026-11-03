@@ -1,5 +1,12 @@
 import type { Job } from '@mytube/shared';
-import { errorHint, errorTail, queueMeta, queuePercent, queueState } from '../../format';
+import {
+  errorHint,
+  errorTail,
+  queueMeta,
+  queuePercent,
+  queueState,
+  waitingReason,
+} from '../../format';
 import { openJobLog } from '../../ui-state';
 import { CloseIcon } from '../icons';
 import { IconButton } from '../ui/IconButton';
@@ -23,7 +30,9 @@ export interface QueueRowProps {
  * Mono 700 13 (`downloading 64%` red, `queued` muted), and a full-width 4px bar (`surface`
  * track, red fill). Also: a small × to cancel (or dismiss a failed row), on
  * failed rows the error's last line in red (then, muted, the cookies hint for a format error
- * while a cookies file is set: `errorHint`) with Retry, after the download the post-processing
+ * while a cookies file is set: `errorHint`) with Retry, on a queued row that was postponed the
+ * reason in muted text (`waitingReason`: the rate limit on captions; the meta line says until
+ * when), after the download the post-processing
  * step as the state (`processing · merging`) while the bar runs from 90 to 99, and on running
  * and failed rows **View log**, which opens the log viewer (`openJobLog`, `LogViewerModal`,
  * live while the job runs). Queued rows have no log yet.
@@ -36,6 +45,7 @@ export function QueueRow({ job, onCancel, onRetry, busy, cookiesSet = false }: Q
   const running = job.status === 'running';
   const error = failed ? errorTail(job.error) : null;
   const hint = failed ? errorHint(job.error, cookiesSet) : null;
+  const waiting = waitingReason(job);
   const hasLog = running || failed;
   return (
     <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 rounded-tile border border-line px-4 py-[14px]">
@@ -44,6 +54,11 @@ export function QueueRow({ job, onCancel, onRetry, busy, cookiesSet = false }: Q
         {meta && (
           <Meta as="div" className="mt-[3px] break-words">
             {meta}
+          </Meta>
+        )}
+        {waiting && (
+          <Meta as="div" className="mt-[6px] break-words">
+            {waiting}
           </Meta>
         )}
         {hasLog && (

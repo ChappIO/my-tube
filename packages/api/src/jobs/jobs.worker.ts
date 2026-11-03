@@ -10,6 +10,7 @@ import { SettingsService } from '../settings/settings.service.js';
 import {
   JOB_RUNNERS,
   PermanentJobError,
+  PostponeJobError,
   type JobProgress,
   type JobRow,
   type JobRunner,
@@ -164,6 +165,11 @@ export class JobsWorker implements OnApplicationBootstrap, OnModuleDestroy {
       } catch (error) {
         if (controller.signal.aborted) {
           this.settleAborted(job, controller);
+        } else if (error instanceof PostponeJobError) {
+          this.jobs.postpone(job.id, error.until, error.message);
+          this.logger.log(
+            `Job ${job.id} (${job.type}) postponed until ${error.until.toISOString()}: ${error.message}`,
+          );
         } else {
           const retryable = !(error instanceof PermanentJobError);
           const failed = this.jobs.fail(job.id, message(error), { retryable });
