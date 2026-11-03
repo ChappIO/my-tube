@@ -218,8 +218,13 @@ export const VideoSettings = z.object({
     .array(SubtitleLanguageCode)
     .max(SUBTITLE_LANGUAGES_MAX)
     .default(['en', 'nl']),
-  /** Embed subtitles in the container instead of writing sidecar files. */
-  subtitlesEmbedded: z.boolean().default(true),
+  /**
+   * Embed subtitles in the container instead of writing `.srt` sidecar files. Off by default
+   * (decided 2026-11-03): Plex direct-plays a sidecar on every client, while an embedded track
+   * can make it transcode, and embedding rewrites the whole file. Installs that stored a choice
+   * keep it.
+   */
+  subtitlesEmbedded: z.boolean().default(false),
   /**
    * "Download generated subtitles": also take YouTube's automatic captions
    * (`--write-auto-subs`) for languages without uploaded subtitles. Existing installs get the

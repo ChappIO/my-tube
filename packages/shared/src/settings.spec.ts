@@ -32,7 +32,7 @@ describe('Settings', () => {
         container: 'mp4',
         codec: 'compatible',
         subtitleLanguages: ['en', 'nl'],
-        subtitlesEmbedded: true,
+        subtitlesEmbedded: false,
         autoSubtitles: true,
         defaultRules: DEFAULT_VIDEO_MATCHER,
         saveThumbnails: true,

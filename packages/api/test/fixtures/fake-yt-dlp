@@ -12,8 +12,8 @@
 //                               music.youtube.com/watch?v= URLs
 //   -x --audio-format <ext>     a download writes <output>.<ext> instead of .mp4
 //   --skip-download --write-subs
-//                               the subtitle job: writes a <stem>.<lang>.vtt sidecar per
-//                               --sub-langs entry (the -orig suffix kept) and no media file
+//                               the subtitle job: writes a <stem>.<lang>.<--convert-subs, else vtt>
+//                               sidecar per --sub-langs entry (the -orig suffix kept), no media file
 //   anything else               a download: progress lines on stdout, post-processor lines
 //                               on stderr, then the final file path; creates the file
 //
@@ -174,9 +174,14 @@ if (args.includes('--skip-download')) {
     .replaceAll('%(id)s', id)
     .replaceAll('%%', '%');
   mkdirSync(dirname(stem), { recursive: true });
+  const subExt = option('--convert-subs') ?? 'vtt';
   for (const lang of subLangs) {
     process.stdout.write(`[info] Writing video subtitles to: ${stem}.${lang}.vtt\n`);
-    writeFileSync(`${stem}.${lang}.vtt`, 'WEBVTT\n');
+    if (subExt !== 'vtt') {
+      process.stdout.write(`[SubtitlesConvertor] Converting subtitles\n`);
+      process.stdout.write(`Deleting original file ${stem}.${lang}.vtt (pass -k to keep)\n`);
+    }
+    writeFileSync(`${stem}.${lang}.${subExt}`, subExt === 'vtt' ? 'WEBVTT\n' : '1\n00:00:00,000 --> 00:00:01,000\nhello\n');
   }
   process.exit(0);
 }

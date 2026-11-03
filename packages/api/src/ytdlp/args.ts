@@ -50,7 +50,7 @@ export interface DownloadArgs {
 
 /**
  * The captions of one video, without its media (`--skip-download --write-subs`): sidecar
- * `.vtt` files next to `output`'s stem. See `SubtitlesRunner`.
+ * `.srt` files next to `output`'s stem. See `SubtitlesRunner`.
  */
 export interface SubtitlesArgs {
   url: string;
@@ -197,9 +197,12 @@ export function buildArgs(command: YtdlpCommand): string[] {
       '--no-playlist',
       '--skip-download',
       '--write-subs',
-      // `vtt` is what YouTube serves and what the player and Plex read; `best` as a fallback.
+      // `vtt` is what YouTube serves (`best` as a fallback); yt-dlp converts it to `.srt`, the
+      // sidecar format every Plex client plays as it is (the player converts it once itself).
       '--sub-format',
       'vtt/best',
+      '--convert-subs',
+      'srt',
     ];
     // `--write-auto-subs` adds the automatic captions; `skip=translated_subs` drops yt-dlp's
     // translations of uploaded subtitles (`nl-en`). Machine translations of the automatic

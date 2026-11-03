@@ -264,8 +264,8 @@ export class YtdlpRunner implements OnModuleDestroy {
   }
 
   /**
-   * Fetches the captions of one video as sidecar files next to `options.output`'s stem, without
-   * the media (`--skip-download`). Resolves once yt-dlp exits 0; the caller lists the files it
+   * Fetches the captions of one video as `.srt` sidecar files next to `options.output`'s stem,
+   * without the media (`--skip-download`). Resolves once yt-dlp exits 0; the caller lists the files it
    * wrote. A caption track YouTube refuses (HTTP 429) rejects with the `subtitles` failure.
    */
   async subtitles(url: string, options: SubtitlesOptions): Promise<void> {

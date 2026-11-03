@@ -112,6 +112,8 @@ describe('buildArgs', () => {
       '--write-subs',
       '--sub-format',
       'vtt/best',
+      '--convert-subs',
+      'srt',
       '--write-auto-subs',
       '--extractor-args',
       'youtube:skip=translated_subs',

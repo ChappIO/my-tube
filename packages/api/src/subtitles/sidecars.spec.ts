@@ -31,20 +31,20 @@ describe('sidecars on disk', () => {
     dirs.push(dir);
     const file = join(dir, 'Video.mp4');
     writeFileSync(file, 'media');
-    writeFileSync(join(dir, 'Video.en-orig.vtt'), 'WEBVTT');
+    writeFileSync(join(dir, 'Video.en-orig.srt'), '1');
     writeFileSync(join(dir, 'Video.nl.vtt'), 'WEBVTT');
     writeFileSync(join(dir, 'Video.nl-orig.vtt'), 'WEBVTT');
     writeFileSync(join(dir, 'Video.jpg'), 'jpg');
     const lines: string[] = [];
     renameOrigSidecars(file, (line) => lines.push(line));
     expect(readdirSync(dir).toSorted()).toEqual([
-      'Video.en.vtt',
+      'Video.en.srt',
       'Video.jpg',
       'Video.mp4',
       'Video.nl-orig.vtt',
       'Video.nl.vtt',
     ]);
-    expect(lines).toEqual(['renamed Video.en-orig.vtt to Video.en.vtt']);
+    expect(lines).toEqual(['renamed Video.en-orig.srt to Video.en.srt']);
     expect(listSidecars(file).map((sidecar) => sidecar.lang)).toEqual(['en', 'nl', 'nl-orig']);
     expect(listSidecars(join(dir, 'missing', 'Video.mp4'))).toEqual([]);
   });

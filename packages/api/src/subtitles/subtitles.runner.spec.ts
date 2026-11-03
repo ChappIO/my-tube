@@ -159,9 +159,10 @@ describe('SubtitlesRunner (fake binaries)', () => {
     };
   }
 
-  it('fetches the missing captions and embeds them, then records the run', async () => {
+  it('fetches the missing captions and embeds them when Settings say so, then records the run', async () => {
     const { runner, job, row, sourceRow, file, logs, ytdlpArgs, ffmpegRuns, jobs, settings } =
       setup();
+    settings.patch({ video: { subtitlesEmbedded: true } });
     // Another queued subtitle job, to see the spacing applied.
     const other = jobs.enqueue({ type: 'subtitles', key: 'video:x', payload: { title: 'x' } }).job;
     const outcome = await runner.run(job, context().ctx);
@@ -173,7 +174,9 @@ describe('SubtitlesRunner (fake binaries)', () => {
     });
     // The subtitle-only yt-dlp call: Dutch is not asked for (only a dub's transcript).
     const args = ytdlpArgs();
-    expect(args).toEqual(expect.arrayContaining(['--skip-download', '--write-subs']));
+    expect(args).toEqual(
+      expect.arrayContaining(['--skip-download', '--write-subs', '--convert-subs', 'srt']),
+    );
     expect(args[args.indexOf('--sub-langs') + 1]).toBe('en-orig');
     expect(args[args.indexOf('-o') + 1]).toBe(
       join(settings.get() && root, 'video', 'NASA/What It Takes (2026-09-04).%(ext)s'),
@@ -182,11 +185,11 @@ describe('SubtitlesRunner (fake binaries)', () => {
     // ffmpeg muxed the renamed sidecar into the file, which then replaced the original.
     const [embed] = ffmpegRuns();
     expect(embed).toEqual(
-      expect.arrayContaining(['-i', file, '-i', `${file.slice(0, -4)}.en.vtt`, '-c:s', 'mov_text']),
+      expect.arrayContaining(['-i', file, '-i', `${file.slice(0, -4)}.en.srt`, '-c:s', 'mov_text']),
     );
     expect(embed).toContain('language=eng');
     expect(readFileSync(file, 'utf8')).toMatch(/^WEBVTT/);
-    expect(existsSync(`${file.slice(0, -4)}.en.vtt`)).toBe(false);
+    expect(existsSync(`${file.slice(0, -4)}.en.srt`)).toBe(false);
     // The size follows the file and the source's total moves by the difference.
     const video = row();
     expect(video.fileSizeBytes).toBe(readFileSync(file).length);
@@ -202,17 +205,17 @@ describe('SubtitlesRunner (fake binaries)', () => {
     );
     expect(log).toContain('subtitles: fetching en-orig');
     expect(log).toContain(
-      'renamed What It Takes (2026-09-04).en-orig.vtt to What It Takes (2026-09-04).en.vtt',
+      'renamed What It Takes (2026-09-04).en-orig.srt to What It Takes (2026-09-04).en.srt',
     );
     expect(log).toContain('subtitles: embedded en');
   });
 
-  it('keeps the captions as sidecar files when Settings say so', async () => {
-    const { runner, job, file, settings } = setup();
-    settings.patch({ video: { subtitlesEmbedded: false } });
+  it('keeps the captions as .srt sidecar files, the default', async () => {
+    const { runner, job, file } = setup();
     const outcome = await runner.run(job, context().ctx);
     expect(outcome?.details).toBe('en as sidecar files');
-    expect(existsSync(`${file.slice(0, -4)}.en.vtt`)).toBe(true);
+    expect(existsSync(`${file.slice(0, -4)}.en.srt`)).toBe(true);
+    expect(existsSync(`${file.slice(0, -4)}.en-orig.srt`)).toBe(false);
     expect(existsSync(join(root, 'ffmpeg.jsonl'))).toBe(false);
     expect(readFileSync(file, 'utf8')).toMatch(/^\{/);
   });

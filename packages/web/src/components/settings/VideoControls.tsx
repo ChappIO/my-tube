@@ -10,7 +10,7 @@ import { LanguageMultiSelect } from './LanguageMultiSelect';
 
 const deliveryOptions = [
   { value: 'embedded', label: 'embedded' },
-  { value: 'sidecar', label: 'sidecar files' },
+  { value: 'sidecar', label: 'sidecar .srt files' },
 ] as const satisfies readonly { value: 'embedded' | 'sidecar'; label: string }[];
 
 /** The subtitle fields of Settings → Video, as a `PATCH /api/settings` `video` group. */
