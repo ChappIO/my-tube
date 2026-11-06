@@ -73,11 +73,36 @@ describe('evaluateItem', () => {
       publishedAt: '2026-01-01',
       durationSeconds: 45,
     });
-    // The entry's own facts win over the stored ones.
+    // The entry's own duration wins over the stored one; the stored date wins over the entry's.
     expect(entryContext(entry(), { ...CHANNEL, known })).toMatchObject({
-      publishedAt: '2026-09-20',
+      publishedAt: '2026-01-01',
       durationSeconds: 600,
     });
+    // A row without a date (never downloaded, listed without one) takes the entry's.
+    expect(
+      entryContext(entry(), { ...CHANNEL, known: { ...known, publishedAt: null } }),
+    ).toMatchObject({ publishedAt: '2026-09-20' });
+  });
+
+  it("judges a known video by its stored date, not the listing's approximate one", () => {
+    // A flat channel listing dates entries from "5 months ago": Shops vs Stax, published
+    // 2026-05-07, was listed as 2026-06-07. Revalidation removed it under `not older than 180
+    // days` by the stored date and the next check, judging the listing's, wanted it again,
+    // every six hours.
+    const now = new Date('2026-11-06T18:00:00Z');
+    const listed = entry({
+      uploadDate: null,
+      timestamp: Date.parse('2026-06-07T00:00:00Z') / 1000,
+    });
+    const rules = and(not({ type: 'older_than_days', days: 180 }));
+    expect(evaluateItem(listed, rules, { ...CHANNEL, now })).toEqual(accept);
+    expect(
+      evaluateItem(listed, rules, {
+        ...CHANNEL,
+        now,
+        known: { publishedAt: '2026-05-07', durationSeconds: 2114, liveStatus: null },
+      }),
+    ).toMatchObject({ accept: false, failing: ['not older than 180 days'] });
   });
 
   it('skips members-only entries under the default video rules; no badge is a match', () => {

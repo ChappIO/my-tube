@@ -59,9 +59,10 @@ export interface KnownItem {
  * next check. Then the source's matcher decides (`evaluateMatcher`); a miss is `no_match`.
  *
  * Entries without a date or duration are not dropped for it: the matcher treats the missing
- * value as unknown, and unknown counts as a match (flat listings sometimes omit dates, and
- * yt-dlp's flat dates are approximate to the day). A known item's stored facts fill the gaps
- * first (`ctx.known`), so the check and revalidation judge it alike.
+ * value as unknown, and unknown counts as a match (flat listings sometimes omit dates). A known
+ * item is dated by its stored date, never the listing's: yt-dlp's flat dates come from "5 months
+ * ago" and are weeks off, and revalidation judges the stored one. Its other stored facts fill
+ * the gaps (`ctx.known`), so the check and revalidation judge it alike.
  */
 export function evaluateItem(entry: SourceEntry, matcher: Matcher, ctx: EntryContext): RuleVerdict {
   if (entry.liveStatus === 'is_upcoming') return reject('upcoming', true);
@@ -74,14 +75,16 @@ export function evaluateItem(entry: SourceEntry, matcher: Matcher, ctx: EntryCon
 }
 
 /**
- * The matcher's view of a fetched entry. The entry's own facts first; what it lacks (no date in
- * a shorts listing, no duration) comes from `ctx.known`, the stored row, when there is one.
+ * The matcher's view of a fetched entry. The stored date wins over the entry's (a flat
+ * listing's date is approximate, the download's exact); for the rest the entry's own facts come
+ * first and what it lacks (no duration) comes from `ctx.known`, the stored row, when there is
+ * one.
  */
 export function entryContext(entry: SourceEntry, ctx: EntryContext): MatcherContext {
   return {
     title: entry.title,
     isShort: entry.isShort,
-    publishedAt: entryDate(entry) ?? ctx.known?.publishedAt ?? null,
+    publishedAt: ctx.known?.publishedAt ?? entryDate(entry),
     durationSeconds:
       entry.duration === null ? (ctx.known?.durationSeconds ?? null) : Math.round(entry.duration),
     liveStatus: entry.liveStatus ?? ctx.known?.liveStatus ?? null,
